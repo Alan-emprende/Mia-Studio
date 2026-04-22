@@ -1294,6 +1294,90 @@ body.dark-mode .ann-bar{filter:brightness(.88);}
 
 .vtop-back{background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.25);color:var(--goldl);width:34px;height:34px;border-radius:var(--r1);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.2s;}
 .vtop-back:hover{background:rgba(201,168,76,.3);}
+
+/* ── CURSO MODAL REDESIGN ── */
+.adm-modal-inner{background:var(--sw);border-radius:var(--r3);width:100%;max-width:680px;box-shadow:var(--s3);border:1px solid rgba(201,168,76,.18);position:relative;max-height:92vh;overflow-y:auto;animation:su .25s cubic-bezier(.4,0,.2,1);}
+.cmod-hdr{display:flex;align-items:center;justify-content:space-between;padding:22px 24px 0;position:sticky;top:0;background:var(--sw);z-index:5;border-bottom:1px solid var(--crd);padding-bottom:16px;}
+.cmod-hdr-title{font-family:var(--fd);font-size:22px;font-weight:500;color:var(--dark);}
+.cmod-hdr-sub{font-size:12.5px;color:var(--muted);margin-top:2px;}
+.cmod-close{background:var(--crd);border:none;width:30px;height:30px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:.15s;flex-shrink:0;}
+.cmod-close:hover{background:var(--c1);color:#fff;}
+.cmod-body{padding:20px 24px 24px;}
+/* secciones del form */
+.cform-section{margin-bottom:22px;}
+.cform-section-title{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:7px;}
+.cform-section-title::after{content:'';flex:1;height:1px;background:var(--crd);}
+/* campos mejorados */
+.cform-field{margin-bottom:14px;}
+.cform-field label{display:block;font-size:12.5px;font-weight:600;color:var(--dark);margin-bottom:5px;}
+.cform-field input,.cform-field textarea,.cform-field select{width:100%;padding:10px 13px;border:1.5px solid var(--crd);border-radius:var(--r2);font-family:var(--fb);font-size:13.5px;color:var(--dark);background:var(--cr);outline:none;transition:.2s;box-sizing:border-box;}
+.cform-field input:focus,.cform-field textarea:focus,.cform-field select:focus{border-color:var(--gold);background:var(--sw);}
+.cform-field textarea{resize:vertical;min-height:80px;}
+.cform-field .field-hint{font-size:11.5px;color:var(--muted);margin-top:4px;}
+/* grid 2 cols */
+.cform-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:500px){.cform-grid2{grid-template-columns:1fr;}}
+/* portada upload */
+.cform-cover{border:2px dashed var(--crd);border-radius:var(--r2);min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:.2s;position:relative;overflow:hidden;background:var(--cr);}
+.cform-cover:hover{border-color:var(--gold);background:var(--goldp);}
+.cform-cover.has-img{border-style:solid;border-color:var(--crd);background:transparent;padding:0;min-height:160px;}
+.cform-cover .cover-preview{width:100%;height:160px;object-fit:cover;border-radius:calc(var(--r2) - 2px);display:block;}
+.cform-cover .cover-clear-btn{display:none;position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;background:rgba(26,0,8,.75);border:none;color:#fff;cursor:pointer;font-size:12px;align-items:center;justify-content:center;}
+.cform-cover.has-img .cover-clear-btn{display:flex;}
+.cform-cover .cover-upload-input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.cform-cover-icon{font-size:28px;}
+.cform-cover-lbl{font-size:13px;color:var(--muted);font-weight:500;}
+.cform-cover-hint{font-size:11px;color:var(--muted);opacity:.75;}
+/* emoji + color row */
+.cform-emoji-row{display:flex;gap:12px;align-items:flex-end;}
+.cform-emoji-row .cform-field:first-child{width:90px;flex-shrink:0;}
+.cform-emoji-row .cform-field:last-child{flex:1;}
+/* precio section */
+.cform-price-box{background:linear-gradient(135deg,rgba(201,168,76,.08),rgba(201,168,76,.04));border:1.5px solid rgba(201,168,76,.3);border-radius:var(--r2);padding:16px 18px;}
+.cform-price-title{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--goldd);margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+/* estado badges */
+.cform-estado-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;}
+.cform-estado-btn{flex:1;min-width:140px;padding:10px 14px;border-radius:var(--r2);border:1.5px solid var(--crd);background:var(--cr);font-family:var(--fb);font-size:13px;cursor:pointer;transition:.2s;text-align:center;color:var(--muted);}
+.cform-estado-btn.active-open{border-color:#22c55e;background:rgba(34,197,94,.08);color:#16a34a;font-weight:600;}
+.cform-estado-btn.active-lock{border-color:var(--c1);background:rgba(140,0,38,.07);color:var(--c1);font-weight:600;}
+/* action buttons */
+.cform-actions{display:flex;gap:10px;margin-top:24px;padding-top:18px;border-top:1px solid var(--crd);flex-wrap:wrap;}
+.cform-save-btn{background:linear-gradient(135deg,var(--c1d),var(--c1));color:#fff;border:none;padding:12px 28px;border-radius:50px;font-family:var(--fb);font-size:14px;font-weight:600;cursor:pointer;transition:.2s;letter-spacing:.02em;}
+.cform-save-btn:hover{filter:brightness(1.1);transform:translateY(-1px);}
+.cform-cancel-btn{background:var(--cr);border:1.5px solid var(--crd);color:var(--muted);padding:12px 20px;border-radius:50px;font-family:var(--fb);font-size:14px;cursor:pointer;transition:.2s;}
+.cform-cancel-btn:hover{border-color:var(--dark);color:var(--dark);}
+/* nivel select custom */
+.cform-nivel-row{display:flex;gap:8px;flex-wrap:wrap;}
+.cform-nivel-opt{flex:1;min-width:90px;padding:9px 12px;border-radius:var(--r1);border:1.5px solid var(--crd);background:var(--cr);font-family:var(--fb);font-size:12.5px;cursor:pointer;transition:.2s;text-align:center;color:var(--muted);}
+.cform-nivel-opt.sel{border-color:var(--gold);background:var(--goldp);color:var(--goldd);font-weight:600;}
+/* dark mode */
+body.dark-mode .adm-modal-inner{background:#150608;border-color:#2a0a14;}
+body.dark-mode .cmod-hdr{background:#150608;border-color:#2a0a14;}
+body.dark-mode .cform-cover{background:#1a0008;border-color:#2a0a14;}
+
+/* ── SLOTS / TURNOS ── */
+.ict-slots-wrap{margin-top:10px;}
+.ict-slots-label{font-size:12px;font-weight:600;color:rgba(255,248,240,.65);margin-bottom:8px;letter-spacing:.04em;}
+.ict-slots-grid{display:flex;flex-wrap:wrap;gap:6px;}
+.ict-slot{padding:7px 13px;border-radius:50px;border:1px solid rgba(201,168,76,.3);background:rgba(255,255,255,.05);color:rgba(255,248,240,.75);font-size:12.5px;font-family:var(--fb);cursor:pointer;transition:.18s;white-space:nowrap;}
+.ict-slot:hover{border-color:rgba(201,168,76,.6);background:rgba(201,168,76,.1);color:var(--goldl);}
+.ict-slot.sel{border-color:var(--gold);background:rgba(201,168,76,.2);color:var(--goldl);font-weight:600;}
+.ict-slot.taken{opacity:.4;cursor:not-allowed;border-color:rgba(255,255,255,.1);text-decoration:line-through;}
+.ict-no-slots{font-size:13px;color:rgba(255,248,240,.4);font-style:italic;padding:8px 0;}
+.ict-step{display:none;}.ict-step.active{display:block;}
+.ict-steps-nav{display:flex;gap:6px;margin-bottom:14px;}
+.ict-step-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.2);transition:.2s;}
+.ict-step-dot.active{background:var(--gold);}
+/* Admin slots config */
+.adm-slots-wrap{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+.adm-slot-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.adm-slot-day{font-size:12.5px;font-weight:600;color:var(--dark);min-width:90px;}
+.adm-slot-times{display:flex;flex-wrap:wrap;gap:5px;flex:1;}
+.adm-slot-pill{background:var(--goldp);border:1px solid rgba(201,168,76,.3);border-radius:50px;padding:4px 11px;font-size:12px;font-family:var(--fb);color:var(--goldd);display:flex;align-items:center;gap:5px;cursor:default;}
+.adm-slot-del{background:none;border:none;color:var(--c1);cursor:pointer;font-size:13px;line-height:1;padding:0;}
+.adm-add-slot{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:flex-end;}
+.adm-add-slot select,.adm-add-slot input{flex:1;min-width:100px;}
+
 </style>
 </head>
 <body>
@@ -1343,7 +1427,7 @@ body.dark-mode .ann-bar{filter:brightness(.88);}
         <img src="data:image/jpeg;base64,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" class="logo-hero" alt="Mira Estudio">
       </div>
       <div class="hero-tag" id="hero-tag">✦ Cursos de pestañas profesionales</div>
-      <h1 id="hero-h1">Domina el arte<br>de las <em>pestañas</em><br>perfectas</h1>
+      <h1 id="hero-h1">Domina el arte de las <em>pestañas</em> perfectas</h1>
       <p id="hero-sub">Aprende las técnicas más demandadas del mercado con instructoras certificadas. Desde extensiones clásicas hasta volumen ruso avanzado.</p>
       <div class="hero-acts">
         <button class="btn-gold" id="hero-btn1" onclick="openAuth('r')">Comenzar gratis</button>
@@ -1413,30 +1497,48 @@ body.dark-mode .ann-bar{filter:brightness(.88);}
       <div class="icar-panel" id="icp-turnos">
         <div class="icp-turno">
           <div class="icp-tservs">
-            <div style="font-family:var(--fd);font-size:18px;color:var(--goldl);margin-bottom:8px;font-style:italic;">Elegi tu servicio</div>
-            <div class="icp-tserv" onclick="icarSetServ(this,'Extensiones Clasicas')"><span class="icp-tserv-icon">&#10024;</span><span class="icp-tserv-name">Extensiones Clasicas</span></div>
+            <div style="font-family:var(--fd);font-size:18px;color:var(--goldl);margin-bottom:8px;font-style:italic;">Elegí tu servicio</div>
+            <div class="icp-tserv" onclick="icarSetServ(this,'Extensiones Clásicas')"><span class="icp-tserv-icon">&#10024;</span><span class="icp-tserv-name">Extensiones Clásicas</span></div>
             <div class="icp-tserv" onclick="icarSetServ(this,'Volumen Ruso')"><span class="icp-tserv-icon">&#127800;</span><span class="icp-tserv-name">Volumen Ruso</span></div>
             <div class="icp-tserv" onclick="icarSetServ(this,'Mega Volumen & Color')"><span class="icp-tserv-icon">&#128142;</span><span class="icp-tserv-name">Mega Volumen &amp; Color</span></div>
             <div class="icp-tserv" onclick="icarSetServ(this,'Lifting & Laminado')"><span class="icp-tserv-icon">&#127769;</span><span class="icp-tserv-name">Lifting &amp; Laminado</span></div>
-            <div class="icp-tserv" onclick="icarSetServ(this,'Remocion Segura')"><span class="icp-tserv-icon">&#9986;</span><span class="icp-tserv-name">Remocion Segura</span></div>
+            <div class="icp-tserv" onclick="icarSetServ(this,'Remoción Segura')"><span class="icp-tserv-icon">&#9986;</span><span class="icp-tserv-name">Remoción Segura</span></div>
             <div class="icp-tserv" onclick="icarSetServ(this,'Consulta')"><span class="icp-tserv-icon">&#128172;</span><span class="icp-tserv-name">Consulta general</span></div>
           </div>
           <div class="icp-tform">
-            <div class="icp-tform-title">Solicita tu turno</div>
-            <div class="fg"><label>Nombre completo</label><input type="text" id="ict-name" placeholder="Tu nombre"></div>
-            <div class="row2">
-              <div class="fg"><label>WhatsApp / Telefono</label><input type="tel" id="ict-tel" placeholder="+54..."></div>
-              <div class="fg"><label>Servicio</label>
-                <select id="ict-serv">
-                  <option>Extensiones Clasicas</option><option>Volumen Ruso</option><option>Mega Volumen</option><option>Lifting</option><option>Remocion</option><option>Consulta</option>
-                </select>
+            <div class="icp-tform-title">Reservá tu turno</div>
+            <!-- Step dots -->
+            <div class="ict-steps-nav">
+              <div class="ict-step-dot active" id="sdot-0"></div>
+              <div class="ict-step-dot" id="sdot-1"></div>
+              <div class="ict-step-dot" id="sdot-2"></div>
+            </div>
+            <!-- Step 1: fecha + horario -->
+            <div class="ict-step active" id="ict-step-0">
+              <div class="fg"><label>📅 Fecha</label><input type="date" id="ict-date" onchange="icarLoadSlots()"></div>
+              <div class="ict-slots-wrap">
+                <div class="ict-slots-label">⏰ Horarios disponibles</div>
+                <div class="ict-slots-grid" id="ict-slots-grid"><div class="ict-no-slots">Elegí una fecha para ver los horarios</div></div>
+              </div>
+              <button class="btn-crimson" style="width:100%;padding:11px;font-size:13.5px;margin-top:12px;" onclick="icarNextStep(1)">Siguiente →</button>
+            </div>
+            <!-- Step 2: datos personales -->
+            <div class="ict-step" id="ict-step-1">
+              <div class="fg"><label>Nombre completo</label><input type="text" id="ict-name" placeholder="Tu nombre"></div>
+              <div class="fg"><label>WhatsApp / Teléfono</label><input type="tel" id="ict-tel" placeholder="+54..."></div>
+              <div class="fg"><label>Mensaje (opcional)</label><textarea id="ict-msg" rows="2" placeholder="¿Alguna consulta adicional?"></textarea></div>
+              <div style="display:flex;gap:8px;margin-top:10px;">
+                <button class="btn-g" style="flex:1;padding:10px;" onclick="icarNextStep(0)">← Volver</button>
+                <button class="btn-crimson" style="flex:2;padding:10px;font-size:13.5px;" onclick="icarSaveTurno()">&#10003; Confirmar turno</button>
               </div>
             </div>
-            <div class="row2">
-              <div class="fg"><label>Fecha preferida</label><input type="date" id="ict-date"></div>
-              <div class="fg"><label>Mensaje</label><textarea id="ict-msg" rows="1" placeholder="Opcional..."></textarea></div>
+            <!-- Step 3: confirmación -->
+            <div class="ict-step" id="ict-step-2" style="text-align:center;padding:16px 0;">
+              <div style="font-size:36px;margin-bottom:8px;">✅</div>
+              <div style="font-family:var(--fd);font-size:18px;color:var(--goldl);margin-bottom:6px;">¡Turno solicitado!</div>
+              <div style="font-size:13px;color:rgba(255,248,240,.65);line-height:1.6;" id="ict-confirm-txt"></div>
+              <button class="btn-g" style="margin-top:16px;padding:9px 22px;" onclick="icarNextStep(0);icarResetForm()">Hacer otra reserva</button>
             </div>
-            <button class="btn-crimson" style="width:100%;padding:12px;font-size:14px;margin-top:2px;" onclick="icarSaveTurno()">&#10003; Enviar solicitud</button>
           </div>
         </div>
       </div>
@@ -1877,10 +1979,11 @@ body.dark-mode .ann-bar{filter:brightness(.88);}
 <div id="view-course-viewer" class="view" style="flex-direction:column;height:100vh;overflow:hidden;">
 
   <!-- TOP BAR -->
-  <div class="vtop">
-    <button class="vtop-back" onclick="backDash()">←</button>
-    <div class="vcname" id="vcname">Curso</div>
-    <div class="vpw">
+  <div class="vtop" style="position:relative;overflow:hidden;">
+    <div id="vtop-cover" style="display:none;position:absolute;inset:0;background-size:cover;background-position:center;opacity:.18;z-index:0;pointer-events:none;"></div>
+    <button class="vtop-back" onclick="backDash()" style="position:relative;z-index:1;">←</button>
+    <div class="vcname" id="vcname" style="position:relative;z-index:1;">Curso</div>
+    <div class="vpw" style="position:relative;z-index:1;">
       <div class="vpbar"><div class="vpfill" id="vpf" style="width:0%"></div></div>
       <span class="vpt" id="vpt">0% completado</span>
     </div>
@@ -1947,7 +2050,7 @@ body.dark-mode .ann-bar{filter:brightness(.88);}
 
 <script>
 // ═══ STORAGE KEYS ═══
-const KU='ms_users',KS='ms_session',KC='ms_courses',KT='ms_turnos',KF='ms_faq',KI='ms_info',KFT='ms_features',KR='ms_recursos',KEB='ms_ebooks',KCF='ms_config',KES='ms_estetics',KBG='ms_herobg';
+const KU='ms_users',KS='ms_session',KC='ms_courses',KT='ms_turnos',KF='ms_faq',KI='ms_info',KFT='ms_features',KR='ms_recursos',KEB='ms_ebooks',KCF='ms_config',KES='ms_estetics',KBG='ms_herobg',KSL='ms_slots';
 
 // ═══ DEFAULT DATA ═══
 const DEF_COURSES=[
@@ -2204,7 +2307,7 @@ function buildCourseThumb(c){
   return `<div class="cctbg" style="background:${c.color||'linear-gradient(135deg,#3D0015,#8C0026)'}"></div><span class="ccte">${c.emoji}</span>`;
 }
 function buildPriceBadge(c){
-  if(!c.price||c.price==='0'||c.price===''||c.price==='Gratis') return '<span class="cct-price-badge cct-free-badge">Gratis</span>';
+  if(!c.price||c.price==='0'||c.price===''||c.price==='Gratis') return '';
   return `<span class="cct-price-badge">${c.price}</span>`;
 }
 function buildBuyBtn(c){
@@ -2382,9 +2485,9 @@ function updateViewerProgress(){
     return l&&(l.done||prog[l.id]);
   }).length;
   const pct=total>0?Math.round(done/total*100):0;
-  const fill=document.getElementById('vs-prog-fill');const txt=document.getElementById('vs-prog-txt');
+  const fill=document.getElementById('vs-pf');const txt=document.getElementById('vs-pt');
   const vfill=document.getElementById('vpf');const vpt=document.getElementById('vpt');
-  if(fill)fill.style.width=pct+'%';if(txt)txt.textContent=pct+'%';
+  if(fill)fill.style.width=pct+'%';if(txt)txt.textContent=done+' de '+total+' clases';
   if(vfill)vfill.style.width=pct+'%';if(vpt)vpt.textContent=pct+'% completado';
   // refresh sidebar icons
   renderVModules(c);
@@ -2489,7 +2592,7 @@ function admPage(name){
   if(pg)pg.classList.add('active');
   const renders={estetica:admRenderEstetica,textos:admRenderTextos,cursos:admRenderCursosList,
     ebooks:admRenderEbooksList,features:admRenderFeatsList,faq:admRenderFAQList,
-    info:admRenderInfoPage,recursos:admRenderRecsList,analytics:renderAnalytics,reviews:admRenderReviewsList,turnos:admRenderTurnosList,
+    info:admRenderInfoPage,recursos:admRenderRecsList,analytics:renderAnalytics,reviews:admRenderReviewsList,turnos:function(){ admRenderTurnosList(); admRenderSlots(); },
     usuarios:admRenderUsersList,config:admRenderConfig};
   if(renders[name])renders[name]();
 }
@@ -2692,6 +2795,7 @@ function admRenderCursosList(){
 function admNewCurso(){
   admCurEditId=null;
   document.getElementById('cmod-title').textContent='Nuevo curso';
+  const sub1=document.getElementById('cmod-sub');if(sub1)sub1.textContent='Completá los datos del nuevo curso';
   document.getElementById('cmod-body').innerHTML=admCursoForm({id:null,emoji:'📚',title:'',subtitle:'',description:'',level:'principiante',levelLabel:'Principiante',color:'#8C0026',locked:false,modules:[]},true);
   openOv('curso-modal');
 }
@@ -2699,60 +2803,121 @@ function admNewCurso(){
 function admEditCurso(id){
   admCurEditId=id;
   const c=gc().find(x=>x.id===id);if(!c)return;
-  document.getElementById('cmod-title').textContent='Editar: '+c.title;
+  document.getElementById('cmod-title').textContent='Editar curso';
+  const sub2=document.getElementById('cmod-sub');if(sub2)sub2.textContent=c.title;
   document.getElementById('cmod-body').innerHTML=admCursoForm(c,false);
   openOv('curso-modal');
 }
 
 function admCursoForm(c,isNew){
   const coverHtml=c.coverImg
-    ?`<div class="cover-upload-area has-img" id="cover-drop" onclick="document.getElementById('ce-cover-inp').click()"><img class="cover-preview" src="${c.coverImg}" id="cover-preview-img"><button class="cover-clear-btn" onclick="event.stopPropagation();clearCoverImg()">✕</button><input type="file" class="cover-upload-input" id="ce-cover-inp" accept="image/*" onchange="onCoverImgChange(event)"></div>`
-    :`<div class="cover-upload-area" id="cover-drop" onclick="document.getElementById('ce-cover-inp').click()"><div style="font-size:32px;">🖼</div><div class="cover-upload-lbl">Subir imagen de portada</div><div class="cover-upload-hint">JPG, PNG o WebP · Recomendado 800×450px</div><input type="file" class="cover-upload-input" id="ce-cover-inp" accept="image/*" onchange="onCoverImgChange(event)"></div>`;
+    ?`<div class="cform-cover has-img" id="cover-drop" onclick="document.getElementById('ce-cover-inp').click()"><img class="cover-preview" src="${c.coverImg}" id="cover-preview-img"><button class="cover-clear-btn" onclick="event.stopPropagation();clearCoverImg()">✕</button><input type="file" class="cover-upload-input" id="ce-cover-inp" accept="image/*" onchange="onCoverImgChange(event)"></div>`
+    :`<div class="cform-cover" id="cover-drop" onclick="document.getElementById('ce-cover-inp').click()"><div class="cform-cover-icon">🖼</div><div class="cform-cover-lbl">Subir imagen de portada</div><div class="cform-cover-hint">JPG, PNG o WebP · Recomendado 800×450px</div><input type="file" class="cover-upload-input" id="ce-cover-inp" accept="image/*" onchange="onCoverImgChange(event)"></div>`;
   const mods=isNew?'':`
-    <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px;">
-      <div style="font-family:var(--fd);font-size:16px;color:var(--dark);">Módulos y clases (${(c.modules||[]).length} módulos)</div>
-      <button class="abtn-add" style="font-size:12px;padding:6px 14px;" onclick="admAddModule()">+ Módulo</button>
-    </div>
-    <div id="ce-modules">${admRenderModsInline(c)}</div>`;
-  return`
-    <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Portada del curso</div>
-    ${coverHtml}
-    <input type="hidden" id="ce-cover-data" value="${c.coverImg||''}">
-    <div class="adm-grid2" style="margin-top:14px;">
-      <div class="fg"><label>Emoji/Ícono</label><input type="text" id="ce-emoji" value="${c.emoji||'📚'}" placeholder="✨"></div>
-      <div class="fg"><label>Color de fondo (si no hay portada)</label><input type="color" id="ce-color" value="${c.color||'#8C0026'}"></div>
-    </div>
-    <div class="fg"><label>Título del curso</label><input type="text" id="ce-title" value="${c.title}" placeholder="Nombre del curso"></div>
-    <div class="fg"><label>Subtítulo corto</label><input type="text" id="ce-subtitle" value="${c.subtitle||''}" placeholder="Frase breve de impacto"></div>
-    <div class="fg"><label>Descripción completa</label><textarea id="ce-desc" rows="3">${c.description||''}</textarea></div>
-    <div class="price-section">
-      <h4>💰 Precio & Pago</h4>
-      <div class="adm-grid2">
-        <div class="fg" style="margin:0;"><label>Precio</label><input type="text" id="ce-price" value="${c.price||''}" placeholder="Gratis · $9.990 · USD 29"></div>
-        <div class="fg" style="margin:0;"><label>Link de pago (MercadoPago, Stripe, etc.)</label><input type="text" id="ce-paylink" value="${c.payLink||''}" placeholder="https://mpago.la/..."></div>
-      </div>
-    </div>
-    <div class="adm-grid2" style="margin-top:10px;">
-      <div class="fg"><label>Nivel</label>
-        <select id="ce-level">
-          <option value="principiante"${c.level==='principiante'?' selected':''}>Principiante</option>
-          <option value="intermedio"${c.level==='intermedio'?' selected':''}>Intermedio</option>
-          <option value="avanzado"${c.level==='avanzado'?' selected':''}>Avanzado</option>
-        </select>
-      </div>
-      <div class="fg"><label>Etiqueta del nivel</label><input type="text" id="ce-levlbl" value="${c.levelLabel||'Principiante'}"></div>
-    </div>
-    <div class="fg"><label>Estado</label>
-      <select id="ce-locked">
-        <option value="0"${!c.locked?' selected':''}>🔓 Disponible para alumnas</option>
-        <option value="1"${c.locked?' selected':''}>🔒 Bloqueado / Próximamente</option>
-      </select>
-    </div>
-    ${mods}
-    <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;">
-      <button class="abtn" onclick="admSaveCurso(${isNew})">${isNew?'Crear curso':'Guardar cambios'}</button>
-      <button class="abtn-g" onclick="closeOv('curso-modal')">Cancelar</button>
+    <div class="cform-section">
+      <div class="cform-section-title">📋 Módulos y clases <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:12px;">(${(c.modules||[]).length} módulos)</span></div>
+      <button class="abtn-add" style="font-size:12px;padding:7px 16px;margin-bottom:12px;" onclick="admAddModule()">+ Agregar módulo</button>
+      <div id="ce-modules">${admRenderModsInline(c)}</div>
     </div>`;
+  return`
+    <!-- SECCIÓN: PORTADA -->
+    <div class="cform-section">
+      <div class="cform-section-title">🖼 Portada visual</div>
+      ${coverHtml}
+      <input type="hidden" id="ce-cover-data" value="${c.coverImg||''}">
+      <div class="cform-emoji-row" style="margin-top:12px;">
+        <div class="cform-field">
+          <label>Emoji</label>
+          <input type="text" id="ce-emoji" value="${c.emoji||'📚'}" placeholder="✨" style="text-align:center;font-size:22px;">
+        </div>
+        <div class="cform-field" style="flex:1;">
+          <label>Color de fondo <span style="font-weight:400;color:var(--muted);">(si no hay imagen)</span></label>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <input type="color" id="ce-color" value="${c.color||'#8C0026'}" style="width:44px;height:40px;border:none;border-radius:var(--r1);cursor:pointer;flex-shrink:0;">
+            <span style="font-size:12px;color:var(--muted);">Usá el color de marca</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN: INFO BÁSICA -->
+    <div class="cform-section">
+      <div class="cform-section-title">✏️ Información del curso</div>
+      <div class="cform-field">
+        <label>Título del curso</label>
+        <input type="text" id="ce-title" value="${c.title}" placeholder="Ej: Extensiones Clásicas — Nivel Completo">
+      </div>
+      <div class="cform-field">
+        <label>Subtítulo <span style="font-weight:400;color:var(--muted);">· frase corta de impacto</span></label>
+        <input type="text" id="ce-subtitle" value="${c.subtitle||''}" placeholder="Ej: La base perfecta para tu carrera profesional">
+      </div>
+      <div class="cform-field">
+        <label>Descripción completa</label>
+        <textarea id="ce-desc" rows="3" placeholder="Contale a las alumnas qué van a aprender, para quién es el curso y qué incluye...">${c.description||''}</textarea>
+      </div>
+    </div>
+
+    <!-- SECCIÓN: PRECIO -->
+    <div class="cform-section">
+      <div class="cform-section-title">💰 Precio y venta</div>
+      <div class="cform-price-box">
+        <div class="cform-price-title">💳 Configuración de pago</div>
+        <div class="cform-grid2">
+          <div class="cform-field" style="margin:0;">
+            <label>Precio</label>
+            <input type="text" id="ce-price" value="${c.price||''}" placeholder="Gratis · $9.990 · USD 29">
+            <div class="field-hint">Dejá vacío para "Gratis"</div>
+          </div>
+          <div class="cform-field" style="margin:0;">
+            <label>Link de pago</label>
+            <input type="text" id="ce-paylink" value="${c.payLink||''}" placeholder="https://mpago.la/...">
+            <div class="field-hint">MercadoPago, Stripe, Hotmart, etc.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN: NIVEL Y ESTADO -->
+    <div class="cform-section">
+      <div class="cform-section-title">🎓 Nivel y visibilidad</div>
+      <div class="cform-grid2">
+        <div class="cform-field">
+          <label>Nivel</label>
+          <select id="ce-level" onchange="document.getElementById('ce-levlbl').value=this.options[this.selectedIndex].text">
+            <option value="principiante"${c.level==='principiante'?' selected':''}>Principiante</option>
+            <option value="intermedio"${c.level==='intermedio'?' selected':''}>Intermedio</option>
+            <option value="avanzado"${c.level==='avanzado'?' selected':''}>Avanzado</option>
+          </select>
+        </div>
+        <div class="cform-field">
+          <label>Etiqueta del nivel <span style="font-weight:400;color:var(--muted);">· se muestra al alumno</span></label>
+          <input type="text" id="ce-levlbl" value="${c.levelLabel||'Principiante'}" placeholder="Principiante">
+        </div>
+      </div>
+      <div class="cform-field" style="margin-top:4px;">
+        <label>Estado del curso</label>
+        <div style="display:flex;gap:10px;margin-top:6px;">
+          <button type="button" class="cform-estado-btn ${!c.locked?'active-open':''}" id="btn-estado-open" onclick="cformSetEstado(false)">🔓 Disponible para alumnas</button>
+          <button type="button" class="cform-estado-btn ${c.locked?'active-lock':''}" id="btn-estado-lock" onclick="cformSetEstado(true)">🔒 Bloqueado / Próximamente</button>
+        </div>
+        <input type="hidden" id="ce-locked" value="${c.locked?'1':'0'}">
+      </div>
+    </div>
+
+    ${mods}
+
+    <div class="cform-actions">
+      <button class="cform-save-btn" onclick="admSaveCurso(${isNew})">${isNew?'✓ Crear curso':'✓ Guardar cambios'}</button>
+      <button class="cform-cancel-btn" onclick="closeOv('curso-modal')">Cancelar</button>
+    </div>`;
+}
+
+function cformSetEstado(locked){
+  document.getElementById('ce-locked').value = locked ? '1' : '0';
+  const btnOpen = document.getElementById('btn-estado-open');
+  const btnLock = document.getElementById('btn-estado-lock');
+  if(btnOpen){ btnOpen.className = 'cform-estado-btn' + (!locked?' active-open':''); }
+  if(btnLock){ btnLock.className = 'cform-estado-btn' + (locked?' active-lock':''); }
 }
 
 function admRenderModsInline(c){
@@ -3182,24 +3347,106 @@ function admSaveCfgDash(){
     if(!isOpen || !toggle){ target.classList.add('open'); }
   }
 
+  // ── SLOT HELPERS ──────────────────────────────────
+  function gSlots(){ try{ return JSON.parse(localStorage.getItem('ms_slots')||'[]'); }catch(e){ return []; } }
+  function sSlots(v){ localStorage.setItem('ms_slots',JSON.stringify(v)); }
+
+  // Default slots if admin hasn't configured any
+  const DEFAULT_SLOTS = [
+    {day:'Lunes',times:['09:00','10:30','12:00','15:00','16:30']},
+    {day:'Martes',times:['09:00','10:30','14:00','15:30']},
+    {day:'Miércoles',times:['09:00','11:00','14:00','16:00']},
+    {day:'Jueves',times:['10:00','11:30','15:00','16:30']},
+    {day:'Viernes',times:['09:00','10:30','12:00','14:00']},
+    {day:'Sábado',times:['09:00','10:30','12:00']},
+  ];
+
+  function getSlotsForDate(dateStr){
+    if(!dateStr) return [];
+    const d = new Date(dateStr + 'T00:00:00');
+    const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    const dayName = days[d.getDay()];
+    const cfg = gSlots();
+    const source = cfg.length ? cfg : DEFAULT_SLOTS;
+    const daySlots = source.find(s => s.day === dayName);
+    return daySlots ? daySlots.times : [];
+  }
+
+  function getTakenSlots(dateStr){
+    // slots already booked for that date
+    return gT().filter(t => t.date === dateStr && t.status !== 'cancelled').map(t => t.time);
+  }
+
+  window.icarLoadSlots = function(){
+    const dateStr = document.getElementById('ict-date').value;
+    const grid = document.getElementById('ict-slots-grid');
+    if(!grid) return;
+    if(!dateStr){ grid.innerHTML = '<div class="ict-no-slots">Elegí una fecha para ver los horarios</div>'; return; }
+    const slots = getSlotsForDate(dateStr);
+    const taken = getTakenSlots(dateStr);
+    if(!slots.length){ grid.innerHTML = '<div class="ict-no-slots">No hay horarios disponibles para ese día</div>'; return; }
+    grid.innerHTML = slots.map(t => {
+      const isTaken = taken.includes(t);
+      return `<div class="ict-slot${isTaken?' taken':''}" ${isTaken?'':'onclick="icarSelSlot(this,''+t+'')"'}>${t}${isTaken?' 🚫':''}</div>`;
+    }).join('');
+  };
+
+  let _selSlot = '';
+  window.icarSelSlot = function(el, time){
+    document.querySelectorAll('.ict-slot').forEach(e => e.classList.remove('sel'));
+    el.classList.add('sel');
+    _selSlot = time;
+  };
+
   window.icarSetServ = function(el, serv){
     document.querySelectorAll('.icp-tserv').forEach(e => e.classList.remove('sel'));
     el.classList.add('sel');
-    const sel = document.getElementById('ict-serv');
-    if(sel) sel.value = serv;
+    window._selServ = serv;
+  };
+
+  let _currentStep = 0;
+  window.icarNextStep = function(step){
+    if(step === 1){
+      // validate step 0
+      const date = document.getElementById('ict-date').value;
+      if(!date){ toast('⚠️ Elegí una fecha'); return; }
+      if(!_selSlot){ toast('⚠️ Elegí un horario disponible'); return; }
+    }
+    _currentStep = step;
+    [0,1,2].forEach(i => {
+      document.getElementById('ict-step-'+i).classList.toggle('active', i===step);
+      document.getElementById('sdot-'+i).classList.toggle('active', i===step);
+    });
+  };
+
+  window.icarResetForm = function(){
+    _selSlot = '';
+    _selServ = '';
+    _currentStep = 0;
+    ['ict-name','ict-tel','ict-date','ict-msg'].forEach(id=>{ const el=document.getElementById(id); if(el)el.value=''; });
+    document.querySelectorAll('.icp-tserv').forEach(e=>e.classList.remove('sel'));
+    const grid=document.getElementById('ict-slots-grid');
+    if(grid) grid.innerHTML='<div class="ict-no-slots">Elegí una fecha para ver los horarios</div>';
   };
 
   window.icarSaveTurno = function(){
     const name = document.getElementById('ict-name').value.trim();
     const tel  = document.getElementById('ict-tel').value.trim();
+    const date = document.getElementById('ict-date').value;
     if(!name || !tel){ toast('⚠️ Nombre y teléfono son requeridos'); return; }
+    if(!date || !_selSlot){ toast('⚠️ Falta fecha u horario'); return; }
+    const serv = window._selServ || 'Consulta';
     const t = gT();
-    t.push({id:Date.now(),name,tel,serv:document.getElementById('ict-serv').value,date:document.getElementById('ict-date').value,msg:document.getElementById('ict-msg').value.trim(),ts:new Date().toLocaleDateString('es-AR')});
+    t.push({
+      id:Date.now(), name, tel, serv, date, time:_selSlot,
+      msg:document.getElementById('ict-msg').value.trim(),
+      status:'pending', ts:new Date().toLocaleDateString('es-AR')
+    });
     sT(t);
-    ['ict-name','ict-tel','ict-date','ict-msg'].forEach(id=>{ const el=document.getElementById(id); if(el)el.value=''; });
-    if(typeof pushNotif==='function')pushNotif('📅','Solicitud de turno enviada correctamente');
-    document.querySelectorAll('.icp-tserv').forEach(e=>e.classList.remove('sel'));
-    toast('✅ Solicitud enviada. Te contactamos pronto!');
+    if(typeof pushNotif==='function') pushNotif('📅','Turno solicitado correctamente');
+    const confirmTxt = document.getElementById('ict-confirm-txt');
+    if(confirmTxt) confirmTxt.innerHTML = `<strong>${serv}</strong><br>${date} a las <strong>${_selSlot}</strong><br>Te contactamos al ${tel} para confirmar.`;
+    icarNextStep(2);
   };
 
   // touch / drag support
@@ -3601,6 +3848,81 @@ function renderAnalytics(){
 }
 
 // ═══ TURNOS CON ESTADOS Y WHATSAPP ═══
+
+// ── ADMIN SLOTS MANAGEMENT ──────────────────────────
+const DEFAULT_SLOTS_ADM = [
+  {day:'Lunes',times:['09:00','10:30','12:00','15:00','16:30']},
+  {day:'Martes',times:['09:00','10:30','14:00','15:30']},
+  {day:'Miércoles',times:['09:00','11:00','14:00','16:00']},
+  {day:'Jueves',times:['10:00','11:30','15:00','16:30']},
+  {day:'Viernes',times:['09:00','10:30','12:00','14:00']},
+  {day:'Sábado',times:['09:00','10:30','12:00']},
+];
+
+function gSlotsAdm(){ try{ return JSON.parse(localStorage.getItem('ms_slots')||'[]'); }catch(e){ return []; } }
+function sSlotsAdm(v){ localStorage.setItem('ms_slots',JSON.stringify(v)); }
+
+function admRenderSlots(){
+  const el = document.getElementById('adm-slots-list');
+  if(!el) return;
+  const slots = gSlotsAdm();
+  const source = slots.length ? slots : DEFAULT_SLOTS_ADM;
+  if(!source.length){ el.innerHTML = '<p style="font-size:13px;color:var(--muted);">No hay horarios configurados.</p>'; return; }
+  el.innerHTML = source.map(row => `
+    <div class="adm-slot-row">
+      <div class="adm-slot-day">${row.day}</div>
+      <div class="adm-slot-times">
+        ${row.times.map(t => `
+          <div class="adm-slot-pill">
+            ${t}
+            <button class="adm-slot-del" onclick="admDelSlot('${row.day}','${t}')" title="Eliminar">✕</button>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function admAddSlot(){
+  const day = document.getElementById('adm-slot-day').value;
+  const time = document.getElementById('adm-slot-time').value;
+  if(!time){ toast('⚠️ Elegí un horario'); return; }
+  let slots = gSlotsAdm();
+  if(!slots.length) slots = JSON.parse(JSON.stringify(DEFAULT_SLOTS_ADM));
+  const row = slots.find(s => s.day === day);
+  if(row){
+    if(row.times.includes(time)){ toast('Ese horario ya existe'); return; }
+    row.times.push(time);
+    row.times.sort();
+  } else {
+    slots.push({day, times:[time]});
+  }
+  sSlotsAdm(slots);
+  admRenderSlots();
+  toast('✅ Horario agregado');
+}
+
+function admDelSlot(day, time){
+  let slots = gSlotsAdm();
+  if(!slots.length) slots = JSON.parse(JSON.stringify(DEFAULT_SLOTS_ADM));
+  const row = slots.find(s => s.day === day);
+  if(!row) return;
+  row.times = row.times.filter(t => t !== time);
+  if(!row.times.length) slots = slots.filter(s => s.day !== day);
+  sSlotsAdm(slots);
+  admRenderSlots();
+  toast('Horario eliminado');
+}
+
+function admResetSlots(){
+  if(!confirm('¿Restaurar los horarios por defecto? Se borrarán los cambios.')) return;
+  localStorage.removeItem('ms_slots');
+  admRenderSlots();
+  toast('↺ Horarios restaurados');
+}
+
+// Hook into admRenderTurnosList to also render slots
+const _origRenderTurnos = typeof admRenderTurnosList !== 'undefined' ? admRenderTurnosList : null;
+
+
 function admRenderTurnosList(){
   const turnos = gT();
   const el = document.getElementById('adm-turnos-content');
@@ -3619,7 +3941,7 @@ function admRenderTurnosList(){
       <button class="abtn" onclick="exportTurnosCSV()" style="font-size:12px;padding:6px 14px;">⬇ Exportar CSV</button>
     </div>
     <table class="atbl">
-      <thead><tr><th>Alumna</th><th>WhatsApp</th><th>Servicio</th><th>Fecha</th><th>Mensaje</th><th>Estado</th><th>Acción</th></tr></thead>
+      <thead><tr><th>Alumna</th><th>WhatsApp</th><th>Servicio</th><th>Fecha y hora</th><th>Mensaje</th><th>Estado</th><th>Acción</th></tr></thead>
       <tbody>${turnos.map(t => {
         const st = t.status || 'pending';
         return `<tr id="trow-${t.id}">
@@ -3632,7 +3954,7 @@ function admRenderTurnosList(){
             </button>
           </td>
           <td><span class="adm-badge">${t.serv}</span></td>
-          <td style="font-size:13px;">${t.date||'—'}</td>
+          <td style="font-size:13px;">${t.date||'—'}${t.time?'<br><span style="background:rgba(201,168,76,.15);color:var(--goldd);font-size:11px;font-weight:600;padding:2px 7px;border-radius:50px;">⏰ '+t.time+'</span>':''}</td>
           <td style="max-width:160px;font-size:12px;color:var(--muted);">${t.msg||'—'}</td>
           <td>
             <select class="turno-status ${statusClass[st]}" onchange="changeTurnoStatus(${t.id},this.value,this)" style="border:none;outline:none;cursor:pointer;font-size:11px;font-weight:600;padding:4px 8px;border-radius:50px;font-family:var(--fb);">
@@ -3646,6 +3968,14 @@ function admRenderTurnosList(){
       }).join('')}
       </tbody>
     </table></div>`;
+}
+
+function admDeleteTurno(id){
+  if(!confirm('¿Eliminar este turno?')) return;
+  const turnos = gT().filter(t => t.id !== id);
+  localStorage.setItem(KT, JSON.stringify(turnos));
+  admRenderTurnosList();
+  toast('Turno eliminado');
 }
 
 function changeTurnoStatus(id, newStatus, selectEl){
@@ -5920,7 +6250,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
     </div>
 
     <div class="adm-pg" id="adm-turnos">
-      <div class="adm-pghdr"><h2>📅 Turnos recibidos</h2><p>Solicitudes de turno enviadas por las alumnas.</p></div>
+      <div class="adm-pghdr"><h2>📅 Turnos</h2><p>Configurá los horarios disponibles y gestioná las solicitudes recibidas.</p></div>
+
+      <!-- SLOTS CONFIG -->
+      <div class="acard" style="margin-bottom:16px;">
+        <h3 style="font-family:var(--fd);font-size:16px;font-weight:500;color:var(--dark);margin-bottom:4px;">⏰ Horarios disponibles</h3>
+        <p style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">Definí los días y horarios que los clientes pueden elegir al reservar. Si no configurás nada se usan los horarios por defecto.</p>
+        <div class="adm-slots-wrap" id="adm-slots-list"></div>
+        <div class="adm-add-slot" style="margin-top:14px;">
+          <select id="adm-slot-day" style="flex:1;min-width:110px;">
+            <option value="Lunes">Lunes</option><option value="Martes">Martes</option>
+            <option value="Miércoles">Miércoles</option><option value="Jueves">Jueves</option>
+            <option value="Viernes">Viernes</option><option value="Sábado">Sábado</option>
+            <option value="Domingo">Domingo</option>
+          </select>
+          <input type="time" id="adm-slot-time" style="flex:1;min-width:100px;">
+          <button class="abtn" onclick="admAddSlot()" style="flex-shrink:0;white-space:nowrap;">+ Agregar</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+          <button class="abtn-g" onclick="admResetSlots()" style="font-size:12px;padding:6px 14px;">↺ Restaurar por defecto</button>
+        </div>
+      </div>
+
+      <!-- TURNOS LIST -->
       <div id="adm-turnos-content"></div>
     </div>
 
@@ -6037,11 +6389,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
 <!-- COURSE EDITOR MODAL -->
 <div class="ov" id="curso-modal" onclick="hovClick(event,'curso-modal')">
   <div class="adm-modal-inner">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-      <div style="font-family:var(--fd);font-size:21px;color:var(--dark);" id="cmod-title">Editar curso</div>
-      <button class="auth-close" onclick="closeOv('curso-modal')">✕</button>
+    <div class="cmod-hdr">
+      <div>
+        <div class="cmod-hdr-title" id="cmod-title">Editar curso</div>
+        <div class="cmod-hdr-sub" id="cmod-sub">Completá los datos del curso</div>
+      </div>
+      <button class="cmod-close" onclick="closeOv('curso-modal')">✕</button>
     </div>
-    <div id="cmod-body"></div>
+    <div class="cmod-body" id="cmod-body"></div>
   </div>
 </div>
 
