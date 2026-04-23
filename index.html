@@ -3387,7 +3387,7 @@ function admSaveCfgDash(){
     if(!slots.length){ grid.innerHTML = '<div class="ict-no-slots">No hay horarios disponibles para ese día</div>'; return; }
     grid.innerHTML = slots.map(t => {
       const isTaken = taken.includes(t);
-      return `<div class="ict-slot${isTaken?' taken':''}" ${isTaken?'':'onclick="icarSelSlot(this,''+t+'')"'}>${t}${isTaken?' 🚫':''}</div>`;
+      const cls='ict-slot'+(isTaken?' taken':''); const clickH=isTaken?'':'onclick="icarSelSlot(this,\''+t+'\')"'; return '<div class="'+cls+'" '+clickH+'>'+t+(isTaken?' 🚫':'')+'</div>';
     }).join('');
   };
 
@@ -3919,9 +3919,7 @@ function admResetSlots(){
   toast('↺ Horarios restaurados');
 }
 
-// Hook into admRenderTurnosList to also render slots
-const _origRenderTurnos = typeof admRenderTurnosList !== 'undefined' ? admRenderTurnosList : null;
-
+// Admin turnos slots are rendered via admPage hook
 
 function admRenderTurnosList(){
   const turnos = gT();
