@@ -1378,6 +1378,14 @@ body.dark-mode .cform-cover{background:#1a0008;border-color:#2a0a14;}
 .adm-add-slot{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:flex-end;}
 .adm-add-slot select,.adm-add-slot input{flex:1;min-width:100px;}
 
+
+/* ── AUTH FIELD ERRORS ── */
+.fg-error input,.fg-error textarea,.fg-error select{border-color:#e53e3e !important;background:#fff5f5;}
+.fg-error .field-err-msg{display:block;}
+.field-err-msg{display:none;font-size:11.5px;color:#c53030;margin-top:4px;font-weight:500;}
+.auth-error{background:#fde8e8;border:1px solid #fbb;color:#8B0000;padding:10px 13px;border-radius:var(--r1);font-size:13px;margin-bottom:12px;display:none;display:flex;align-items:center;gap:8px;}
+.auth-error .auth-err-icon{font-size:16px;flex-shrink:0;}
+
 </style>
 </head>
 <body>
@@ -1588,18 +1596,18 @@ body.dark-mode .cform-cover{background:#1a0008;border-color:#2a0a14;}
       <button class="auth-tab active" id="tab-l" onclick="switchTab('l')">Iniciar sesión</button>
       <button class="auth-tab" id="tab-r" onclick="switchTab('r')">Crear cuenta</button>
     </div>
-    <div id="auth-err" class="auth-error"></div>
+    <div id="auth-err" class="auth-error" style="display:none;"><span class="auth-err-icon">⚠️</span><span id="auth-err-txt"></span></div>
     <div id="form-l">
-      <div class="fg"><label>Email</label><input type="email" id="li-email" placeholder="tu@email.com"></div>
-      <div class="fg"><label>Contraseña</label><input type="password" id="li-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="fg" id="fg-li-email"><label>Email</label><input type="email" id="li-email" placeholder="tu@email.com" oninput="clearFieldErr('fg-li-email')"><span class="field-err-msg" id="err-li-email"></span></div>
+      <div class="fg" id="fg-li-pass"><label>Contraseña</label><input type="password" id="li-pass" placeholder="••••••••" oninput="clearFieldErr('fg-li-pass')" onkeydown="if(event.key==='Enter')doLogin()"><span class="field-err-msg" id="err-li-pass"></span></div>
       <button class="btn-auth" onclick="doLogin()">Iniciar sesión</button>
       <div class="auth-divider">— acceso rápido —</div>
       <button class="auth-demo" onclick="demoLogin()">🎓 Entrar como alumna demo</button>
     </div>
     <div id="form-r" style="display:none;">
-      <div class="fg"><label>Nombre completo</label><input type="text" id="rg-name" placeholder="Tu nombre"></div>
-      <div class="fg"><label>Email</label><input type="email" id="rg-email" placeholder="tu@email.com"></div>
-      <div class="fg"><label>Contraseña</label><input type="password" id="rg-pass" placeholder="Mínimo 6 caracteres" onkeydown="if(event.key==='Enter')doRegister()"></div>
+      <div class="fg" id="fg-rg-name"><label>Nombre completo</label><input type="text" id="rg-name" placeholder="Tu nombre" oninput="clearFieldErr('fg-rg-name')"><span class="field-err-msg" id="err-rg-name"></span></div>
+      <div class="fg" id="fg-rg-email"><label>Email</label><input type="email" id="rg-email" placeholder="tu@email.com" oninput="clearFieldErr('fg-rg-email')"><span class="field-err-msg" id="err-rg-email"></span></div>
+      <div class="fg" id="fg-rg-pass"><label>Contraseña</label><input type="password" id="rg-pass" placeholder="Mínimo 6 caracteres" oninput="clearFieldErr('fg-rg-pass')" onkeydown="if(event.key==='Enter')doRegister()"><span class="field-err-msg" id="err-rg-pass"></span></div>
       <button class="btn-auth" onclick="doRegister()">Crear cuenta gratis</button>
     </div>
   </div>
@@ -2170,7 +2178,7 @@ function checkKey(){
 // ═══ AUTH ═══
 let currentUser=null,currentCourseId=0,lessonFlat=[],lessonIdx=0,fabOpen=false;
 
-function openAuth(t){openOv('auth-ov');switchTab(t);hideErr();}
+function openAuth(t){openOv('auth-ov');switchTab(t);if(typeof clearAllFieldErrs==='function')clearAllFieldErrs();else hideErr();}
 function switchTab(t){
   document.getElementById('form-l').style.display=t==='l'?'':'none';
   document.getElementById('form-r').style.display=t==='r'?'':'none';
@@ -2178,20 +2186,75 @@ function switchTab(t){
   document.getElementById('tab-r').className='auth-tab'+(t==='r'?' active':'');
   hideErr();
 }
-function showErr(m){const e=document.getElementById('auth-err');e.textContent=m;e.style.display='';}
-function hideErr(){document.getElementById('auth-err').style.display='none';}
+function showErr(m){
+  const e=document.getElementById('auth-err');
+  const t=document.getElementById('auth-err-txt');
+  if(t)t.textContent=m; else e.textContent=m;
+  e.style.display='flex';
+}
+function hideErr(){
+  const e=document.getElementById('auth-err');
+  if(e)e.style.display='none';
+}
+function showFieldErr(fieldId, msg){
+  const fg=document.getElementById(fieldId);
+  if(!fg)return;
+  fg.classList.add('fg-error');
+  const span=fg.querySelector('.field-err-msg');
+  if(span){span.textContent=msg;span.style.display='block';}
+}
+function clearFieldErr(fieldId){
+  const fg=document.getElementById(fieldId);
+  if(!fg)return;
+  fg.classList.remove('fg-error');
+  const span=fg.querySelector('.field-err-msg');
+  if(span){span.textContent='';span.style.display='none';}
+  hideErr();
+}
+function clearAllFieldErrs(){
+  document.querySelectorAll('.fg-error').forEach(el=>{
+    el.classList.remove('fg-error');
+    const s=el.querySelector('.field-err-msg');
+    if(s){s.textContent='';s.style.display='none';}
+  });
+  hideErr();
+}
 function doLogin(){
-  const em=document.getElementById('li-email').value.trim(),pw=document.getElementById('li-pass').value;
-  if(!em||!pw){showErr('Completa todos los campos.');return;}
+  clearAllFieldErrs();
+  const em=document.getElementById('li-email').value.trim();
+  const pw=document.getElementById('li-pass').value;
+  let ok=true;
+  if(!em){showFieldErr('fg-li-email','Ingresá tu email');ok=false;}
+  else if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){showFieldErr('fg-li-email','Email inválido');ok=false;}
+  if(!pw){showFieldErr('fg-li-pass','Ingresá tu contraseña');ok=false;}
+  if(!ok)return;
   const u=gU().find(x=>x.email===em&&x.pass===pw);
-  if(!u){showErr('Email o contraseña incorrectos.');return;}
+  if(!u){
+    showFieldErr('fg-li-email','Email o contraseña incorrectos');
+    showFieldErr('fg-li-pass','Email o contraseña incorrectos');
+    showErr('No encontramos una cuenta con esos datos.');
+    return;
+  }
   loginOk(u);
 }
 function doRegister(){
-  const nm=document.getElementById('rg-name').value.trim(),em=document.getElementById('rg-email').value.trim(),pw=document.getElementById('rg-pass').value;
-  if(!nm||!em||!pw){showErr('Completa todos los campos.');return;}
-  if(pw.length<6){showErr('Mínimo 6 caracteres.');return;}
-  const users=gU();if(users.find(x=>x.email===em)){showErr('Ya existe esa cuenta.');return;}
+  clearAllFieldErrs();
+  const nm=document.getElementById('rg-name').value.trim();
+  const em=document.getElementById('rg-email').value.trim();
+  const pw=document.getElementById('rg-pass').value;
+  let ok=true;
+  if(!nm){showFieldErr('fg-rg-name','Ingresá tu nombre completo');ok=false;}
+  if(!em){showFieldErr('fg-rg-email','Ingresá tu email');ok=false;}
+  else if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){showFieldErr('fg-rg-email','Email inválido — revisá el formato');ok=false;}
+  if(!pw){showFieldErr('fg-rg-pass','Creá una contraseña');ok=false;}
+  else if(pw.length<6){showFieldErr('fg-rg-pass','Mínimo 6 caracteres');ok=false;}
+  if(!ok)return;
+  const users=gU();
+  if(users.find(x=>x.email===em)){
+    showFieldErr('fg-rg-email','Ya existe una cuenta con ese email');
+    showErr('Ese email ya tiene una cuenta. ¿Querés iniciar sesión?');
+    return;
+  }
   const u={name:nm,email:em,pass:pw};users.push(u);sU(users);loginOk(u);
 }
 function demoLogin(){loginOk({name:'Valentina López',email:'demo@mirastudio.com',pass:'demo123'});}
@@ -2250,9 +2313,9 @@ function renderLanding(){
     lc.innerHTML=list.map(c=>{
       const tot=(c.modules||[]).reduce((a,m)=>a+m.lessons.length,0);
       const isFree=!c.price||c.price===''||c.price==='Gratis'||c.price==='0';
-      const priceLbl=isFree?'Gratis':c.price;
       const thumbInner=c.coverImg?`<img src="${c.coverImg}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:var(--r3) var(--r3) 0 0;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.6),transparent);"></div><span style="position:relative;z-index:1;font-size:46px;">${c.emoji}</span>`:c.emoji;
-      return`<div class="cpc" onclick="openAuth('r')"><div class="cpc-thumb" style="background:${c.coverImg?'transparent':c.color};">${thumbInner}<span style="position:absolute;top:8px;right:8px;background:${isFree?'linear-gradient(135deg,#1a7a3a,#25a85a)':'linear-gradient(135deg,#B8860B,#DAA520)'};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px;">${priceLbl}</span></div><div class="cpc-body"><span class="cpc-tag">${c.levelLabel}</span><div class="cpc-title">${c.title}</div><p class="cpc-desc">${c.description}</p><div class="cpc-meta">📹 ${tot} clases</div></div></div>`;
+      const priceHtml=(!c.price||c.price===''||c.price==='Gratis'||c.price==='0')?'':(`<span style="position:absolute;top:8px;right:8px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px;">${c.price}</span>`);
+      return`<div class="cpc" onclick="openAuth('r')"><div class="cpc-thumb" style="background:${c.coverImg?'transparent':c.color};">${thumbInner}${priceHtml}</div><div class="cpc-body"><span class="cpc-tag">${c.levelLabel}</span><div class="cpc-title">${c.title}</div><p class="cpc-desc">${c.description}</p><div class="cpc-meta">📹 ${tot} clases</div></div></div>`;
     }).join('');
   }
 }
@@ -3472,9 +3535,9 @@ function renderIcarousel(){
   if(cg) cg.innerHTML = courses.map(c=>{
     const tot = (c.modules||[]).reduce((a,m)=>a+m.lessons.length, 0);
     const isFree=!c.price||c.price===''||c.price==='Gratis'||c.price==='0';
-    const priceLbl=isFree?'Gratis':c.price;
+    const priceLbl=isFree?'':c.price;
     const thumbContent=c.coverImg?`<img src="${c.coverImg}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.5),transparent);"></div><span style="position:relative;z-index:1;font-size:38px;">${c.emoji}</span>`:c.emoji;
-    const priceTag=`<span style="position:absolute;top:7px;right:7px;background:${isFree?'linear-gradient(135deg,#1a7a3a,#25a85a)':'linear-gradient(135deg,#B8860B,#DAA520)'};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:50px;z-index:2;">${priceLbl}</span>`;
+    const priceTag=priceLbl?`<span style="position:absolute;top:7px;right:7px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:50px;z-index:2;">${priceLbl}</span>`:'';
     if(c.locked) return `<div class="icp-ccard" style="opacity:.55;cursor:default;"><div class="icp-thumb" style="background:${c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${c.levelLabel}</span><div class="icp-name">${c.title}</div><div class="icp-meta">🔒 Próximamente</div></div></div>`;
     return `<div class="icp-ccard" onclick="openAuth('r')"><div class="icp-thumb" style="background:${c.coverImg?'#0a0005':c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${c.levelLabel}</span><div class="icp-name">${c.title}</div><div class="icp-meta">📹 ${tot} clases · ${(c.modules||[]).length} módulos</div></div></div>`;
   }).join('');
