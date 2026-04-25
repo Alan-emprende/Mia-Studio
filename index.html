@@ -2290,7 +2290,7 @@ const ADMIN_PASS_DEFAULT='Mira2025';
 
 // ═══ GETTERS ═══
 const gc=()=>{const d=localStorage.getItem(KC);return d?JSON.parse(d):DEF_COURSES.map(c=>({...c,modules:(c.modules||[]).map(m=>({...m,lessons:[...m.lessons]}))}))}
-const sc=v=>localStorage.setItem(KC,JSON.stringify(v));_fsSet('courses',v);
+const sc=v=>{localStorage.setItem(KC,JSON.stringify(v));_fsSet('courses',v);};
 const gT=()=>JSON.parse(localStorage.getItem(KT)||'[]');
 const sT=v=>{localStorage.setItem(KT,JSON.stringify(v));_fsSet('turnos_list',v);}
 const gF=()=>{const d=localStorage.getItem(KF);return d?JSON.parse(d):[...DEF_FAQ];}
@@ -2491,30 +2491,29 @@ function doLogout(){
   showView('landing');
 }
 function checkSession(){
-  if(_fbReady&&_auth){
-    // Firebase handles session automatically
-    _auth.onAuthStateChanged(user=>{
-      if(user&&!currentUser){
-        _fbUid=user.uid;
-        _loadUserProfile(user.uid).then(profile=>{
-          if(!profile){
-            // First time or local fallback
-            const ls=localStorage.getItem(KS);
-            if(ls){ currentUser=JSON.parse(ls); _doSessionLoad(); }
-          } else {
-            currentUser = profile;
-            localStorage.setItem(KS, JSON.stringify(profile));
-            _doSessionLoad();
-          }
-        });
-      }
-    });
-  }
-  // Always check localStorage too (instant load / fallback)
+  // Instant load from localStorage (works always)
   const s=localStorage.getItem(KS);
-  if(s&&!currentUser){
+  if(s){
     currentUser=JSON.parse(s);
     _doSessionLoad();
+  }
+  // Firebase: re-validate and sync profile in background
+  if(_fbReady&&_auth){
+    _auth.onAuthStateChanged(user=>{
+      if(user){
+        _fbUid=user.uid;
+        // Refresh profile from Firestore silently
+        _loadUserProfile(user.uid).then(profile=>{
+          if(profile){
+            currentUser=Object.assign(currentUser||{},profile);
+            localStorage.setItem(KS,JSON.stringify(currentUser));
+          }
+        }).catch(()=>{});
+      } else if(!s){
+        // No local session and no Firebase session
+        showView('landing');
+      }
+    });
   }
 }
 function _doSessionLoad(){
