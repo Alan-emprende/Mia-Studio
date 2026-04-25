@@ -1605,9 +1605,30 @@ body.dark-mode .cform-cover{background:#1a0008;border-color:#2a0a14;}
       <div class="fg" id="fg-li-email"><label>Email</label><input type="email" id="li-email" placeholder="tu@email.com" oninput="clearFieldErr('fg-li-email')"><span class="field-err-msg" id="err-li-email"></span></div>
       <div class="fg" id="fg-li-pass"><label>Contraseña</label><input type="password" id="li-pass" placeholder="••••••••" oninput="clearFieldErr('fg-li-pass')" onkeydown="if(event.key==='Enter')doLogin()"><span class="field-err-msg" id="err-li-pass"></span></div>
       <button class="btn-auth" onclick="doLogin()">Iniciar sesión</button>
+      <div style="text-align:center;margin-top:10px;">
+        <button onclick="showResetPass()" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;font-family:var(--fb);text-decoration:underline;text-underline-offset:3px;">¿Olvidaste tu contraseña?</button>
+      </div>
       <div class="auth-divider">— acceso rápido —</div>
       <button class="auth-demo" onclick="demoLogin()">🎓 Entrar como alumna demo</button>
     </div>
+    <!-- RESET PASSWORD PANEL -->
+    <div id="form-reset" style="display:none;">
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:32px;margin-bottom:8px;">🔑</div>
+        <div style="font-family:var(--fd);font-size:18px;color:var(--dark);margin-bottom:4px;">Restablecer contraseña</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.5;">Te enviaremos un link a tu email para crear una nueva contraseña.</div>
+      </div>
+      <div class="fg" id="fg-reset-email">
+        <label>Email de tu cuenta</label>
+        <input type="email" id="reset-email" placeholder="tu@email.com" oninput="clearFieldErr('fg-reset-email')" onkeydown="if(event.key==='Enter')doResetPass()">
+        <span class="field-err-msg" id="err-reset-email"></span>
+      </div>
+      <button class="btn-auth" onclick="doResetPass()">Enviar link de recuperación</button>
+      <div style="text-align:center;margin-top:12px;">
+        <button onclick="switchTab('l')" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;font-family:var(--fb);">← Volver al inicio de sesión</button>
+      </div>
+    </div>
+
     <div id="form-r" style="display:none;">
       <div class="fg" id="fg-rg-name"><label>Nombre completo</label><input type="text" id="rg-name" placeholder="Tu nombre" oninput="clearFieldErr('fg-rg-name')"><span class="field-err-msg" id="err-rg-name"></span></div>
       <div class="fg" id="fg-rg-email"><label>Email</label><input type="email" id="rg-email" placeholder="tu@email.com" oninput="clearFieldErr('fg-rg-email')"><span class="field-err-msg" id="err-rg-email"></span></div>
@@ -2340,6 +2361,7 @@ let currentUser=null,currentCourseId=0,lessonFlat=[],lessonIdx=0,fabOpen=false;
 function openAuth(t){openOv('auth-ov');switchTab(t);if(typeof clearAllFieldErrs==='function')clearAllFieldErrs();else hideErr();}
 function switchTab(t){
   document.getElementById('form-l').style.display=t==='l'?'':'none';
+  const fr=document.getElementById('form-reset');if(fr)fr.style.display='none';
   document.getElementById('form-r').style.display=t==='r'?'':'none';
   document.getElementById('tab-l').className='auth-tab'+(t==='l'?' active':'');
   document.getElementById('tab-r').className='auth-tab'+(t==='r'?' active':'');
@@ -6411,6 +6433,61 @@ function resendVerification(email){
   } else {
     toast('Iniciá sesión primero para reenviar el email');
   }
+}
+
+
+// ── PASSWORD RESET ───────────────────────────────────
+function showResetPass(){
+  document.getElementById('form-l').style.display = 'none';
+  document.getElementById('form-r').style.display = 'none';
+  document.getElementById('form-reset').style.display = '';
+  hideErr();
+  // pre-fill email if already typed
+  const liEmail = document.getElementById('li-email').value.trim();
+  if(liEmail) document.getElementById('reset-email').value = liEmail;
+}
+
+function doResetPass(){
+  clearAllFieldErrs();
+  const em = document.getElementById('reset-email').value.trim();
+  if(!em){ showFieldErr('fg-reset-email','Ingresá tu email'); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){
+    showFieldErr('fg-reset-email','Email inválido');
+    return;
+  }
+  if(!_fbReady || !_auth){
+    showErr('Firebase no disponible. Intentá más tarde.');
+    return;
+  }
+  // Disable button while sending
+  const btn = document.querySelector('#form-reset .btn-auth');
+  if(btn){ btn.disabled=true; btn.textContent='Enviando...'; }
+
+  _auth.sendPasswordResetEmail(em)
+    .then(()=>{
+      // Show success state
+      document.getElementById('form-reset').innerHTML = `
+        <div style="text-align:center;padding:16px 0;">
+          <div style="font-size:48px;margin-bottom:12px;">📧</div>
+          <div style="font-family:var(--fd);font-size:20px;color:var(--dark);margin-bottom:8px;">¡Email enviado!</div>
+          <p style="font-size:13.5px;color:var(--muted);line-height:1.6;margin-bottom:20px;">
+            Revisá tu bandeja de <strong>${em}</strong>.<br>
+            Hacé clic en el link para crear tu nueva contraseña.<br>
+            <span style="font-size:12px;">También revisá la carpeta de spam.</span>
+          </p>
+          <button onclick="switchTab('l')" class="btn-auth">← Volver al inicio de sesión</button>
+        </div>`;
+    })
+    .catch(err=>{
+      if(btn){ btn.disabled=false; btn.textContent='Enviar link de recuperación'; }
+      const msg = err.code==='auth/user-not-found'
+        ? 'No existe una cuenta con ese email'
+        : err.code==='auth/too-many-requests'
+        ? 'Demasiados intentos. Esperá unos minutos.'
+        : 'Error al enviar el email. Intentá de nuevo.';
+      showFieldErr('fg-reset-email', msg);
+      showErr(msg);
+    });
 }
 
 </script>
