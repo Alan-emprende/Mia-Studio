@@ -1387,6 +1387,10 @@ body.dark-mode .cform-cover{background:#1a0008;border-color:#2a0a14;}
 .auth-error .auth-err-icon{font-size:16px;flex-shrink:0;}
 
 </style>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <div class="toast" id="toast"></div>
@@ -2060,6 +2064,161 @@ body.dark-mode .cform-cover{background:#1a0008;border-color:#2a0a14;}
 // ═══ STORAGE KEYS ═══
 const KU='ms_users',KS='ms_session',KC='ms_courses',KT='ms_turnos',KF='ms_faq',KI='ms_info',KFT='ms_features',KR='ms_recursos',KEB='ms_ebooks',KCF='ms_config',KES='ms_estetics',KBG='ms_herobg',KSL='ms_slots';
 
+// ════════════════════════════════════════════════════════
+// FIREBASE CONFIG — Reemplazá con tus credenciales
+// firebase.google.com → Tu proyecto → Configuración → Apps web
+// ════════════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyC-8ZrZjzooLk8Ft-thbzRVbKpPd1nMj1E",
+  authDomain:        "mira-estudio.firebaseapp.com",
+  projectId:         "mira-estudio",
+  storageBucket:     "mira-estudio.firebasestorage.app",
+  messagingSenderId: "1022892060353",
+  appId:             "1:1022892060353:web:a63091853b9a5921ae2e40"
+};
+
+// ── FIREBASE STATE ───────────────────────────────────────
+let _db = null, _auth = null, _fbReady = false, _fbUid = null;
+
+function initFirebase(){
+  if(FIREBASE_CONFIG.apiKey === 'REEMPLAZAR_API_KEY'){
+    console.warn('⚠️ Firebase: pegá tus credenciales en FIREBASE_CONFIG');
+    return;
+  }
+  try{
+    if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    _db   = firebase.firestore();
+    _auth = firebase.auth();
+    _fbReady = true;
+    console.log('✅ Firebase conectado');
+    const badge=document.getElementById('fb-status-badge');
+    if(badge){badge.textContent='☁ online';badge.style.background='rgba(34,197,94,.2)';badge.style.color='#4ade80';}
+    _auth.onAuthStateChanged(user=>{
+      if(user){
+        _fbUid = user.uid;
+        // Pull fresh site config in background
+        _syncSiteFromCloud();
+      } else {
+        _fbUid = null;
+      }
+    });
+    // Always pull public site config
+    _syncSiteFromCloud();
+  }catch(e){
+    console.warn('Firebase no disponible, usando localStorage:', e.message);
+    _fbReady = false;
+  }
+}
+
+// ── CLOUD SYNC HELPERS ──────────────────────────────────
+// site-level config: one doc per key in /site collection
+async function _fsGet(key){
+  if(!_fbReady||!_db) return null;
+  try{
+    const doc = await _db.collection('site').doc(key).get();
+    if(doc.exists){ const v=doc.data().v; return v!==undefined?v:null; }
+    return null;
+  }catch(e){ return null; }
+}
+
+async function _fsSet(key, value){
+  if(!_fbReady||!_db) return;
+  // Skip base64 images (too large for Firestore 1MB limit)
+  const str = JSON.stringify(value);
+  if(str.length > 900000){ console.warn('⚠️ Dato muy grande para Firestore, solo localStorage:',key); return; }
+  try{
+    await _db.collection('site').doc(key).set({ v: value, t: Date.now() });
+  }catch(e){ console.warn('Firestore write error:',key,e.message); }
+}
+
+// Pull all site config from Firestore and refresh localStorage + UI
+async function _syncSiteFromCloud(){
+  if(!_fbReady||!_db) return;
+  const SITE_KEYS = [
+    {ls:KC,  fs:'courses'},
+    {ls:KF,  fs:'faq'},
+    {ls:KI,  fs:'info'},
+    {ls:KFT, fs:'features'},
+    {ls:KR,  fs:'recursos'},
+    {ls:KEB, fs:'ebooks'},
+    {ls:KCF, fs:'config'},
+    {ls:KES, fs:'estetics'},
+    {ls:'ms_banner', fs:'banner'},
+    {ls:'ms_minilandings', fs:'minilandings'},
+    {ls:'ms_social', fs:'social'},
+    {ls:KSL, fs:'slots'},
+    {ls:'ms_reviews', fs:'reviews_list'},
+  ];
+  let updated = false;
+  for(const {ls, fs} of SITE_KEYS){
+    try{
+      const cloudVal = await _fsGet(fs);
+      if(cloudVal !== null){
+        const localStr  = localStorage.getItem(ls);
+        const cloudStr  = JSON.stringify(cloudVal);
+        if(localStr !== cloudStr){
+          localStorage.setItem(ls, cloudStr);
+          updated = true;
+        }
+      }
+    }catch(e){}
+  }
+  if(updated){
+    // Refresh UI if it's loaded
+    if(typeof renderLanding==='function') renderLanding();
+    if(typeof admPage==='function' && document.getElementById('view-admin')?.classList.contains('active')){
+      const active = document.querySelector('.adm-ni.active');
+      if(active) admPage(active.dataset.adm);
+    }
+  }
+}
+
+// Wrapped storage: write localStorage + Firestore together
+function _dualSet(lsKey, fsKey, value){
+  localStorage.setItem(lsKey, JSON.stringify(value));
+  _fsSet(fsKey, value);
+}
+
+// ── TURNOS COLLECTION (individual docs) ─────────────────
+async function _fsSaveTurno(turno){
+  if(!_fbReady||!_db) return;
+  try{
+    await _db.collection('turnos').doc(String(turno.id)).set(turno);
+  }catch(e){ console.warn('Turno save error:',e.message); }
+}
+
+async function _fsDeleteTurno(id){
+  if(!_fbReady||!_db) return;
+  try{
+    await _db.collection('turnos').doc(String(id)).delete();
+  }catch(e){}
+}
+
+async function _fsSyncTurnos(){
+  if(!_fbReady||!_db) return;
+  try{
+    const snap = await _db.collection('turnos').get();
+    const turnos = snap.docs.map(d=>d.data());
+    localStorage.setItem(KT, JSON.stringify(turnos));
+  }catch(e){}
+}
+
+// ── USER PROFILE IN FIRESTORE ───────────────────────────
+async function _saveUserProfile(uid, data){
+  if(!_fbReady||!_db) return;
+  try{
+    await _db.collection('users').doc(uid).set(data, {merge:true});
+  }catch(e){}
+}
+
+async function _loadUserProfile(uid){
+  if(!_fbReady||!_db) return null;
+  try{
+    const doc = await _db.collection('users').doc(uid).get();
+    return doc.exists ? doc.data() : null;
+  }catch(e){ return null; }
+}
+
 // ═══ DEFAULT DATA ═══
 const DEF_COURSES=[
   {id:0,emoji:'✨',title:'Extensiones Clásicas',subtitle:'La base perfecta',description:'Aprende desde cero la técnica 1:1. Colocación, aislamiento, adherencia y postservicio.',level:'principiante',levelLabel:'Principiante',color:'linear-gradient(135deg,#3D2B1F,#8B5E3C)',locked:false,modules:[
@@ -2131,21 +2290,21 @@ const ADMIN_PASS_DEFAULT='Mira2025';
 
 // ═══ GETTERS ═══
 const gc=()=>{const d=localStorage.getItem(KC);return d?JSON.parse(d):DEF_COURSES.map(c=>({...c,modules:(c.modules||[]).map(m=>({...m,lessons:[...m.lessons]}))}))}
-const sc=v=>localStorage.setItem(KC,JSON.stringify(v));
+const sc=v=>localStorage.setItem(KC,JSON.stringify(v));_fsSet('courses',v);
 const gT=()=>JSON.parse(localStorage.getItem(KT)||'[]');
-const sT=v=>localStorage.setItem(KT,JSON.stringify(v));
+const sT=v=>{localStorage.setItem(KT,JSON.stringify(v));_fsSet('turnos_list',v);}
 const gF=()=>{const d=localStorage.getItem(KF);return d?JSON.parse(d):[...DEF_FAQ];}
-const sF=v=>localStorage.setItem(KF,JSON.stringify(v));
+const sF=v=>{localStorage.setItem(KF,JSON.stringify(v));_fsSet('faq',v);}
 const gFt=()=>{const d=localStorage.getItem(KFT);return d?JSON.parse(d):[...DEF_FEATS];}
-const sFt=v=>localStorage.setItem(KFT,JSON.stringify(v));
+const sFt=v=>{localStorage.setItem(KFT,JSON.stringify(v));_fsSet('features',v);}
 const gR=()=>{const d=localStorage.getItem(KR);return d?JSON.parse(d):[...DEF_RECURSOS];}
-const sR=v=>localStorage.setItem(KR,JSON.stringify(v));
+const sR=v=>{localStorage.setItem(KR,JSON.stringify(v));_fsSet('recursos',v);}
 const gEB=()=>{const d=localStorage.getItem(KEB);return d?JSON.parse(d):[...DEF_EBOOKS];}
-const sEB=v=>localStorage.setItem(KEB,JSON.stringify(v));
+const sEB=v=>{localStorage.setItem(KEB,JSON.stringify(v));_fsSet('ebooks',v);}
 const gU=()=>JSON.parse(localStorage.getItem(KU)||'[]');
 const sU=v=>localStorage.setItem(KU,JSON.stringify(v));
 const gCfg=()=>JSON.parse(localStorage.getItem(KCF)||'{}');
-const sCfg=v=>localStorage.setItem(KCF,JSON.stringify(v));
+const sCfg=v=>{localStorage.setItem(KCF,JSON.stringify(v));_fsSet('config',v);}
 const gBG=()=>JSON.parse(localStorage.getItem(KBG)||'{}');
 const sBG=v=>localStorage.setItem(KBG,JSON.stringify(v));
 
@@ -2225,18 +2384,44 @@ function doLogin(){
   const pw=document.getElementById('li-pass').value;
   let ok=true;
   if(!em){showFieldErr('fg-li-email','Ingresá tu email');ok=false;}
-  else if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){showFieldErr('fg-li-email','Email inválido');ok=false;}
+  else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){showFieldErr('fg-li-email','Email inválido');ok=false;}
   if(!pw){showFieldErr('fg-li-pass','Ingresá tu contraseña');ok=false;}
   if(!ok)return;
-  const u=gU().find(x=>x.email===em&&x.pass===pw);
-  if(!u){
-    showFieldErr('fg-li-email','Email o contraseña incorrectos');
-    showFieldErr('fg-li-pass','Email o contraseña incorrectos');
-    showErr('No encontramos una cuenta con esos datos.');
-    return;
+
+  if(_fbReady && _auth){
+    // Firebase Auth login
+    _auth.signInWithEmailAndPassword(em, pw)
+      .then(cred=>{
+        const fu = cred.user;
+        if(!fu.emailVerified){
+          _auth.signOut();
+          showErr('⚠️ Verificá tu email antes de iniciar sesión. Revisá tu bandeja de entrada.');
+          return;
+        }
+        _fbUid = fu.uid;
+        _loadUserProfile(fu.uid).then(profile=>{
+          const u = profile || {name: fu.displayName||'Alumna', email:fu.email, role:'student'};
+          u.uid = fu.uid;
+          loginOk(u);
+        });
+      })
+      .catch(err=>{
+        const msg = err.code==='auth/wrong-password'||err.code==='auth/user-not-found'||err.code==='auth/invalid-credential'
+          ? 'Email o contraseña incorrectos.'
+          : err.code==='auth/too-many-requests' ? 'Demasiados intentos. Esperá unos minutos.'
+          : 'Error al iniciar sesión.';
+        showFieldErr('fg-li-email', msg);
+        showFieldErr('fg-li-pass', msg);
+        showErr(msg);
+      });
+  } else {
+    // Fallback: localStorage
+    const u=gU().find(x=>x.email===em&&x.pass===pw);
+    if(!u){ showFieldErr('fg-li-email','Email o contraseña incorrectos'); showFieldErr('fg-li-pass','Email o contraseña incorrectos'); showErr('No encontramos una cuenta con esos datos.'); return; }
+    loginOk(u);
   }
-  loginOk(u);
 }
+
 function doRegister(){
   clearAllFieldErrs();
   const nm=document.getElementById('rg-name').value.trim();
@@ -2245,57 +2430,168 @@ function doRegister(){
   let ok=true;
   if(!nm){showFieldErr('fg-rg-name','Ingresá tu nombre completo');ok=false;}
   if(!em){showFieldErr('fg-rg-email','Ingresá tu email');ok=false;}
-  else if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){showFieldErr('fg-rg-email','Email inválido — revisá el formato');ok=false;}
+  else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){showFieldErr('fg-rg-email','Email inválido — revisá el formato');ok=false;}
   if(!pw){showFieldErr('fg-rg-pass','Creá una contraseña');ok=false;}
   else if(pw.length<6){showFieldErr('fg-rg-pass','Mínimo 6 caracteres');ok=false;}
   if(!ok)return;
-  const users=gU();
-  if(users.find(x=>x.email===em)){
-    showFieldErr('fg-rg-email','Ya existe una cuenta con ese email');
-    showErr('Ese email ya tiene una cuenta. ¿Querés iniciar sesión?');
-    return;
+
+  if(_fbReady && _auth){
+    // Firebase Auth register
+    _auth.createUserWithEmailAndPassword(em, pw)
+      .then(cred=>{
+        const fu = cred.user;
+        _fbUid = fu.uid;
+        fu.updateProfile({displayName: nm});
+        const u = {name:nm, email:em, uid:fu.uid, role:'student'};
+        _saveUserProfile(fu.uid, u);
+        // Send verification email
+        fu.sendEmailVerification()
+          .then(()=>{
+            // Sign out until verified
+            _auth.signOut();
+            _fbUid = null;
+            closeOv('auth-ov');
+            showVerifyBanner(em);
+          })
+          .catch(()=>{
+            // If send fails, log in anyway
+            loginOk(u);
+          });
+      })
+      .catch(err=>{
+        const msg = err.code==='auth/email-already-in-use'
+          ? 'Ya existe una cuenta con ese email'
+          : err.code==='auth/weak-password' ? 'Contraseña muy débil (mínimo 6 caracteres)'
+          : 'Error al crear la cuenta.';
+        showFieldErr('fg-rg-email', msg);
+        showErr(msg);
+      });
+  } else {
+    // Fallback: localStorage
+    const users=gU();
+    if(users.find(x=>x.email===em)){ showFieldErr('fg-rg-email','Ya existe una cuenta con ese email'); showErr('Ese email ya tiene una cuenta. ¿Querés iniciar sesión?'); return; }
+    const u={name:nm,email:em,pass:pw};users.push(u);sU(users);loginOk(u);
   }
-  const u={name:nm,email:em,pass:pw};users.push(u);sU(users);loginOk(u);
 }
 function demoLogin(){loginOk({name:'Valentina López',email:'demo@mirastudio.com',pass:'demo123'});}
 function loginOk(u){
   currentUser=u;localStorage.setItem(KS,JSON.stringify(u));
+  // Persist profile to Firestore if Firebase is ready
+  if(_fbReady&&_db&&u.uid){
+    _saveUserProfile(u.uid, {name:u.name,email:u.email,role:u.role||'student',uid:u.uid});
+  }
   closeOv('auth-ov');setupDash(u);showView('dashboard');
   document.getElementById('fab-wrap').style.display='';
 }
 function doLogout(){
   currentUser=null;localStorage.removeItem(KS);
+  if(_fbReady&&_auth) _auth.signOut().catch(()=>{});
+  _fbUid=null;
   document.getElementById('fab-wrap').style.display='none';
   showView('landing');
 }
 function checkSession(){
-  const s=localStorage.getItem(KS);
-  if(s){
-    currentUser=JSON.parse(s);
-    if(currentUser.role==='admin'){showView('admin');window.loadAdminData&&loadAdminData();}
-    else{setupDash(currentUser);showView('dashboard');document.getElementById('fab-wrap').style.display='';}
+  if(_fbReady&&_auth){
+    // Firebase handles session automatically
+    _auth.onAuthStateChanged(user=>{
+      if(user&&!currentUser){
+        _fbUid=user.uid;
+        _loadUserProfile(user.uid).then(profile=>{
+          if(!profile){
+            // First time or local fallback
+            const ls=localStorage.getItem(KS);
+            if(ls){ currentUser=JSON.parse(ls); _doSessionLoad(); }
+          } else {
+            currentUser = profile;
+            localStorage.setItem(KS, JSON.stringify(profile));
+            _doSessionLoad();
+          }
+        });
+      }
+    });
   }
+  // Always check localStorage too (instant load / fallback)
+  const s=localStorage.getItem(KS);
+  if(s&&!currentUser){
+    currentUser=JSON.parse(s);
+    _doSessionLoad();
+  }
+}
+function _doSessionLoad(){
+  if(!currentUser) return;
+  if(currentUser.role==='admin'){showView('admin');window.loadAdminData&&loadAdminData();}
+  else{setupDash(currentUser);showView('dashboard');document.getElementById('fab-wrap').style.display='';}
 }
 
 // ═══ VIEWS ═══
 function showView(n){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById('view-'+n).classList.add('active');window.scrollTo(0,0);}
 
 // ═══ HERO BG ═══
+function parseHeroUrl(url){
+  if(!url)return null;
+  // YouTube
+  const ytMatch=url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if(ytMatch)return{kind:'youtube',id:ytMatch[1]};
+  // Vimeo
+  const vimMatch=url.match(/vimeo\.com\/(\d+)/);
+  if(vimMatch)return{kind:'vimeo',id:vimMatch[1]};
+  // Direct video URL
+  if(/\.(mp4|webm|ogg|mov)(\?|$)/i.test(url))return{kind:'video-url',url};
+  // Direct image URL
+  if(/\.(jpg|jpeg|png|webp|gif|svg)(\?|$)/i.test(url))return{kind:'image-url',url};
+  // Fallback: try as video URL
+  return{kind:'video-url',url};
+}
+
 function applyHeroBg(){
   const bg=gBG();const media=document.getElementById('hero-media');
   if(!media)return;
   const def=document.getElementById('hero-default-bg');
-  // remove old dynamic media
-  media.querySelectorAll('img.dyn,video.dyn').forEach(el=>el.remove());
+  media.querySelectorAll('img.dyn,video.dyn,iframe.dyn').forEach(el=>el.remove());
+  if(!bg||!bg.type){if(def)def.style.display='';return;}
+
   if(bg.type==='image'&&bg.data){
     if(def)def.style.display='none';
-    const img=document.createElement('img');img.src=bg.data;img.className='dyn';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;';
+    const img=document.createElement('img');img.src=bg.data;img.className='dyn';
+    img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;';
     media.insertBefore(img,media.firstChild);
+
   }else if(bg.type==='video'&&bg.data){
     if(def)def.style.display='none';
-    const vid=document.createElement('video');vid.src=bg.data;vid.className='dyn';vid.autoplay=true;vid.loop=true;vid.muted=true;vid.playsInline=true;
+    const vid=document.createElement('video');vid.src=bg.data;vid.className='dyn';
+    vid.autoplay=true;vid.loop=true;vid.muted=true;vid.playsInline=true;
     vid.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;';
     media.insertBefore(vid,media.firstChild);
+
+  }else if(bg.type==='youtube'&&bg.data){
+    if(def)def.style.display='none';
+    const ifr=document.createElement('iframe');ifr.className='dyn';
+    ifr.src='https://www.youtube.com/embed/'+bg.data+'?autoplay=1&mute=1&loop=1&playlist='+bg.data+'&controls=0&showinfo=0&rel=0&modestbranding=1';
+    ifr.allow='autoplay;encrypted-media';ifr.frameBorder='0';
+    ifr.style.cssText='position:absolute;inset:-60px;width:calc(100% + 120px);height:calc(100% + 120px);border:none;pointer-events:none;';
+    media.insertBefore(ifr,media.firstChild);
+
+  }else if(bg.type==='vimeo'&&bg.data){
+    if(def)def.style.display='none';
+    const ifr=document.createElement('iframe');ifr.className='dyn';
+    ifr.src='https://player.vimeo.com/video/'+bg.data+'?autoplay=1&muted=1&loop=1&background=1';
+    ifr.allow='autoplay;fullscreen';ifr.frameBorder='0';
+    ifr.style.cssText='position:absolute;inset:-60px;width:calc(100% + 120px);height:calc(100% + 120px);border:none;pointer-events:none;';
+    media.insertBefore(ifr,media.firstChild);
+
+  }else if(bg.type==='video-url'&&bg.data){
+    if(def)def.style.display='none';
+    const vid=document.createElement('video');vid.src=bg.data;vid.className='dyn';
+    vid.autoplay=true;vid.loop=true;vid.muted=true;vid.playsInline=true;
+    vid.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;';
+    media.insertBefore(vid,media.firstChild);
+
+  }else if(bg.type==='image-url'&&bg.data){
+    if(def)def.style.display='none';
+    const img=document.createElement('img');img.src=bg.data;img.className='dyn';
+    img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;';
+    media.insertBefore(img,media.firstChild);
+
   }else{if(def)def.style.display='';}
 }
 
@@ -2715,6 +3011,17 @@ function admUploadHeroBg(input,type){
   reader.readAsDataURL(file);input.value='';
 }
 
+function admSetHeroBgUrl(){
+  const url=document.getElementById('hero-url-inp').value.trim();
+  if(!url){toast('⚠️ Pegá un link primero');return;}
+  const parsed=parseHeroUrl(url);
+  if(!parsed){toast('⚠️ URL no reconocida');return;}
+  const typeLabels={youtube:'YouTube',vimeo:'Vimeo','video-url':'Video (URL)','image-url':'Imagen (URL)'};
+  sBG({type:parsed.kind,data:parsed.id||parsed.url});
+  applyHeroBg();admUpdateBgPreview();
+  document.getElementById('hero-url-inp').value='';
+  toast('✅ Fondo aplicado — '+typeLabels[parsed.kind]);
+}
 function admClearHeroBg(){sBG({});applyHeroBg();admUpdateBgPreview();toast('✅ Fondo removido');}
 
 function admUpdateBgPreview(){
@@ -2725,9 +3032,25 @@ function admUpdateBgPreview(){
   }else if(bg.type==='video'&&bg.data){
     const vid=document.createElement('video');vid.src=bg.data;vid.autoplay=true;vid.loop=true;vid.muted=true;
     vid.style.cssText='width:100%;height:100%;object-fit:cover;';prev.appendChild(vid);
+  }else if(bg.type==='youtube'&&bg.data){
+    prev.style.background='#000';prev.style.display='flex';prev.style.alignItems='center';prev.style.justifyContent='center';
+    prev.innerHTML='<div style="text-align:center;"><div style="font-size:28px;">▶️</div><div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:4px;">YouTube</div></div>';
+    const lbl=document.getElementById('adm-bg-type-label');if(lbl)lbl.textContent='✅ Video de YouTube aplicado';
+  }else if(bg.type==='vimeo'&&bg.data){
+    prev.style.background='#1ab7ea';prev.style.display='flex';prev.style.alignItems='center';prev.style.justifyContent='center';
+    prev.innerHTML='<div style="text-align:center;"><div style="font-size:28px;">▶️</div><div style="font-size:11px;color:#fff;margin-top:4px;">Vimeo</div></div>';
+    const lbl=document.getElementById('adm-bg-type-label');if(lbl)lbl.textContent='✅ Video de Vimeo aplicado';
+  }else if(bg.type==='video-url'&&bg.data){
+    prev.style.background='#111';prev.style.display='flex';prev.style.alignItems='center';prev.style.justifyContent='center';
+    prev.innerHTML='<div style="text-align:center;padding:8px;"><div style="font-size:24px;">🎬</div><div style="font-size:10px;color:rgba(255,255,255,.5);margin-top:4px;word-break:break-all;">'+bg.data.slice(0,50)+'</div></div>';
+    const lbl=document.getElementById('adm-bg-type-label');if(lbl)lbl.textContent='✅ Video URL aplicado';
+  }else if(bg.type==='image-url'&&bg.data){
+    const img=document.createElement('img');img.src=bg.data;img.style.cssText='width:100%;height:100%;object-fit:cover;';prev.appendChild(img);
+    const lbl=document.getElementById('adm-bg-type-label');if(lbl)lbl.textContent='✅ Imagen URL aplicada';
   }else{
     prev.style.background='linear-gradient(135deg,#1A0008,#620018)';prev.style.display='flex';prev.style.alignItems='center';prev.style.justifyContent='center';
     prev.innerHTML='<span style="color:rgba(255,255,255,.35);font-size:13px;">Degradé por defecto</span>';
+    const lbl=document.getElementById('adm-bg-type-label');if(lbl)lbl.textContent='';
   }
 }
 
@@ -4636,6 +4959,7 @@ loginOk = function(u){
 // ═══ PATCH INIT ═══
 const _origDOMLoaded = document.addEventListener;
 document.addEventListener('DOMContentLoaded', ()=>{
+  initFirebase();
   loadDarkMode();
   renderNotifPanel();
   // push a welcome notif on first visit ever
@@ -6047,6 +6371,49 @@ document.addEventListener('DOMContentLoaded', ()=>{
   });
 })();
 
+
+// ── EMAIL VERIFICATION ──────────────────────────────
+function showVerifyBanner(email){
+  // Show a friendly modal/message instead of dashboard
+  const existing = document.getElementById('verify-banner-ov');
+  if(existing) existing.remove();
+  const div = document.createElement('div');
+  div.id = 'verify-banner-ov';
+  div.className = 'ov open';
+  div.style.cssText = 'z-index:500;';
+  div.innerHTML = `
+    <div class="mcard mcard-sm" style="text-align:center;padding:36px 28px;">
+      <div style="font-size:48px;margin-bottom:12px;">📧</div>
+      <div style="font-family:var(--fd);font-size:22px;color:var(--dark);margin-bottom:8px;">Verificá tu email</div>
+      <p style="font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:20px;">
+        Te enviamos un email a <strong>${email}</strong>.<br>
+        Hacé clic en el link del mail para activar tu cuenta.
+      </p>
+      <div style="background:var(--goldp);border:1px solid rgba(201,168,76,.3);border-radius:var(--r2);padding:12px 16px;font-size:13px;color:var(--goldd);margin-bottom:20px;">
+        💡 Revisá también la carpeta de <strong>spam</strong> o correo no deseado.
+      </div>
+      <button class="btn-p" onclick="document.getElementById('verify-banner-ov').remove();" style="width:100%;padding:13px;margin-bottom:10px;">
+        Ya verifiqué → Iniciar sesión
+      </button>
+      <button onclick="resendVerification('${email}')" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;font-family:var(--fb);">
+        ↺ Reenviar email de verificación
+      </button>
+    </div>`;
+  document.body.appendChild(div);
+}
+
+function resendVerification(email){
+  if(!_fbReady||!_auth){ toast('Firebase no disponible'); return; }
+  const user = _auth.currentUser;
+  if(user){
+    user.sendEmailVerification()
+      .then(()=>toast('✅ Email reenviado a ' + email))
+      .catch(e=>toast('Error al reenviar: ' + e.message));
+  } else {
+    toast('Iniciá sesión primero para reenviar el email');
+  }
+}
+
 </script>
 
 <!-- ADMIN PANEL PART 2 -->
@@ -6054,7 +6421,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   <aside class="adm-sb">
     <div class="adm-sb-top">
       <div>
-        <div class="adm-sb-brand">⚙ Panel de Admin</div>
+        <div class="adm-sb-brand">⚙ Panel de Admin <span id="fb-status-badge" title="Estado Firebase" style="font-size:9px;padding:1px 6px;border-radius:50px;background:rgba(255,255,255,.1);color:rgba(255,248,240,.4);margin-left:4px;">⏳</span></div>
         <div class="adm-sb-sub">Mira Estudio</div>
       </div>
       <button class="adm-nav-toggle" id="adm-nav-toggle" onclick="toggleAdmNav()">☰ Menú</button>
@@ -6111,13 +6478,31 @@ document.addEventListener('DOMContentLoaded', ()=>{
         <h3>Fondo del Hero (portada)</h3>
         <div class="adm-grid2">
           <div>
-            <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Subí una imagen o video para reemplazar el degradé. El overlay carmesí se mantiene sobre el fondo.</p>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Podés subir una imagen/video pequeño, o pegar un link de YouTube, Vimeo o URL directa de video/imagen.</p>
+
+            <!-- OPCIÓN A: URL de video o imagen -->
+            <div style="margin-bottom:10px;">
+              <label style="font-size:12px;font-weight:600;color:var(--dark);display:block;margin-bottom:5px;">🔗 Pegar link (YouTube, Vimeo, URL directa)</label>
+              <div style="display:flex;gap:7px;">
+                <input type="text" id="hero-url-inp" placeholder="https://youtube.com/watch?v=... o https://..." style="flex:1;font-size:13px;padding:9px 12px;border:1.5px solid var(--crd);border-radius:var(--r1);font-family:var(--fb);outline:none;" onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='var(--crd)'">
+                <button class="abtn" onclick="admSetHeroBgUrl()" style="white-space:nowrap;flex-shrink:0;">Aplicar</button>
+              </div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px;">YouTube y Vimeo se cargan como iframe. URLs directas de video/imagen se muestran directamente.</div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px;margin:12px 0 10px;">
+              <div style="flex:1;height:1px;background:var(--crd);"></div>
+              <span style="font-size:11px;color:var(--muted);white-space:nowrap;">o subir archivo (máx 4MB)</span>
+              <div style="flex:1;height:1px;background:var(--crd);"></div>
+            </div>
+
+            <!-- OPCIÓN B: Subir archivo -->
             <div class="file-drop" onclick="document.getElementById('hero-img-inp').click()">
-              <div style="font-size:28px;">🖼</div><p>Click para subir imagen (JPG/PNG/WEBP)</p>
+              <div style="font-size:24px;">🖼</div><p>Imagen (JPG/PNG/WEBP)</p>
               <input type="file" id="hero-img-inp" accept="image/*" style="display:none;" onchange="admUploadHeroBg(this,'image')">
             </div>
-            <div class="file-drop" style="margin-top:9px;" onclick="document.getElementById('hero-vid-inp').click()">
-              <div style="font-size:28px;">🎬</div><p>Click para subir video (MP4/WEBM)</p>
+            <div class="file-drop" style="margin-top:8px;" onclick="document.getElementById('hero-vid-inp').click()">
+              <div style="font-size:24px;">🎬</div><p>Video corto (MP4 · máx 4MB)</p>
               <input type="file" id="hero-vid-inp" accept="video/*" style="display:none;" onchange="admUploadHeroBg(this,'video')">
             </div>
             <button class="abtn-g" style="margin-top:9px;width:100%;" onclick="admClearHeroBg()">🗑 Quitar fondo personalizado</button>
@@ -6127,6 +6512,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             <div id="adm-bg-prev" style="width:100%;height:160px;border-radius:var(--r1);border:1px solid var(--crd);overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1A0008,#620018);">
               <span style="color:rgba(255,255,255,.35);font-size:13px;">Degradé por defecto</span>
             </div>
+            <div id="adm-bg-type-label" style="font-size:11.5px;color:var(--muted);margin-top:6px;text-align:center;"></div>
           </div>
         </div>
       </div>
