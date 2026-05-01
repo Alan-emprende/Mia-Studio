@@ -1610,6 +1610,18 @@ function checkKey(){
   }else{document.getElementById('admin-key-err').style.display='';}
 }
 
+// Alternative: open admin panel from URL ?admin=1 or typing /admin in address bar
+function checkUrlAdmin(){
+  if(window.location.search.includes('admin=1')||window.location.hash==='#admin'){
+    setTimeout(()=>{
+      document.getElementById('admin-key').value='';
+      document.getElementById('admin-key-err').style.display='none';
+      openOv('admin-ov');
+      setTimeout(()=>document.getElementById('admin-key').focus(),100);
+    },500);
+  }
+}
+
 // ═══ AUTH ═══
 let currentUser=null,currentCourseId=0,lessonFlat=[],lessonIdx=0,fabOpen=false;
 
@@ -2067,6 +2079,7 @@ function scrollTo2(id){const el=document.getElementById(id);if(el)el.scrollIntoV
 // ═══ INIT ═══
 document.addEventListener('DOMContentLoaded',()=>{
   initFirebase();
+  checkUrlAdmin();
   loadSavedEstetics();
   loadSavedTexts();
   applyHeroBg();
