@@ -1566,7 +1566,7 @@ const ADMIN_PASS_DEFAULT='Mira2025';
 
 // ═══ GETTERS ═══
 const gc=()=>{const d=localStorage.getItem(KC);return d?JSON.parse(d):DEF_COURSES.map(c=>({...c,modules:(c.modules||[]).map(m=>({...m,lessons:[...m.lessons]}))}))}
-const sc=v=>localStorage.setItem(KC,JSON.stringify(v));_fsSet('courses',v);
+const sc=v=>{localStorage.setItem(KC,JSON.stringify(v));_fsSet('courses',v);};
 const gT=()=>JSON.parse(localStorage.getItem(KT)||'[]');
 const sT=v=>{localStorage.setItem(KT,JSON.stringify(v));_fsSet('turnos_list',v);};
 const gF=()=>{const d=localStorage.getItem(KF);return d?JSON.parse(d):[...DEF_FAQ];}
