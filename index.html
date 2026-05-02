@@ -878,6 +878,17 @@ body.dark-mode .profile-stat{background:#1a0008;}
 .adm-slot-pill{background:var(--goldp);border:1px solid rgba(201,168,76,.3);border-radius:50px;padding:4px 11px;font-size:12px;font-family:var(--fb);color:var(--goldd);display:flex;align-items:center;gap:5px;}
 .adm-slot-del{background:none;border:none;color:var(--c1);cursor:pointer;font-size:13px;}
 
+
+/* ── COURSE EDITOR PAGE ── */
+.adm-pg.editor-pg{max-width:780px;margin:0 auto;}
+.editor-pg-hdr{display:flex;align-items:center;gap:14px;padding:18px 24px;background:var(--sw);border-bottom:1px solid var(--crd);position:sticky;top:0;z-index:10;}
+.editor-pg-back{background:var(--cr);border:1.5px solid var(--crd);border-radius:50px;padding:8px 16px;font-family:var(--fb);font-size:13px;color:var(--muted);cursor:pointer;transition:.15s;white-space:nowrap;}
+.editor-pg-back:hover{border-color:var(--dark);color:var(--dark);}
+.editor-pg-title{font-family:var(--fd);font-size:20px;color:var(--dark);flex:1;}
+.editor-pg-save{background:linear-gradient(135deg,var(--c1d),var(--c1));color:#fff;border:none;padding:10px 24px;border-radius:50px;font-family:var(--fb);font-size:14px;font-weight:600;cursor:pointer;transition:.2s;}
+.editor-pg-save:hover{filter:brightness(1.1);}
+.editor-pg-body{padding:24px;}
+
 </style>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
@@ -2324,17 +2335,19 @@ function admRenderCursosList(){
 
 function admNewCurso(){
   admCurEditId=null;
-  document.getElementById('cmod-title').textContent='Nuevo curso';
+  window._editorIsNew=true;
+  document.getElementById('editor-pg-title').textContent='Nuevo curso';
   document.getElementById('cmod-body').innerHTML=admCursoForm({id:null,emoji:'📚',title:'',subtitle:'',description:'',level:'principiante',levelLabel:'Principiante',color:'#8C0026',locked:false,modules:[]},true);
-  openOv('curso-modal');
+  admOpenEditor();
 }
 
 function admEditCurso(id){
   admCurEditId=id;
+  window._editorIsNew=false;
   const c=gc().find(x=>x.id===id);if(!c)return;
-  document.getElementById('cmod-title').textContent='Editar: '+c.title;
+  document.getElementById('editor-pg-title').textContent=c.title||'Editar curso';
   document.getElementById('cmod-body').innerHTML=admCursoForm(c,false);
-  openOv('curso-modal');
+  admOpenEditor();
 }
 
 function admCursoForm(c,isNew){
@@ -2546,7 +2559,7 @@ function admSaveCurso(isNew){
     document.getElementById('cmod-body').innerHTML=admCursoForm(c,false);
     toast('✅ Curso creado. Ahora podés agregar módulos.');
   }else{
-    closeOv('curso-modal');toast('✅ Curso guardado');
+    admCloseEditor();toast('✅ Curso guardado');
   }
   admRenderCursosList();renderLanding();
 }
@@ -3889,17 +3902,7 @@ admTogModAcc = function(modId) {
 /* ─────────────────────────────────────────────────────── */
 /* Patch admCursoForm → llama initDragModules tras render  */
 /* ─────────────────────────────────────────────────────── */
-const _origAdmEditCurso = admEditCurso;
-admEditCurso = function(id) {
-  _origAdmEditCurso(id);
-  // Give DOM time to render then init drag
-  setTimeout(() => {
-    initDragModules();
-    const courses = gc();
-    const c = courses.find(x => x.id === id);
-    if (c) (c.modules||[]).forEach(m => initDragLessons(m.id));
-  }, 80);
-};
+// override removed
 
 /* Patch admAddModule / admAddLesson to re-init drag */
 const _origAdmAddModule = admAddModule;
@@ -4629,6 +4632,23 @@ async function admRevokeEbook(userEmail, ebookId){
   }
 }
 
+
+// ── COURSE EDITOR PAGE ──────────────────────────────
+function admOpenEditor(){
+  // Hide all adm pages, show editor
+  document.querySelectorAll('.adm-pg').forEach(p=>p.style.display='none');
+  const ep=document.getElementById('adm-curso-editor');
+  if(ep){ ep.style.display=''; ep.scrollIntoView({behavior:'smooth',block:'start'}); }
+  // Scroll adm-body to top
+  const body=document.querySelector('.adm-body');
+  if(body) body.scrollTop=0;
+}
+function admCloseEditor(){
+  const ep=document.getElementById('adm-curso-editor');
+  if(ep) ep.style.display='none';
+  admPage('cursos');
+}
+
 </script>
 
 <!-- ADMIN PANEL PART 2 -->
@@ -4952,15 +4972,7 @@ async function admRevokeEbook(userEmail, ebookId){
 </div><!-- /view-admin -->
 
 <!-- COURSE EDITOR MODAL -->
-<div class="ov" id="curso-modal" onclick="hovClick(event,'curso-modal')">
-  <div class="adm-modal-inner">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-      <div style="font-family:var(--fd);font-size:21px;color:var(--dark);" id="cmod-title">Editar curso</div>
-      <button class="auth-close" onclick="closeOv('curso-modal')">✕</button>
-    </div>
-    <div id="cmod-body"></div>
-  </div>
-</div>
+<!-- curso-modal removed: now uses full-page editor -->
 
 
 <!-- CERTIFICADO -->
