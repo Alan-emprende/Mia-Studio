@@ -1849,20 +1849,22 @@ function renderEbooks(){
     const price=e.paid?(e.price||'De pago'):'Gratis';
     const isPurchased=!e.paid||hasEbook(e.id);
     let btn;
+    const dlLink = e.downloadLink || e.link || '';
+    const pyLink = e.payLink || e.link || '';
     if(!e.paid){
-      // Free ebook
-      btn=e.link
-        ?`<a href="${e.link}" target="_blank" rel="noopener" class="btn-crimson" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;text-decoration:none;border-radius:50px;">⬇ Descargar gratis</a>`
+      // Free ebook → show download link
+      btn=dlLink
+        ?`<a href="${dlLink}" target="_blank" rel="noopener" class="btn-crimson" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;text-decoration:none;border-radius:50px;">⬇ Descargar gratis</a>`
         :`<button class="btn-g" style="margin-top:10px;width:100%;padding:9px;font-size:13px;opacity:.5;cursor:default;" disabled>Próximamente</button>`;
     } else if(isPurchased){
-      // Paid + already purchased
-      btn=e.link
-        ?`<a href="${e.link}" target="_blank" rel="noopener" class="btn-crimson" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;text-decoration:none;border-radius:50px;">✅ Ver / Descargar</a>`
-        :`<button class="btn-g" style="margin-top:10px;width:100%;padding:9px;font-size:13px;opacity:.5;cursor:default;" disabled>Link no disponible</button>`;
+      // Paid + already purchased → show download link
+      btn=dlLink
+        ?`<a href="${dlLink}" target="_blank" rel="noopener" class="btn-crimson" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;text-decoration:none;border-radius:50px;">✅ Ver / Descargar</a>`
+        :`<button class="btn-g" style="margin-top:10px;width:100%;padding:9px;font-size:13px;opacity:.5;cursor:default;" disabled>Sin link de descarga</button>`;
     } else {
-      // Paid + not yet purchased
-      btn=e.link
-        ?`<a href="${e.link}" target="_blank" rel="noopener" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;text-decoration:none;border-radius:50px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;">🛒 Comprar ${price}</a>`
+      // Paid + not yet purchased → show payment link
+      btn=pyLink
+        ?`<a href="${pyLink}" target="_blank" rel="noopener" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;text-decoration:none;border-radius:50px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;">🛒 Comprar ${price}</a>`
         :`<button class="btn-g" style="margin-top:10px;width:100%;padding:9px;font-size:13px;opacity:.5;cursor:default;" disabled>Próximamente</button>`;
     }
     const lockBadge=e.paid&&!isPurchased?`<div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);border-radius:50px;padding:3px 8px;font-size:11px;color:#fff;">🔒 Pago</div>`:'';
@@ -2612,7 +2614,19 @@ function admRenderEbooksList(){
             <div class="fg" style="margin:0;"><label>Precio</label><input type="text" id="eb-price-${idx}" value="${e.price||''}" placeholder="Gratis · $9.990 · USD 15"></div>
             <div class="fg" style="margin:0;"><label>Tipo</label><select id="eb-paid-${idx}"><option value="0"${!e.paid?' selected':''}>Gratuito</option><option value="1"${e.paid?' selected':''}>De pago</option></select></div>
           </div>
-          <div class="fg" style="margin-bottom:6px;"><label>🔗 Link de descarga / pago</label><input type="text" id="eb-link-${idx}" value="${e.link||''}" placeholder="https://drive.google.com/... o https://mpago.la/..."></div>
+          <div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.2);border-radius:var(--r2);padding:12px 14px;margin-bottom:6px;">
+            <div style="font-size:11px;font-weight:700;color:var(--goldd);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;">💳 Links de acceso</div>
+            <div class="fg" style="margin-bottom:8px;">
+              <label>🔗 Link de descarga <span style="font-weight:400;color:var(--muted);">· Google Drive, Dropbox, etc.</span></label>
+              <input type="text" id="eb-download-${idx}" value="${e.downloadLink||e.link||''}" placeholder="https://drive.google.com/file/d/...">
+              <div style="font-size:11px;color:var(--muted);margin-top:3px;">Se muestra cuando la alumna ya pagó o el ebook es gratis</div>
+            </div>
+            <div class="fg" style="margin:0;">
+              <label>🛒 Link de pago <span style="font-weight:400;color:var(--muted);">· MercadoPago, Stripe, Hotmart, etc.</span></label>
+              <input type="text" id="eb-paylink-${idx}" value="${e.payLink||''}" placeholder="https://mpago.la/...">
+              <div style="font-size:11px;color:var(--muted);margin-top:3px;">Se muestra cuando el ebook es de pago y aún no fue desbloqueado</div>
+            </div>
+          </div>
           <div class="fg" style="margin-bottom:6px;"><label>📎 Portada (URL o subir imagen)</label>
             <div style="display:flex;gap:8px;">
               <input type="text" id="eb-cover-url-${idx}" value="${e.cover&&!e.cover.startsWith('data:')?e.cover:''}" placeholder="https://... o subir abajo" style="flex:1;">
@@ -2640,7 +2654,9 @@ function admSaveEbook(idx){
   ebs[idx].desc=document.getElementById('eb-desc-'+idx).value;
   ebs[idx].price=document.getElementById('eb-price-'+idx).value;
   ebs[idx].paid=document.getElementById('eb-paid-'+idx).value==='1';
-  ebs[idx].link=document.getElementById('eb-link-'+idx)?.value.trim()||'';
+  ebs[idx].downloadLink=document.getElementById('eb-download-'+idx)?.value.trim()||'';
+  ebs[idx].payLink=document.getElementById('eb-paylink-'+idx)?.value.trim()||'';
+  ebs[idx].link=ebs[idx].downloadLink; // backward compat
   // cover from URL field if filled, otherwise keep existing
   const coverUrlEl=document.getElementById('eb-cover-url-'+idx);
   if(coverUrlEl&&coverUrlEl.value.trim()) ebs[idx].cover=coverUrlEl.value.trim();
