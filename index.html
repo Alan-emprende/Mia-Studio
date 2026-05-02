@@ -1921,7 +1921,7 @@ function openViewer(id){
   applyCourseThumbToViewer(c);
   const fm=document.querySelector('.mod-hdr');if(fm)openMod(fm);
   if(lessonFlat.length)selLesson(lessonFlat[0]);
-  if(window.innerWidth<=768)document.getElementById('vtoggle').style.display='';
+  // vs-panel mobile handled by vsCheckMobile()
 }
 function renderVModules(c){
   document.getElementById('vmodules').innerHTML=(c.modules||[]).map((m,mi)=>{
@@ -2093,13 +2093,12 @@ function scrollTo2(id){const el=document.getElementById(id);if(el)el.scrollIntoV
 // ═══ INIT ═══
 document.addEventListener('DOMContentLoaded',()=>{
   initFirebase();
-  const _isAdminMode = checkUrlAdmin();
   loadSavedEstetics();
   loadSavedTexts();
   applyHeroBg();
   checkSession();
   renderLanding();
-  if(window.innerWidth<=768)document.getElementById('vtoggle').style.display='';
+  setTimeout(()=>checkUrlAdmin(), 300);
 });
 
 // ═══════════════════════════════════════════════════════
