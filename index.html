@@ -1268,15 +1268,35 @@ body.dark-mode .profile-stat{background:#1a0008;}
                   </div>
                 </div>
                 <div class="turno-form">
-                  <div style="font-family:var(--fd);font-size:18px;font-weight:500;margin-bottom:14px;color:var(--dark);">Formulario de turno</div>
-                  <div class="fg"><label>Nombre completo</label><input type="text" id="t-name" placeholder="Tu nombre"></div>
-                  <div class="row2">
-                    <div class="fg"><label>Teléfono/WhatsApp</label><input type="tel" id="t-tel" placeholder="+54..."></div>
-                    <div class="fg"><label>Servicio</label><select id="t-serv"><option>Extensiones Clásicas</option><option>Volumen Ruso</option><option>Mega Volumen</option><option>Lifting</option><option>Remoción</option><option>Consulta</option></select></div>
+                  <div style="font-family:var(--fd);font-size:18px;font-weight:500;margin-bottom:10px;color:var(--dark);">Reservá tu turno</div>
+                  <!-- Paso 1: fecha + horario -->
+                  <div id="tf1-step-0">
+                    <div class="fg"><label>📅 Fecha</label><input type="date" id="t-date" onchange="dashLoadSlots('t')"></div>
+                    <div style="margin-top:10px;">
+                      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:7px;letter-spacing:.03em;">⏰ Horarios disponibles</div>
+                      <div style="display:flex;flex-wrap:wrap;gap:6px;" id="t-slots-grid"><div style="font-size:13px;color:var(--muted);font-style:italic;">Seleccioná una fecha primero</div></div>
+                    </div>
+                    <div id="t-slot-sel" style="display:none;margin-top:10px;padding:7px 12px;background:var(--goldp);border:1px solid rgba(201,168,76,.3);border-radius:50px;font-size:13px;color:var(--goldd);text-align:center;"></div>
+                    <button class="btn-crimson" style="width:100%;padding:11px;margin-top:12px;" onclick="dashNextStep('t',1)">Siguiente →</button>
                   </div>
-                  <div class="fg"><label>Fecha preferida</label><input type="date" id="t-date"></div>
-                  <div class="fg"><label>Mensaje adicional</label><textarea id="t-msg" rows="2" placeholder="Algo que quieras comentar..."></textarea></div>
-                  <button class="btn-crimson" style="width:100%;padding:12px;" onclick="saveTurno()">Enviar solicitud de turno</button>
+                  <!-- Paso 2: datos -->
+                  <div id="tf1-step-1" style="display:none;">
+                    <div class="fg"><label>Nombre completo</label><input type="text" id="t-name" placeholder="Tu nombre"></div>
+                    <div class="fg"><label>Teléfono/WhatsApp</label><input type="tel" id="t-tel" placeholder="+54..."></div>
+                    <div class="fg"><label>Mensaje (opcional)</label><textarea id="t-msg" rows="2" placeholder="Algo que quieras comentar..."></textarea></div>
+                    <div id="t-resumen" style="background:var(--goldp);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:10px 13px;font-size:12.5px;color:var(--goldd);margin-bottom:12px;line-height:1.6;"></div>
+                    <div style="display:flex;gap:8px;">
+                      <button class="btn-g" style="flex:1;padding:10px;" onclick="dashNextStep('t',0)">← Volver</button>
+                      <button class="btn-crimson" style="flex:2;padding:10px;" onclick="saveTurno()">✓ Confirmar turno</button>
+                    </div>
+                  </div>
+                  <!-- Paso 3: confirmación -->
+                  <div id="tf1-step-2" style="display:none;text-align:center;padding:16px 0;">
+                    <div style="font-size:42px;margin-bottom:8px;">✅</div>
+                    <div style="font-family:var(--fd);font-size:18px;color:var(--dark);margin-bottom:6px;">¡Turno solicitado!</div>
+                    <div style="font-size:13px;color:var(--muted);line-height:1.6;" id="t-confirm-txt"></div>
+                    <button class="btn-g" style="margin-top:14px;width:100%;padding:9px;" onclick="dashNextStep('t',0);dashResetForm('t')">+ Nueva reserva</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1318,15 +1338,32 @@ body.dark-mode .profile-stat{background:#1a0008;}
               </div>
             </div>
             <div class="turno-form">
-              <div style="font-family:var(--fd);font-size:18px;font-weight:500;margin-bottom:14px;">Formulario</div>
-              <div class="fg"><label>Nombre</label><input type="text" id="t2-name" placeholder="Tu nombre"></div>
-              <div class="row2">
-                <div class="fg"><label>Teléfono</label><input type="tel" id="t2-tel" placeholder="+54..."></div>
-                <div class="fg"><label>Servicio</label><select id="t2-serv"><option>Extensiones Clásicas</option><option>Volumen Ruso</option><option>Mega Volumen</option><option>Lifting</option><option>Remoción</option></select></div>
+              <div style="font-family:var(--fd);font-size:18px;font-weight:500;margin-bottom:10px;">Reservá tu turno</div>
+              <div id="tf2-step-0">
+                <div class="fg"><label>📅 Fecha</label><input type="date" id="t2-date" onchange="dashLoadSlots('t2')"></div>
+                <div style="margin-top:10px;">
+                  <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:7px;">⏰ Horarios disponibles</div>
+                  <div style="display:flex;flex-wrap:wrap;gap:6px;" id="t2-slots-grid"><div style="font-size:13px;color:var(--muted);font-style:italic;">Seleccioná una fecha primero</div></div>
+                </div>
+                <div id="t2-slot-sel" style="display:none;margin-top:10px;padding:7px 12px;background:var(--goldp);border:1px solid rgba(201,168,76,.3);border-radius:50px;font-size:13px;color:var(--goldd);text-align:center;"></div>
+                <button class="btn-crimson" style="width:100%;padding:11px;margin-top:12px;" onclick="dashNextStep('t2',1)">Siguiente →</button>
               </div>
-              <div class="fg"><label>Fecha</label><input type="date" id="t2-date"></div>
-              <div class="fg"><label>Mensaje</label><textarea id="t2-msg" rows="2" placeholder="Algo que quieras comentar..."></textarea></div>
-              <button class="btn-crimson" style="width:100%;padding:11px;" onclick="saveTurno2()">Enviar solicitud</button>
+              <div id="tf2-step-1" style="display:none;">
+                <div class="fg"><label>Nombre completo</label><input type="text" id="t2-name" placeholder="Tu nombre"></div>
+                <div class="fg"><label>Teléfono/WhatsApp</label><input type="tel" id="t2-tel" placeholder="+54..."></div>
+                <div class="fg"><label>Mensaje (opcional)</label><textarea id="t2-msg" rows="2" placeholder="Algo que quieras comentar..."></textarea></div>
+                <div id="t2-resumen" style="background:var(--goldp);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:10px 13px;font-size:12.5px;color:var(--goldd);margin-bottom:12px;line-height:1.6;"></div>
+                <div style="display:flex;gap:8px;">
+                  <button class="btn-g" style="flex:1;padding:10px;" onclick="dashNextStep('t2',0)">← Volver</button>
+                  <button class="btn-crimson" style="flex:2;padding:10px;" onclick="saveTurno2()">✓ Confirmar turno</button>
+                </div>
+              </div>
+              <div id="tf2-step-2" style="display:none;text-align:center;padding:16px 0;">
+                <div style="font-size:42px;margin-bottom:8px;">✅</div>
+                <div style="font-family:var(--fd);font-size:18px;color:var(--dark);margin-bottom:6px;">¡Turno solicitado!</div>
+                <div style="font-size:13px;color:var(--muted);line-height:1.6;" id="t2-confirm-txt"></div>
+                <button class="btn-g" style="margin-top:14px;width:100%;padding:9px;" onclick="dashNextStep('t2',0);dashResetForm('t2')">+ Nueva reserva</button>
+              </div>
             </div>
           </div>
         </div>
@@ -4635,18 +4672,130 @@ async function admRevokeEbook(userEmail, ebookId){
 
 // ── COURSE EDITOR PAGE ──────────────────────────────
 function admOpenEditor(){
-  // Hide all adm pages, show editor
-  document.querySelectorAll('.adm-pg').forEach(p=>p.style.display='none');
+  // Use same classList system as admPage
+  document.querySelectorAll('.adm-pg').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.adm-ni').forEach(el=>el.classList.remove('active'));
   const ep=document.getElementById('adm-curso-editor');
-  if(ep){ ep.style.display=''; ep.scrollIntoView({behavior:'smooth',block:'start'}); }
-  // Scroll adm-body to top
-  const body=document.querySelector('.adm-body');
-  if(body) body.scrollTop=0;
+  if(ep){
+    ep.classList.add('active');
+    const body=document.querySelector('.adm-body');
+    if(body) body.scrollTop=0;
+  }
 }
 function admCloseEditor(){
   const ep=document.getElementById('adm-curso-editor');
-  if(ep) ep.style.display='none';
+  if(ep) ep.classList.remove('active');
   admPage('cursos');
+}
+
+
+// ── DASHBOARD TURNO SLOT SYSTEM ─────────────────────
+// prefix: 't' for form1, 't2' for form2
+const _dashSlot={t:'',t2:''};
+const _dashServ={t:'',t2:''};
+const _dashStep={t:0,t2:0};
+
+function dashLoadSlots(prefix){
+  const dateStr=document.getElementById(prefix+'-date').value;
+  const grid=document.getElementById(prefix+'-slots-grid');
+  if(!grid)return;
+  grid.innerHTML='';
+  if(!dateStr){grid.innerHTML='<div style="font-size:13px;color:var(--muted);font-style:italic;">Seleccioná una fecha primero</div>';return;}
+  const slots=getSlotsForDate(dateStr);
+  const taken=getTakenSlots(dateStr);
+  if(!slots.length){grid.innerHTML='<div style="font-size:13px;color:var(--muted);font-style:italic;">No hay horarios para ese día</div>';return;}
+  slots.forEach(function(t){
+    const isTaken=taken.includes(t);
+    const btn=document.createElement('button');
+    btn.textContent=t+(isTaken?' 🚫':'');
+    btn.style.cssText='padding:7px 13px;border-radius:50px;border:1.5px solid '+(isTaken?'var(--crd)':'rgba(201,168,76,.4)')+';background:'+(isTaken?'var(--cr)':'var(--goldp)')+';color:'+(isTaken?'var(--muted)':'var(--goldd)')+';font-size:12.5px;font-family:var(--fb);cursor:'+(isTaken?'not-allowed':'pointer')+';transition:.15s;';
+    if(!isTaken){
+      btn.onclick=function(){
+        grid.querySelectorAll('button').forEach(b=>{b.style.background='var(--goldp)';b.style.borderColor='rgba(201,168,76,.4)';b.style.fontWeight='400';});
+        btn.style.background='rgba(201,168,76,.35)';btn.style.borderColor='var(--gold)';btn.style.fontWeight='700';
+        _dashSlot[prefix]=t;
+        const sel=document.getElementById(prefix+'-slot-sel');
+        if(sel){sel.style.display='';sel.textContent='⏰ Seleccionaste: '+t;}
+      };
+    }
+    grid.appendChild(btn);
+  });
+  _dashSlot[prefix]='';
+  const sel=document.getElementById(prefix+'-slot-sel');if(sel)sel.style.display='none';
+}
+
+function dashNextStep(prefix,step){
+  const formPfx=prefix==='t'?'tf1':'tf2';
+  if(step===1){
+    const date=document.getElementById(prefix+'-date').value;
+    if(!date){toast('⚠️ Elegí una fecha');return;}
+    if(!_dashSlot[prefix]){toast('⚠️ Elegí un horario disponible');return;}
+    const serv=_dashServ[prefix]||'Consulta';
+    const res=document.getElementById(prefix+'-resumen');
+    if(res)res.innerHTML='<strong>📋 Resumen:</strong><br>📌 Servicio: '+serv+'<br>📅 Fecha: '+date+'<br>⏰ Horario: '+_dashSlot[prefix];
+  }
+  _dashStep[prefix]=step;
+  [0,1,2].forEach(i=>{
+    const el=document.getElementById(formPfx+'-step-'+i);
+    if(el)el.style.display=(i===step?'':'none');
+  });
+}
+
+function dashResetForm(prefix){
+  _dashSlot[prefix]='';_dashServ[prefix]='';_dashStep[prefix]=0;
+  const dateEl=document.getElementById(prefix+'-date');if(dateEl)dateEl.value='';
+  const nameEl=document.getElementById(prefix+'-name');if(nameEl)nameEl.value='';
+  const telEl=document.getElementById(prefix+'-tel');if(telEl)telEl.value='';
+  const msgEl=document.getElementById(prefix+'-msg');if(msgEl)msgEl.value='';
+  const grid=document.getElementById(prefix+'-slots-grid');
+  if(grid)grid.innerHTML='<div style="font-size:13px;color:var(--muted);font-style:italic;">Seleccioná una fecha primero</div>';
+  const sel=document.getElementById(prefix+'-slot-sel');if(sel)sel.style.display='none';
+  // reset services highlight
+  document.querySelectorAll('.tsv').forEach(e=>e.classList.remove('sel'));
+}
+
+// Override setTurnoService to also store in _dashServ
+const _origSetServ=typeof setTurnoService==='function'?setTurnoService:null;
+function setTurnoService(serv){
+  _dashServ.t=serv;
+  document.querySelectorAll('#cpanel-turnos .tsv').forEach(e=>e.classList.remove('sel'));
+  event.currentTarget.classList.add('sel');
+}
+function setTurnoService2(serv){
+  _dashServ.t2=serv;
+  document.querySelectorAll('#explorer-turnos .tsv').forEach(e=>e.classList.remove('sel'));
+  event.currentTarget.classList.add('sel');
+}
+
+// Override saveTurno to use slot
+const _origSaveTurno=typeof saveTurno==='function'?saveTurno:null;
+function saveTurno(){
+  const name=document.getElementById('t-name').value.trim();
+  const tel=document.getElementById('t-tel').value.trim();
+  const date=document.getElementById('t-date').value;
+  if(!name||!tel){toast('⚠️ Nombre y teléfono son requeridos');return;}
+  if(!date||!_dashSlot.t){toast('⚠️ Falta fecha u horario');return;}
+  const serv=_dashServ.t||'Consulta';
+  const turno={id:Date.now(),name,tel,serv,date,time:_dashSlot.t,msg:document.getElementById('t-msg')?.value.trim()||'',status:'pending',ts:new Date().toLocaleDateString('es-AR')};
+  const arr=gT();arr.push(turno);sT(arr);
+  const txt=document.getElementById('t-confirm-txt');
+  if(txt)txt.innerHTML='<strong>'+serv+'</strong><br>📅 '+date+' a las <strong>'+_dashSlot.t+'</strong><br>📱 Te contactamos al '+tel;
+  dashNextStep('t',2);
+  if(typeof pushNotif==='function')pushNotif('📅','Turno solicitado correctamente');
+}
+function saveTurno2(){
+  const name=document.getElementById('t2-name').value.trim();
+  const tel=document.getElementById('t2-tel').value.trim();
+  const date=document.getElementById('t2-date').value;
+  if(!name||!tel){toast('⚠️ Nombre y teléfono son requeridos');return;}
+  if(!date||!_dashSlot.t2){toast('⚠️ Falta fecha u horario');return;}
+  const serv=_dashServ.t2||'Consulta';
+  const turno={id:Date.now(),name,tel,serv,date,time:_dashSlot.t2,msg:document.getElementById('t2-msg')?.value.trim()||'',status:'pending',ts:new Date().toLocaleDateString('es-AR')};
+  const arr=gT();arr.push(turno);sT(arr);
+  const txt=document.getElementById('t2-confirm-txt');
+  if(txt)txt.innerHTML='<strong>'+serv+'</strong><br>📅 '+date+' a las <strong>'+_dashSlot.t2+'</strong><br>📱 Te contactamos al '+tel;
+  dashNextStep('t2',2);
+  if(typeof pushNotif==='function')pushNotif('📅','Turno solicitado correctamente');
 }
 
 </script>
@@ -4818,6 +4967,18 @@ function admCloseEditor(){
         <div class="fg"><label>Título</label><input type="text" id="txt-com-tit" placeholder="Comunidad Mira Estudio"></div>
         <div class="fg"><label>Texto</label><textarea id="txt-com-txt" rows="2"></textarea></div>
         <button class="abtn" onclick="admSaveTextos('com')">Guardar</button>
+      </div>
+    </div>
+
+    <!-- COURSE EDITOR PAGE -->
+    <div class="adm-pg editor-pg" id="adm-curso-editor" style="padding:0;">
+      <div class="editor-pg-hdr">
+        <button class="editor-pg-back" onclick="admCloseEditor()">← Volver a Cursos</button>
+        <div class="editor-pg-title" id="editor-pg-title">Editar curso</div>
+        <button class="editor-pg-save" onclick="admSaveCurso(window._editorIsNew||false)">✓ Guardar cambios</button>
+      </div>
+      <div class="editor-pg-body">
+        <div id="cmod-body"></div>
       </div>
     </div>
 
