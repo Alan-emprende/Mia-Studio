@@ -1529,8 +1529,12 @@ function initFirebase(){
     _db=firebase.firestore();_auth=firebase.auth();_fbReady=true;
     const badge=document.getElementById('fb-status-badge');
     if(badge){badge.textContent='☁ online';badge.style.background='rgba(34,197,94,.2)';badge.style.color='#4ade80';}
-    _auth.onAuthStateChanged(user=>{if(user){_fbUid=user.uid;_syncSiteFromCloud();}else{_fbUid=null;}});
+    // Always sync site config (public read)
     _syncSiteFromCloud();
+    _auth.onAuthStateChanged(user=>{
+      if(user){_fbUid=user.uid;_syncSiteFromCloud();}
+      else{_fbUid=null;}
+    });
   }catch(e){console.warn('Firebase error:',e.message);}
 }
 async function _fsGet(key){if(!_fbReady||!_db)return null;try{const d=await _db.collection('site').doc(key).get();return d.exists?(d.data().v??null):null;}catch(e){return null;}}
@@ -2155,7 +2159,18 @@ document.addEventListener('DOMContentLoaded',()=>{
 // ADMIN PANEL — PART 2
 // ═══════════════════════════════════════════════════════
 
-function loadAdminData(){admPage('estetica');}
+function loadAdminData(){
+  // Pull latest data from Firestore before showing admin
+  if(_fbReady&&_db){
+    toast('☁ Sincronizando datos...');
+    _syncSiteFromCloud().then(()=>{
+      admPage('estetica');
+      toast('✅ Datos actualizados');
+    }).catch(()=>admPage('estetica'));
+  } else {
+    admPage('estetica');
+  }
+}
 
 function admLogout(){
   currentUser=null;localStorage.removeItem(KS);
@@ -2889,6 +2904,31 @@ function admSaveCfgDash(){
 
 
 // ═══ INSTAGRAM CAROUSEL ═══
+
+// ── SLOT HELPERS (GLOBAL) ─────────────────────────
+const DEFAULT_SLOTS=[
+  {day:'Lunes',times:['09:00','10:30','12:00','15:00','16:30']},
+  {day:'Martes',times:['09:00','10:30','14:00','15:30']},
+  {day:'Miércoles',times:['09:00','11:00','14:00','16:00']},
+  {day:'Jueves',times:['10:00','11:30','15:00','16:30']},
+  {day:'Viernes',times:['09:00','10:30','12:00','14:00']},
+  {day:'Sábado',times:['09:00','10:30','12:00']},
+];
+function gSlotsLoc(){try{return JSON.parse(localStorage.getItem('ms_slots')||'[]');}catch(e){return[];}}
+function getSlotsForDate(dateStr){
+  if(!dateStr)return[];
+  const d=new Date(dateStr+'T00:00:00');
+  const days=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const dayName=days[d.getDay()];
+  const cfg=gSlotsLoc();
+  const src=cfg.length?cfg:DEFAULT_SLOTS;
+  const row=src.find(s=>s.day===dayName);
+  return row?row.times:[];
+}
+function getTakenSlots(dateStr){
+  return gT().filter(t=>t.date===dateStr&&t.status!=='cancelled').map(t=>t.time);
+}
+
 (function(){
   const ORDER = ['ebooks','cursos','turnos'];
   let centerIdx = 1; // cursos starts center
@@ -2943,29 +2983,8 @@ function admSaveCfgDash(){
     if(!isOpen || !toggle){ target.classList.add('open'); }
   }
 
-  // ── SLOT HELPERS ──
-  const DEFAULT_SLOTS=[
-    {day:'Lunes',times:['09:00','10:30','12:00','15:00','16:30']},
-    {day:'Martes',times:['09:00','10:30','14:00','15:30']},
-    {day:'Miércoles',times:['09:00','11:00','14:00','16:00']},
-    {day:'Jueves',times:['10:00','11:30','15:00','16:30']},
-    {day:'Viernes',times:['09:00','10:30','12:00','14:00']},
-    {day:'Sábado',times:['09:00','10:30','12:00']},
-  ];
-  function gSlotsLoc(){try{return JSON.parse(localStorage.getItem('ms_slots')||'[]');}catch(e){return[];}}
-  function getSlotsForDate(dateStr){
-    if(!dateStr)return[];
-    const d=new Date(dateStr+'T00:00:00');
-    const days=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-    const dayName=days[d.getDay()];
-    const cfg=gSlotsLoc();
-    const src=cfg.length?cfg:DEFAULT_SLOTS;
-    const row=src.find(s=>s.day===dayName);
-    return row?row.times:[];
-  }
-  function getTakenSlots(dateStr){
-    return gT().filter(t=>t.date===dateStr&&t.status!=='cancelled').map(t=>t.time);
-  }
+  // ── SLOT HELPERS (delegated to global scope) ──
+  // getSlotsForDate / getTakenSlots / DEFAULT_SLOTS are global (see below)
 
   window.icarLoadSlots=function(){
     const dateStr=document.getElementById('ict-date').value;
@@ -4798,6 +4817,25 @@ function saveTurno2(){
   if(typeof pushNotif==='function')pushNotif('📅','Turno solicitado correctamente');
 }
 
+
+// ── ADMIN FORCE SYNC ────────────────────────────────
+async function admForcSync(){
+  if(!_fbReady||!_db){
+    toast('⚠️ Firebase no disponible');
+    return;
+  }
+  toast('☁ Sincronizando con la nube...');
+  try{
+    await _syncSiteFromCloud();
+    // Refresh current admin page
+    const active=document.querySelector('.adm-ni.active');
+    if(active&&active.dataset.adm) admPage(active.dataset.adm);
+    toast('✅ Datos sincronizados correctamente');
+  }catch(e){
+    toast('❌ Error al sincronizar: '+e.message);
+  }
+}
+
 </script>
 
 <!-- ADMIN PANEL PART 2 -->
@@ -4827,6 +4865,7 @@ function saveTurno2(){
       <button class="adm-ni" data-adm="social" onclick="admPage('social')">🌐 Redes Sociales</button>
       <button class="adm-ni" data-adm="config" onclick="admPage('config')">⚙️ Configuración</button>
     </nav>
+    <button class="adm-exit" onclick="admForcSync()" style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.25);color:var(--goldd);margin-bottom:6px;">☁ Sincronizar</button>
     <button class="adm-exit" onclick="admLogout()">← Volver al sitio</button>
   </aside>
 
