@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="site-title">Mira Estudio — Mi Área</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<title id="site-title">Mira Estudio — Dashboard</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -4761,357 +4761,11 @@ function switchCarousel(tab){
 
 <script src="shared.js"></script>
 <script>
-function setupDash(u){
-  const ini=u.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
-  ['uav','pav'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=ini;});
-  document.getElementById('uname').textContent=u.name;
-  document.getElementById('wname').textContent=u.name.split(' ')[0];
-  ['pname','pname'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=u.name;});
-  const pe=document.getElementById('pemail');if(pe)pe.textContent=u.email;
-  document.getElementById('sb-badge').textContent=gc().filter(c=>!c.locked).length;
-  renderCarouselCourses();renderEbooks();renderResources();
-  updateDashStats();
-}
-
-function showPage(p){
-  ['home','explorar','progreso','comunidad','recursos','perfil'].forEach(pg=>{
-    const el=document.getElementById('page-'+pg);if(el)el.style.display=pg===p?'':'none';
-  });
-  document.querySelectorAll('.sb-item').forEach(n=>n.classList.remove('active'));
-  const ni=document.getElementById('nav-'+p);if(ni)ni.classList.add('active');
-  const titles={home:'Inicio',explorar:'Explorar',progreso:'Mi Progreso',comunidad:'Comunidad',recursos:'Recursos',perfil:'Mi Perfil'};
-  document.getElementById('tb-title').textContent=titles[p]||p;
-  if(p==='progreso'||p==='home')updateDashStats();
-  if(window.innerWidth<=768)document.getElementById('main-sidebar').classList.remove('open');
-  if(window.innerWidth<=768&&typeof closeSidebar==='function')closeSidebar();
-}
-function toggleSidebar(){
-  const sb=document.getElementById('main-sidebar');
-  const ov=document.getElementById('sidebar-overlay');
-  if(!sb)return;
-  sb.classList.toggle('open');
-  if(ov) ov.classList.toggle('active', sb.classList.contains('open'));
-  document.body.style.overflow=sb.classList.contains('open')&&window.innerWidth<=768?'hidden':'';
-}
-function closeSidebar(){
-  const sb=document.getElementById('main-sidebar');
-  const ov=document.getElementById('sidebar-overlay');
-  if(sb)sb.classList.remove('open');
-  if(ov)ov.classList.remove('active');
-  document.body.style.overflow='';
-}
-function switchExplorer(tab){
-  ['cursos','ebooks','turnos'].forEach(t=>{
-    const btn=document.getElementById('etab-'+t);if(btn)btn.className='car-tab'+(t===tab?' active':'');
-    const panel=document.getElementById('explorer-'+t);if(panel)panel.style.display=t===tab?'':'none';
-  });
-}
-
-// ═══ COURSE RENDERS ═══
-function buildCourseThumb(c){
-  if(c.coverImg) return `<img class="cct-img" src="${c.coverImg}" alt="${c.title}"><div class="cct-overlay"></div><span class="cct-emoji-over">${c.emoji}</span>`;
-  return `<div class="cctbg" style="background:${c.color||'linear-gradient(135deg,#3D0015,#8C0026)'}"></div><span class="ccte">${c.emoji}</span>`;
-}
-function buildPriceBadge(c){
-  if(!c.price||c.price==='0'||c.price===''||c.price==='Gratis') return '<span class="cct-price-badge cct-free-badge">Gratis</span>';
-  return `<span class="cct-price-badge">${c.price}</span>`;
-}
-function buildBuyBtn(c){
-  const isFree=!c.price||c.price==='0'||c.price===''||c.price==='Gratis';
-  if(isFree) return `<button class="btn-buy btn-buy-free" onclick="event.stopPropagation();openViewer(${c.id})">▶ Comenzar gratis</button>`;
-  if(c.payLink) return `<button class="btn-buy" onclick="event.stopPropagation();buyCourse(${c.id})">🛒 Comprar ${c.price}</button>`;
-  return `<button class="btn-buy" onclick="event.stopPropagation();openViewer(${c.id})">🛒 Comprar ${c.price}</button>`;
-}
-function renderCarouselCourses(filt='todos', q=''){
-  const all=gc();let list=filt==='todos'?all:all.filter(c=>c.level===filt);
-  if(q){const ql=q.toLowerCase();list=list.filter(c=>(c.title+' '+(c.description||'')).toLowerCase().includes(ql));}
-  const lvlC={principiante:'lvl-b',intermedio:'lvl-i',avanzado:'lvl-a'};
-  const html=list.map(c=>{
-    const tot=(c.modules||[]).reduce((a,m)=>a+m.lessons.length,0);
-    const thumb=buildCourseThumb(c);
-    const priceBadge=buildPriceBadge(c);
-    if(c.locked)return`<div class="course-card clocked"><div class="cct">${thumb}${priceBadge}</div><div class="ccc"><div class="cch"><div class="ccn">${c.title}</div><span class="clvl ${lvlC[c.level]||'lvl-b'}">${c.levelLabel}</span></div><p class="ccd">${c.description}</p><div class="ccf"><div class="cmi">📹 ${tot||'?'} clases</div><div class="lckbdg">🔒 Próximamente</div></div></div></div>`;
-    const buyBtn=buildBuyBtn(c);
-    return`<div class="course-card" onclick="openViewer(${c.id})"><div class="cct">${thumb}${priceBadge}</div><div class="ccc"><div class="cch"><div class="ccn">${c.title}</div><span class="clvl ${lvlC[c.level]||'lvl-b'}">${c.levelLabel}</span></div><p class="ccd">${c.description}</p><div class="ccf"><div class="cmi">📹 ${tot} clases &nbsp;📋 ${(c.modules||[]).length} módulos</div>${buyBtn}</div></div></div>`;
-  }).join('');
-  const el1=document.getElementById('carousel-courses-list');if(el1)el1.innerHTML=html;
-  const el2=document.getElementById('explorer-courses-list');if(el2)el2.innerHTML=html;
-}
-function filterCar(lv,btn){renderCarouselCourses(lv);}
-
-// ═══ EBOOKS ═══
-function renderEbooks(){
-  const ebs=gEB();
-  const cards=ebs.map(e=>{
-    const cover=e.cover?`<img src="${e.cover}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`:`<span>${e.emoji||'📕'}</span>`;
-    const price=e.paid?(e.price||'De pago'):'Gratis';
-    const isPurchased=!e.paid||hasEbook(e.id);
-    let btn;
-    const dlLink = e.downloadLink || e.link || '';
-    const pyLink = e.payLink || e.link || '';
-    if(!e.paid){
-      // Free ebook → show download link
-      btn=dlLink
-        ?`<a href="${dlLink}" target="_blank" rel="noopener" class="btn-crimson" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;text-decoration:none;border-radius:50px;">⬇ Descargar gratis</a>`
-        :`<button class="btn-g" style="margin-top:10px;width:100%;padding:9px;font-size:13px;opacity:.5;cursor:default;" disabled>Próximamente</button>`;
-    } else if(isPurchased){
-      // Paid + already purchased → show download link
-      btn=dlLink
-        ?`<a href="${dlLink}" target="_blank" rel="noopener" class="btn-crimson" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;text-decoration:none;border-radius:50px;">✅ Ver / Descargar</a>`
-        :`<button class="btn-g" style="margin-top:10px;width:100%;padding:9px;font-size:13px;opacity:.5;cursor:default;" disabled>Sin link de descarga</button>`;
-    } else {
-      // Paid + not yet purchased → show payment link
-      btn=pyLink
-        ?`<button onclick="buyEbook('${e.id}')" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;border:none;border-radius:50px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;cursor:pointer;font-family:var(--fb);">🛒 Comprar ${price}</button>`
-        :`<button class="btn-g" style="margin-top:10px;width:100%;padding:9px;font-size:13px;opacity:.5;cursor:default;" disabled>Próximamente</button>`;
-    }
-    const lockBadge=e.paid&&!isPurchased?`<div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);border-radius:50px;padding:3px 8px;font-size:11px;color:#fff;">🔒 Pago</div>`:'';
-    return`<div class="ebook-card" style="position:relative;"><div class="ebook-cover" style="background:${e.color||'#8C0026'};">${cover}</div>${lockBadge}<div class="ebook-title">${e.title}</div><p class="ebook-desc">${e.desc}</p><div class="ebook-price ${e.paid&&!isPurchased?'':'ebook-free'}">${price}</div>${btn}</div>`;
-  }).join('');
-  const el1=document.getElementById('ebook-grid');if(el1)el1.innerHTML=cards;
-  const el2=document.getElementById('explorer-ebook-grid');if(el2)el2.innerHTML=cards;
-}
-
-// ═══ RECURSOS ═══
-function renderResources(){
-  const recs=gR();
-  const html=recs.map(r=>`<div class="ritem"><div class="rico">${r.icon}</div><div><div class="rname">${r.name}</div><div class="rtype">${r.type}</div></div></div>`).join('');
-  const el=document.getElementById('rlist');if(el)el.innerHTML=html;
-}
-
-// ═══ TURNO ═══
-function setTurnoService(s){document.getElementById('t-serv').value=s;}
-function setTurnoService2(s){document.getElementById('t2-serv').value=s;}
-function saveTurnoForm(nameId,telId,servId,dateId,msgId){
-  const name=document.getElementById(nameId).value.trim(),tel=document.getElementById(telId).value.trim();
-  if(!name||!tel){toast('⚠️ Nombre y teléfono son requeridos');return false;}
-  const t=gT();
-  t.push({id:Date.now(),name,tel,serv:document.getElementById(servId).value,date:document.getElementById(dateId).value,msg:document.getElementById(msgId).value.trim(),ts:new Date().toLocaleDateString('es-AR')});
-  sT(t);
-  [nameId,telId,dateId,msgId].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  toast('✅ Solicitud enviada. Te contactamos pronto!');return true;
-}
-function saveTurno(){saveTurnoForm('t-name','t-tel','t-serv','t-date','t-msg');}
-function saveTurno2(){saveTurnoForm('t2-name','t2-tel','t2-serv','t2-date','t2-msg');}
-
-// ═══ FAB ═══
-function toggleFab(){fabOpen=!fabOpen;document.getElementById('fab-menu').classList.toggle('open',fabOpen);}
-function fabGo(a){
-  fabOpen=false;document.getElementById('fab-menu').classList.remove('open');
-  if(a==='cursos'){showPage('explorar');switchExplorer('cursos');}
-  else if(a==='turno'){showPage('explorar');switchExplorer('turnos');}
-  else if(a==='info'){document.getElementById('info-modal-cnt').textContent=localStorage.getItem(KI)||DEF_INFO;openOv('info-modal');}
-  else if(a==='faq'){renderFAQModal();openOv('faq-modal');}
-}
-document.addEventListener('click',e=>{if(fabOpen&&!e.target.closest('.fab-wrap')){fabOpen=false;document.getElementById('fab-menu').classList.remove('open');}});
-function renderFAQModal(){const faqs=gF();document.getElementById('faq-modal-list').innerHTML=faqs.map(f=>`<div style="padding:13px 0;border-bottom:1px solid var(--crd);"><div style="font-weight:500;color:var(--dark);margin-bottom:4px;">${f.q}</div><div style="font-size:14px;color:var(--muted);">${f.a}</div></div>`).join('');}
-
-// ═══ VIEWER ═══
-function openViewer(id){
-  const courses=gc();const c=courses.find(x=>x.id===id);if(!c||c.locked)return;
-  currentCourseId=id;lessonFlat=[];
-  (c.modules||[]).forEach((m,mi)=>m.lessons.forEach((l,li)=>lessonFlat.push({mi,li,mid:m.id,lid:l.id})));
-  document.getElementById('vcname').textContent=c.title;
-  document.getElementById('vsh-tit').textContent=c.title;
-  const tot=lessonFlat.length;const prog=getProgress(id);const done=(c.modules||[]).reduce((a,m)=>a+m.lessons.filter(l=>l.done||!!prog[l.id]).length,0);
-  const pct=tot>0?Math.round(done/tot*100):0;
-  document.getElementById('vpf').style.width=pct+'%';document.getElementById('vpt').textContent=pct+'% completado';
-  document.getElementById('vsh-meta').textContent=`${(c.modules||[]).length} módulos · ${tot} clases`;
-  renderVModules(c);showView('course-viewer');
-  applyCourseThumbToViewer(c);
-  const fm=document.querySelector('.mod-hdr');if(fm)openMod(fm);
-  if(lessonFlat.length)selLesson(lessonFlat[0]);
-  // vs-panel mobile handled by vsCheckMobile()
-}
-function renderVModules(c){
-  document.getElementById('vmodules').innerHTML=(c.modules||[]).map((m,mi)=>{
-    const prog=getProgress(currentCourseId);const dc=m.lessons.filter(l=>l.done||!!prog[l.id]).length;
-    return`<div class="mod-sec"><div class="mod-hdr" onclick="toggleMod(this)"><div><div class="mod-num">Módulo ${mi+1} · ${dc}/${m.lessons.length}</div><div class="mod-name">${m.title}</div></div><span class="mod-chev">▾</span></div><div class="mod-lessons">${m.lessons.map((l,li)=>{const isDoneL=l.done||!!prog[l.id];const sc=isDoneL?'done':(li===0&&dc===0&&!isDoneL?'current':'locked');const si=isDoneL?'✓':(sc==='current'?'▶':li+1);return`<div class="les-item" id="li-${m.id}-${l.id}" onclick="selById('${m.id}','${l.id}')"><div class="les-st ${sc}">${si}</div><div><div class="les-name">${l.title}</div><div class="les-dur">⏱ ${l.duration}</div></div></div>`;}).join('')}</div></div>`;
-  }).join('');
-}
-function toggleMod(h){const l=h.nextElementSibling,c=h.querySelector('.mod-chev'),o=l.classList.contains('open');if(o){l.classList.remove('open');c.classList.remove('open');h.classList.remove('open');}else openMod(h);}
-function openMod(h){h.nextElementSibling.classList.add('open');h.querySelector('.mod-chev').classList.add('open');h.classList.add('open');}
-function selById(mid,lid){const idx=lessonFlat.findIndex(f=>f.mid===mid&&f.lid===lid);if(idx>=0)selLesson(lessonFlat[idx]);}
-// ── VIDEO URL PARSER ────────────────────────────────
-function parseVideoUrl(raw){
-  if(!raw||!raw.trim())return null;
-  const url=raw.trim();
-  // YouTube
-  let m=url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  if(m)return{type:'yt',embed:`https://www.youtube.com/embed/${m[1]}?rel=0&modestbranding=1&color=white`};
-  // Vimeo
-  m=url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-  if(m)return{type:'vi',embed:`https://player.vimeo.com/video/${m[1]}?color=C9A84C&title=0&byline=0`};
-  // Google Drive
-  m=url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
-  if(m)return{type:'gd',embed:`https://drive.google.com/file/d/${m[1]}/preview`};
-  // Direct mp4/webm/ogg
-  if(url.match(/\.(mp4|webm|ogv|ogg)(\?.*)?$/i))return{type:'mp4',embed:url};
-  // Fallback — try as embed
-  if(url.startsWith('http'))return{type:'iframe',embed:url};
-  return null;
-}
-
-function renderVideoArea(l){
-  const area=document.getElementById('vid-area');if(!area)return;
-  // remove old embed
-  area.querySelectorAll('.vid-embed,.vid-no-url,.vid-type-badge,video.vid-direct').forEach(el=>el.remove());
-  const ph=document.getElementById('vid-ph');
-  const bar=document.getElementById('vid-complete-bar');
-  if(bar)bar.style.display='';
-  const parsed=parseVideoUrl(l.videoUrl);
-  if(!parsed){
-    // Show styled placeholder
-    if(ph)ph.style.display='';
-    document.getElementById('vlt').textContent=l.title;
-    document.getElementById('vls').textContent='Sin video asignado · '+l.duration;
-    // add "no url" overlay
-    const noUrl=document.createElement('div');
-    noUrl.className='vid-no-url';
-    noUrl.innerHTML=`<div class="vid-no-url-icon">🎬</div><div class="vid-no-url-txt">${l.title}</div><div class="vid-no-url-sub">El administrador aún no asignó un video a esta clase</div>`;
-    area.appendChild(noUrl);
-    return;
-  }
-  if(ph)ph.style.display='none';
-  // badge
-  const labels={yt:'YouTube',vi:'Vimeo',gd:'Google Drive',mp4:'Video',iframe:'Video'};
-  const badge=document.createElement('div');badge.className='vid-type-badge';badge.textContent=labels[parsed.type]||'Video';area.appendChild(badge);
-  if(parsed.type==='mp4'){
-    const vid=document.createElement('video');
-    vid.className='vid-embed vid-direct';vid.controls=true;vid.autoplay=false;
-    vid.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;';
-    vid.src=parsed.embed;area.appendChild(vid);
-  }else{
-    const ifr=document.createElement('iframe');
-    ifr.className='vid-embed';ifr.src=parsed.embed;
-    ifr.setAttribute('allowfullscreen','');ifr.setAttribute('allow','autoplay; fullscreen; picture-in-picture');
-    area.appendChild(ifr);
-  }
-}
-
-function updateDoneUI(isDone){
-  const st=document.getElementById('vcb-status');
-  const lbl=document.getElementById('vcb-label');
-  const btn=document.getElementById('btn-mark-done');
-  if(!st)return;
-  if(isDone){
-    st.className='vcb-status done';st.textContent='✓';
-    if(lbl){lbl.className='vcb-label done';lbl.textContent='Clase completada';}
-    if(btn){btn.className='btn-mark-done done';btn.textContent='✓ Completada';btn.disabled=true;}
-  }else{
-    st.className='vcb-status';st.textContent='';
-    if(lbl){lbl.className='vcb-label';lbl.textContent='Marcar como completada al terminar';}
-    if(btn){btn.className='btn-mark-done';btn.textContent='✓ Marcar como completada';btn.disabled=false;}
-  }
-}
-
-function updateViewerProgress(){
-  const courses=gc();const c=courses.find(x=>x.id===currentCourseId);if(!c)return;
-  const prog=getProgress(currentCourseId);
-  const total=lessonFlat.length;
-  const done=lessonFlat.filter(f=>{
-    const m=c.modules[f.mi];const l=m&&m.lessons[f.li];
-    return l&&(l.done||prog[l.id]);
-  }).length;
-  const pct=total>0?Math.round(done/total*100):0;
-  const fill=document.getElementById('vs-prog-fill');const txt=document.getElementById('vs-prog-txt');
-  const vfill=document.getElementById('vpf');const vpt=document.getElementById('vpt');
-  if(fill)fill.style.width=pct+'%';if(txt)txt.textContent=pct+'%';
-  if(vfill)vfill.style.width=pct+'%';if(vpt)vpt.textContent=pct+'% completado';
-  // refresh sidebar icons
-  renderVModules(c);
-}
-
-// ── PROGRESS STORAGE ─────────────────────────────────
-function getProgress(courseId){
-  try{return JSON.parse(localStorage.getItem('prog_'+courseId)||'{}');}catch(e){return {};}
-}
-function setProgress(courseId,lessonId,done){
-  const p=getProgress(courseId);
-  if(done)p[lessonId]=true;else delete p[lessonId];
-  localStorage.setItem('prog_'+courseId,JSON.stringify(p));
-}
-
-function markLessonDone(){
-  const c=gc().find(x=>x.id===currentCourseId);if(!c)return;
-  const flat=lessonFlat[lessonIdx];if(!flat)return;
-  const m=c.modules[flat.mi];const l=m&&m.lessons[flat.li];if(!l)return;
-  setProgress(currentCourseId,l.id,true);
-  updateDoneUI(true);
-  // highlight lesson as done in sidebar
-  const li=document.getElementById(`li-${m.id}-${l.id}`);
-  if(li){const st=li.querySelector('.les-st');if(st){st.className='les-st done';st.textContent='✓';}}
-  updateViewerProgress();
-  // auto-advance after short delay
-  setTimeout(()=>{
-    if(lessonIdx<lessonFlat.length-1){navL(1);}
-    else{toast('🏆 ¡Módulo completado! Podés avanzar al siguiente.');}
-  },900);
-}
-
-// ── selLesson (updated) ──────────────────────────────
-function selLesson(flat){
-  lessonIdx=lessonFlat.indexOf(flat);
-  const c=gc().find(x=>x.id===currentCourseId);const m=c.modules[flat.mi];const l=m.lessons[flat.li];
-  document.querySelectorAll('.les-item').forEach(el=>el.classList.remove('active'));
-  const el=document.getElementById(`li-${m.id}-${l.id}`);if(el){el.classList.add('active');el.scrollIntoView({behavior:'smooth',block:'nearest'});}
-  // video
-  renderVideoArea(l);
-  loadNote(currentCourseId, l.id);
-  document.getElementById('vlt').textContent=l.title;document.getElementById('vls').textContent=`${m.title} · ${l.duration}`;
-  document.getElementById('lctit').textContent=l.title;document.getElementById('lcmod').textContent=`📹 ${m.title}`;document.getElementById('lcdur').textContent=`⏱ ${l.duration}`;
-  document.getElementById('lcdesc').textContent=l.desc;
-  // done state
-  const prog=getProgress(currentCourseId);
-  const isDone=l.done||!!prog[l.id];
-  updateDoneUI(isDone);
-  updateViewerProgress();
-  const rl=document.getElementById('lcres-list');
-  const hasRes=(l.resources&&l.resources.length)||(l.attachments&&l.attachments.length);
-  if(hasRes){
-    const resHtml=(l.resources||[]).map(r=>`<div class="ritem"><div class="rico">${r.icon}</div><div><div class="rname">${r.name}</div><div class="rtype">${r.type}</div></div></div>`).join('');
-    const attHtml=(l.attachments||[]).map(a=>`<div class="attach-item" onclick="downloadAttachment('${a.name}','${a.data||''}')"><div class="attach-icon">${fileIcon(a.type)}</div><div><div class="attach-name">${a.name}</div><div class="attach-size">${a.size||''}</div></div><div class="attach-dl">⬇ Descargar</div></div>`).join('');
-    rl.innerHTML=resHtml+attHtml;rl.closest('.lcres').style.display='';
-  }else{rl.innerHTML='';rl.closest('.lcres').style.display='none';}
-  document.getElementById('btn-prev').style.display=lessonIdx>0?'':'none';
-  document.getElementById('btn-next').textContent=lessonIdx<lessonFlat.length-1?'Siguiente →':'✓ Completar curso';
-}
-function navL(d){const ni=lessonIdx+d;if(ni>=0&&ni<lessonFlat.length)selLesson(lessonFlat[ni]);}
-function backDash(){showView('dashboard');showPage('explorar');switchExplorer('cursos');updateDashStats();}
-
-// ═══ ESTETICS ═══
-function loadSavedEstetics(){
-  const saved=localStorage.getItem(KES);
-  if(saved){try{const v=JSON.parse(saved);Object.entries(v).forEach(([k,val])=>document.documentElement.style.setProperty(k,val));}catch(e){}}
-  const cfg=gCfg();if(cfg.siteName){const nm=cfg.siteName;['site-name-nav','site-name-footer','sb-brand'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=nm;});document.getElementById('site-title').textContent=nm;}
-}
-function applyText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
-
-// ═══ MISC ═══
-function scrollTo2(id){const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth'});}
-
-// ═══ INIT ═══
-document.addEventListener('DOMContentLoaded',()=>{
-  initFirebase();
-  loadSavedEstetics();
-  loadSavedTexts();
-  applyHeroBg();
-  checkSession();
-  renderLanding();
-  setTimeout(()=>checkUrlAdmin(), 300);
-});
-
-// ═══════════════════════════════════════════════════════
-// ADMIN PANEL — PART 2
-// ═══════════════════════════════════════════════════════
-
-
 
 // ── DASHBOARD INIT ──────────────────────────────────────
 function loginOk(u){
   currentUser = u;
   localStorage.setItem(KS, JSON.stringify(u));
-  if(_fbReady && _db && u.uid) _saveUserProfile(u.uid, {name:u.name, email:u.email, role:u.role||'student', uid:u.uid});
   setupDash(u);
   loadUserPurchases();
 }
@@ -5129,34 +4783,38 @@ function backDash(){
   showPage('home');
 }
 
-document.addEventListener('DOMContentLoaded', ()=>{
-  initFirebase();
-  loadDarkMode();
-  checkSessionDash();
-  renderEbooks();
-});
-
-function checkSessionDash(){
+// Check session on load
+(function initDashboard(){
   const s = localStorage.getItem(KS);
-  if(!s){
-    window.location.href = 'index.html';
-    return;
-  }
-  const u = JSON.parse(s);
-  if(u.role === 'admin'){
-    window.location.href = 'admin.html';
-    return;
-  }
-  currentUser = u;
-  setupDash(u);
-  loadUserPurchases();
-  if(_fbReady && _auth){
-    _auth.onAuthStateChanged(user=>{
-      if(!user){ window.location.href = 'index.html'; }
-      else { _fbUid = user.uid; loadUserPurchases(); }
+  if(!s){ window.location.href = 'index.html'; return; }
+  try{
+    const u = JSON.parse(s);
+    if(!u || !u.role){ window.location.href = 'index.html'; return; }
+    if(u.role === 'admin'){ window.location.href = 'admin.html'; return; }
+    currentUser = u;
+    // Init Firebase and sync
+    document.addEventListener('DOMContentLoaded', ()=>{
+      initFirebase();
+      loadDarkMode();
+      setupDash(u);
+      loadUserPurchases();
+      renderEbooks();
+      // Firebase auth check
+      setTimeout(()=>{
+        if(_fbReady && _auth){
+          _auth.onAuthStateChanged(user=>{
+            if(!user && !localStorage.getItem(KS)){
+              window.location.href = 'index.html';
+            } else if(user){
+              _fbUid = user.uid;
+              loadUserPurchases();
+            }
+          });
+        }
+      }, 1000);
     });
-  }
-}
+  }catch(e){ window.location.href = 'index.html'; }
+})();
 
 </script>
 </body>
