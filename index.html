@@ -728,12 +728,19 @@ body{font-family:var(--fb);background:var(--cr);color:var(--dark);min-height:100
 .topbar-right{display:flex;align-items:center;gap:8px;position:relative;}
 
 /* ── DARK MODE ── */
+/* Default IS dark mode — light mode overrides below */
+body.light-mode{
+  --cr:#FFF8F0;--crd:#EDE0D4;--sw:#FFFFFF;--muted:#8A6A5A;
+  --dark:#1A0008;--darkm:#3A1020;
+  background:var(--cr);color:var(--dark);
+}
 body.dark-mode{
   --cr:#0F0008;--crd:#1F0010;--sw:#170008;--muted:#9A6A72;
   --dark:#F5EBD8;--darkm:#E8D5C0;
   background:var(--cr);color:var(--dark);
 }
 body.dark-mode .topbar,body.dark-mode .sidebar,body.dark-mode .acard,body.dark-mode .scard,body.dark-mode .cc,body.dark-mode .arow{background:rgba(255,255,255,.04);border-color:rgba(201,168,76,.15);}
+body.light-mode .topbar,body.light-mode .sidebar,body.light-mode .acard,body.light-mode .scard,body.light-mode .cc,body.light-mode .arow{background:rgba(255,255,255,.04);border-color:rgba(201,168,76,.15);}
 body.dark-mode .fg input,body.dark-mode .fg select,body.dark-mode .fg textarea{background:rgba(255,255,255,.06);border-color:rgba(201,168,76,.2);color:var(--cr);}
 body.dark-mode .les-card,body.dark-mode .mod-acc{background:rgba(255,255,255,.04);border-color:rgba(201,168,76,.15);}
 body.dark-mode .les-card-body{background:rgba(255,255,255,.03);}
@@ -889,6 +896,50 @@ body.dark-mode .profile-stat{background:#1a0008;}
 .editor-pg-save:hover{filter:brightness(1.1);}
 .editor-pg-body{padding:24px;}
 
+
+@media(max-width:380px){
+  .topbar{padding:0 10px;height:50px;}
+  .tb-title{font-size:14px;}
+  .sidebar{width:240px;}
+  .stats-row{grid-template-columns:1fr 1fr;}
+  .scard{padding:10px 8px;}
+  .scard-val{font-size:20px;}
+  .hero h1{font-size:28px;}
+  .icar-card{min-width:140px;}
+  .adm-pg{padding:14px 12px;}
+  .editor-pg-hdr{flex-wrap:wrap;gap:8px;padding:12px 14px;}
+  .editor-pg-title{font-size:16px;width:100%;}
+  .cform-grid2{grid-template-columns:1fr;}
+}
+
+
+/* ── INTERACTIVE / LOADING STATES ── */
+.btn-loading{position:relative;pointer-events:none;opacity:.75;}
+.btn-loading::after{content:'';display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;margin-left:8px;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.pulse{animation:pulse 2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.6;}}
+/* Touch feedback */
+.sb-item:active,.btn-p:active,.btn-gold:active,.btn-crimson:active,.abtn:active{transform:scale(.97);transition:transform .1s;}
+/* Dashboard card hover */
+.scard{transition:transform .2s,box-shadow .2s;}
+.scard:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(201,168,76,.15);}
+.cc{transition:transform .2s;}
+.cc:hover{transform:translateY(-2px);}
+/* Better focus states for accessibility */
+input:focus,textarea:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px;}
+/* Smooth page transitions */
+.pc{animation:fadeIn .2s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(26,0,8,.6);z-index:149;backdrop-filter:blur(2px);}
+.sidebar-overlay.active{display:block;}
+@media(max-width:768px){
+  .sidebar{position:fixed;left:-260px;top:0;height:100vh;z-index:150;transition:left .28s cubic-bezier(.4,0,.2,1);box-shadow:4px 0 24px rgba(0,0,0,.3);}
+  .sidebar.open{left:0;}
+  .main-content{margin-left:0 !important;}
+}
 </style>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
@@ -1618,7 +1669,12 @@ const ADMIN_PASS_DEFAULT='Mira2025';
 
 // ═══ GETTERS ═══
 const gc=()=>{const d=localStorage.getItem(KC);return d?JSON.parse(d):DEF_COURSES.map(c=>({...c,modules:(c.modules||[]).map(m=>({...m,lessons:[...m.lessons]}))}))}
-const sc=v=>{localStorage.setItem(KC,JSON.stringify(v));_fsSet('courses',v);};
+const sc=v=>{
+  localStorage.setItem(KC,JSON.stringify(v));
+  _fsSet('courses',v);
+  // Refresh landing cards immediately
+  if(typeof renderLanding==='function') setTimeout(renderLanding, 100);
+};
 const gT=()=>JSON.parse(localStorage.getItem(KT)||'[]');
 const sT=v=>{localStorage.setItem(KT,JSON.stringify(v));_fsSet('turnos_list',v);};
 const gF=()=>{const d=localStorage.getItem(KF);return d?JSON.parse(d):[...DEF_FAQ];}
@@ -1628,7 +1684,11 @@ const sFt=v=>{localStorage.setItem(KFT,JSON.stringify(v));_fsSet('features',v);}
 const gR=()=>{const d=localStorage.getItem(KR);return d?JSON.parse(d):[...DEF_RECURSOS];}
 const sR=v=>{localStorage.setItem(KR,JSON.stringify(v));_fsSet('recursos',v);};
 const gEB=()=>{const d=localStorage.getItem(KEB);return d?JSON.parse(d):[...DEF_EBOOKS];}
-const sEB=v=>{localStorage.setItem(KEB,JSON.stringify(v));_fsSet('ebooks',v);};
+const sEB=v=>{
+  localStorage.setItem(KEB,JSON.stringify(v));
+  _fsSet('ebooks',v);
+  if(typeof renderEbooks==='function') setTimeout(renderEbooks, 100);
+};
 const gU=()=>JSON.parse(localStorage.getItem(KU)||'[]');
 const sU=v=>localStorage.setItem(KU,JSON.stringify(v));
 const gCfg=()=>JSON.parse(localStorage.getItem(KCF)||'{}');
@@ -1842,17 +1902,22 @@ function showPage(p){
   document.getElementById('tb-title').textContent=titles[p]||p;
   if(p==='progreso'||p==='home')updateDashStats();
   if(window.innerWidth<=768)document.getElementById('main-sidebar').classList.remove('open');
+  if(window.innerWidth<=768&&typeof closeSidebar==='function')closeSidebar();
 }
-function toggleSidebar(){document.getElementById('main-sidebar').classList.toggle('open');}
-
-// ═══ CAROUSEL ═══
-let activeCarTab='cursos';
-function switchCarousel(tab){
-  activeCarTab=tab;
-  ['cursos','ebooks','turnos'].forEach(t=>{
-    document.getElementById('ctab-'+t).className='car-tab'+(t===tab?' active':'');
-    document.getElementById('cpanel-'+t).className='car-panel'+(t===tab?' active':'');
-  });
+function toggleSidebar(){
+  const sb=document.getElementById('main-sidebar');
+  const ov=document.getElementById('sidebar-overlay');
+  if(!sb)return;
+  sb.classList.toggle('open');
+  if(ov) ov.classList.toggle('active', sb.classList.contains('open'));
+  document.body.style.overflow=sb.classList.contains('open')&&window.innerWidth<=768?'hidden':'';
+}
+function closeSidebar(){
+  const sb=document.getElementById('main-sidebar');
+  const ov=document.getElementById('sidebar-overlay');
+  if(sb)sb.classList.remove('open');
+  if(ov)ov.classList.remove('active');
+  document.body.style.overflow='';
 }
 function switchExplorer(tab){
   ['cursos','ebooks','turnos'].forEach(t=>{
@@ -1873,7 +1938,7 @@ function buildPriceBadge(c){
 function buildBuyBtn(c){
   const isFree=!c.price||c.price==='0'||c.price===''||c.price==='Gratis';
   if(isFree) return `<button class="btn-buy btn-buy-free" onclick="event.stopPropagation();openViewer(${c.id})">▶ Comenzar gratis</button>`;
-  if(c.payLink) return `<button class="btn-buy" onclick="event.stopPropagation();window.open('${c.payLink}','_blank')">🛒 Comprar ${c.price}</button>`;
+  if(c.payLink) return `<button class="btn-buy" onclick="event.stopPropagation();buyCourse(${c.id})">🛒 Comprar ${c.price}</button>`;
   return `<button class="btn-buy" onclick="event.stopPropagation();openViewer(${c.id})">🛒 Comprar ${c.price}</button>`;
 }
 function renderCarouselCourses(filt='todos', q=''){
@@ -1916,7 +1981,7 @@ function renderEbooks(){
     } else {
       // Paid + not yet purchased → show payment link
       btn=pyLink
-        ?`<a href="${pyLink}" target="_blank" rel="noopener" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;text-decoration:none;border-radius:50px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;">🛒 Comprar ${price}</a>`
+        ?`<button onclick="buyEbook('${e.id}')" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;border:none;border-radius:50px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;cursor:pointer;font-family:var(--fb);">🛒 Comprar ${price}</button>`
         :`<button class="btn-g" style="margin-top:10px;width:100%;padding:9px;font-size:13px;opacity:.5;cursor:default;" disabled>Próximamente</button>`;
     }
     const lockBadge=e.paid&&!isPurchased?`<div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);border-radius:50px;padding:3px 8px;font-size:11px;color:#fff;">🔒 Pago</div>`:'';
@@ -3545,23 +3610,27 @@ function exportTurnosCSV(){
 }
 
 
-// ═══ COVER IMAGE UPLOAD ═══
-function onCoverImgChange(e){
+// ═══ COVER IMAGE UPLOAD (Cloudinary) ═══
+async function onCoverImgChange(e){
   const file=e.target.files[0];if(!file)return;
-  if(file.size>3*1024*1024){toast('⚠️ La imagen no puede superar 3MB');return;}
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    const data=ev.target.result;
-    const dataEl=document.getElementById('ce-cover-data');if(dataEl)dataEl.value=data;
-    const dropEl=document.getElementById('cover-drop');
+  const dropEl=document.getElementById('cover-drop');
+  if(dropEl) dropEl.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">☁ Subiendo...<br><span id="cov-pct" style="font-size:22px;font-weight:700;color:var(--gold);">0%</span></div>';
+  try{
+    const url=await uploadToCloudinary(file,'cursos',pct=>{
+      const el=document.getElementById('cov-pct');if(el)el.textContent=pct+'%';
+    });
+    const dataEl=document.getElementById('ce-cover-data');if(dataEl)dataEl.value=url;
     if(dropEl){
       dropEl.classList.add('has-img');
-      dropEl.innerHTML=`<img class="cover-preview" src="${data}" id="cover-preview-img"><button class="cover-clear-btn" onclick="event.stopPropagation();clearCoverImg()">✕</button><input type="file" class="cover-upload-input" id="ce-cover-inp" accept="image/*" onchange="onCoverImgChange(event)">`;
+      dropEl.innerHTML=`<img class="cover-preview" src="${url}" id="cover-preview-img"><button class="cover-clear-btn" onclick="event.stopPropagation();clearCoverImg()">✕</button><input type="file" class="cover-upload-input" id="ce-cover-inp" accept="image/*" onchange="onCoverImgChange(event)">`;
     }
-    toast('✅ Portada cargada');
-  };
-  reader.readAsDataURL(file);
+    toast('✅ Portada subida a la nube');
+  }catch(err){
+    toast('❌ '+err.message);
+    if(dropEl){dropEl.classList.remove('has-img');dropEl.innerHTML='<div style="font-size:32px;">🖼</div><div class="cover-upload-lbl">Subir imagen de portada</div><div style="font-size:11px;color:var(--muted);">JPG, PNG o WebP · hasta 10MB</div><input type="file" class="cover-upload-input" id="ce-cover-inp" accept="image/*" onchange="onCoverImgChange(event)">';}
+  }
 }
+
 function clearCoverImg(){
   const dataEl=document.getElementById('ce-cover-data');if(dataEl)dataEl.value='';
   const dropEl=document.getElementById('cover-drop');
@@ -4834,6 +4903,61 @@ async function admForcSync(){
   }catch(e){
     toast('❌ Error al sincronizar: '+e.message);
   }
+}
+
+
+// ════════════════════════════════════════════════════════
+// MERCADOPAGO — Preparación para integración futura
+// Para activar: reemplazá MP_PUBLIC_KEY con tu clave pública
+// Conseguila en: mercadopago.com.ar → Credenciales
+// ════════════════════════════════════════════════════════
+const MP_PUBLIC_KEY = ''; // TODO: pegar tu clave pública de MercadoPago
+
+/**
+ * Crear preferencia de pago vía tu backend (futuro)
+ * Por ahora redirige al link de pago configurado en cada producto
+ * @param {object} item - {title, price, currency, quantity}
+ * @param {string} successUrl - URL de retorno después del pago
+ */
+function mpCheckout(payLink, productTitle, price){
+  if(!payLink){
+    toast('⚠️ Link de pago no configurado para este producto');
+    return;
+  }
+  // Track intent (analytics)
+  console.log('[MP] Checkout iniciado:', productTitle, price);
+  // Redirect to payment link
+  window.open(payLink, '_blank', 'noopener');
+}
+
+/**
+ * Verificar si un pago fue completado (futuro - requiere backend)
+ * Por ahora el admin desbloquea manualmente
+ */
+function mpVerifyPayment(orderId){
+  // TODO: implementar con backend + MP webhooks
+  console.log('[MP] Verificar pago:', orderId);
+}
+
+// Hook en botones de compra de ebooks
+function buyEbook(ebookId){
+  const eb = gEB().find(e=>String(e.id)===String(ebookId));
+  if(!eb) return;
+  if(!eb.paid || hasEbook(ebookId)){
+    // Free or already purchased
+    if(eb.downloadLink || eb.link) window.open(eb.downloadLink||eb.link,'_blank','noopener');
+    return;
+  }
+  // Paid and not purchased yet
+  mpCheckout(eb.payLink||eb.link, eb.title, eb.price);
+}
+
+// Hook en botones de compra de cursos
+function buyCourse(courseId){
+  const c = gc().find(x=>x.id===courseId);
+  if(!c) return;
+  if(!c.price || !c.payLink){ openViewer(courseId); return; }
+  mpCheckout(c.payLink, c.title, c.price);
 }
 
 </script>
