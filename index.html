@@ -730,16 +730,47 @@ body{font-family:var(--fb);background:var(--cr);color:var(--dark);min-height:100
 /* ── DARK MODE ── */
 /* Default IS dark mode — light mode overrides below */
 body.light-mode{
-  --cr:#FFF8F0;--crd:#EDE0D4;--sw:#FFFFFF;--muted:#8A6A5A;
+  --cr:#FFF8F0;--crd:#E8D8CC;--sw:#FFFFFF;--muted:#8A6A5A;
   --dark:#1A0008;--darkm:#3A1020;
   background:var(--cr);color:var(--dark);
 }
+body.light-mode .topbar{background:#FFFFFF;border-color:#E8D8CC;}
+body.light-mode .sidebar{background:#FFF0E8;border-color:#E8D8CC;}
+body.light-mode .main-content{background:var(--cr);}
+body.light-mode .scard{background:#FFFFFF;border:1px solid #E8D8CC;}
+body.light-mode .scard-val{color:var(--c1) !important;}
+body.light-mode .cc{background:#FFFFFF;border-color:#E8D8CC;}
+body.light-mode .course-card{background:#FFFFFF;border-color:#E8D8CC;}
+body.light-mode .car-tab.active{background:var(--c1);color:#fff;}
+body.light-mode .ebook-card{background:#FFFFFF;border-color:#E8D8CC;}
+body.light-mode .sb-item:hover{background:rgba(140,0,38,.07);}
+body.light-mode .sb-item.active{background:var(--c1) !important;color:#fff !important;}
+body.light-mode .mcard,.light-mode .auth-card{background:#FFFFFF;border-color:#E8D8CC;}
 body.dark-mode{
-  --cr:#0F0008;--crd:#1F0010;--sw:#170008;--muted:#9A6A72;
-  --dark:#F5EBD8;--darkm:#E8D5C0;
+  --cr:#0D0005;--crd:#2A0818;--sw:#160008;--muted:#A07880;
+  --dark:#F0E6D3;--darkm:#D8CABC;
   background:var(--cr);color:var(--dark);
 }
-body.dark-mode .topbar,body.dark-mode .sidebar,body.dark-mode .acard,body.dark-mode .scard,body.dark-mode .cc,body.dark-mode .arow{background:rgba(255,255,255,.04);border-color:rgba(201,168,76,.15);}
+body.dark-mode .topbar{background:#1A0009;border-color:#2A0818;}
+body.dark-mode .sidebar{background:#130006;border-color:#2A0818;}
+body.dark-mode .main-content{background:var(--cr);}
+body.dark-mode .scard{background:rgba(255,255,255,.07);border:1px solid rgba(201,168,76,.2);}
+body.dark-mode .scard-val{color:var(--goldl) !important;}
+body.dark-mode .scard-lbl,.dark-mode .scard-sub{color:var(--muted);}
+body.dark-mode .cc{background:rgba(255,255,255,.05);border-color:rgba(201,168,76,.15);}
+body.dark-mode .cc-title{color:var(--dark);}
+body.dark-mode .course-card{background:rgba(255,255,255,.05);border-color:rgba(201,168,76,.12);}
+body.dark-mode .car-tab{background:transparent;color:var(--muted);}
+body.dark-mode .car-tab.active{background:rgba(201,168,76,.18);color:var(--goldl);}
+body.dark-mode .ebook-card{background:rgba(255,255,255,.05);border-color:rgba(201,168,76,.12);}
+body.dark-mode .ebook-title{color:var(--dark);}
+body.dark-mode .acard{background:rgba(255,255,255,.04);border-color:#2A0818;}
+body.dark-mode .arow{background:rgba(255,255,255,.03);border-color:#2A0818;}
+body.dark-mode .fg input,body.dark-mode .fg select,body.dark-mode .fg textarea{background:#200010;border-color:#3A1020;color:var(--dark);}
+body.dark-mode .sb-item:hover{background:rgba(255,255,255,.07);}
+body.dark-mode .sb-item.active{background:var(--c1) !important;}
+body.dark-mode .mcard,.dark-mode .auth-card{background:#1A0009;border-color:#2A0818;}
+body.dark-mode .perfil-section{background:rgba(255,255,255,.04);border-color:#2A0818;}
 body.light-mode .topbar,body.light-mode .sidebar,body.light-mode .acard,body.light-mode .scard,body.light-mode .cc,body.light-mode .arow{background:rgba(255,255,255,.04);border-color:rgba(201,168,76,.15);}
 body.dark-mode .fg input,body.dark-mode .fg select,body.dark-mode .fg textarea{background:rgba(255,255,255,.06);border-color:rgba(201,168,76,.2);color:var(--cr);}
 body.dark-mode .les-card,body.dark-mode .mod-acc{background:rgba(255,255,255,.04);border-color:rgba(201,168,76,.15);}
@@ -1232,6 +1263,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--gold);outline-of
       <button class="btn-logout" onclick="doLogout()" title="Salir">⎋</button>
     </div>
   </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 
   <div class="main-content">
     <div class="topbar">
@@ -1256,7 +1288,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--gold);outline-of
     <!-- HOME -->
     <div class="pc" id="page-home">
       <div class="welcome-banner">
-        <div class="wb-text">
+        <div class="welcome-banner wb-text">
           <h2>¡Bienvenida, <em id="wname">Alumna</em>!</h2>
           <p id="wsub">Continuá donde lo dejaste y seguí avanzando.</p>
         </div>
