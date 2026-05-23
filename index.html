@@ -1258,26 +1258,21 @@ body.dark-mode .btn-gold{
 <script src="shared.js"></script>
 <script>
 
-// ── INDEX INIT ──────────────────────────────────────────
-// Override loginOk to redirect to other pages
+// ── INDEX.HTML INIT ─────────────────────────────────────
 function loginOk(u){
   currentUser = u;
   localStorage.setItem(KS, JSON.stringify(u));
-  if(_fbReady && _db && u.uid){
-    _saveUserProfile(u.uid, {name:u.name, email:u.email, role:u.role||'student', uid:u.uid});
-  }
+  if(_fbReady && _db && u.uid)
+    _saveUserProfile(u.uid, {name:u.name,email:u.email,role:u.role||'student',uid:u.uid});
   closeOv('auth-ov');
-  if(u.role === 'admin') window.location.href = 'admin.html';
-  else window.location.href = 'dashboard.html';
+  window.location.href = (u.role==='admin') ? 'admin.html' : 'dashboard.html';
 }
 
-// Override checkKey to redirect to admin.html
 function checkKey(){
-  const cfg = gCfg();
-  const pw = cfg.adminPass || ADMIN_PASS_DEFAULT;
+  const pw = (gCfg().adminPass) || ADMIN_PASS_DEFAULT;
   if(document.getElementById('admin-key').value === pw){
     closeOv('admin-ov');
-    currentUser = {name:'Administrador', email:'admin@mirastudio.com', role:'admin'};
+    currentUser = {name:'Administrador',email:'admin@mirastudio.com',role:'admin'};
     localStorage.setItem(KS, JSON.stringify(currentUser));
     window.location.href = 'admin.html';
   } else {
@@ -1285,40 +1280,62 @@ function checkKey(){
   }
 }
 
-// Override doLogout
 function doLogout(){
   currentUser = null;
   localStorage.removeItem(KS);
   if(_fbReady && _auth) _auth.signOut().catch(()=>{});
-  _fbUid = null;
-  // Already on landing
 }
 
-// Index page initialization
-(function initIndex(){
-  // If already logged in, redirect
+document.addEventListener('DOMContentLoaded', ()=>{
+  // Redirect if already logged in
   const s = localStorage.getItem(KS);
   if(s){
     try{
       const u = JSON.parse(s);
       if(u && u.role){
-        if(u.role === 'admin') { window.location.href = 'admin.html'; return; }
-        else { window.location.href = 'dashboard.html'; return; }
+        window.location.href = (u.role==='admin') ? 'admin.html' : 'dashboard.html';
+        return;
       }
-    }catch(e){}
+    }catch(e){ localStorage.removeItem(KS); }
   }
-  // Check ?admin=1 URL param
+
+  // Init
+  initFirebase();
+  loadSavedEstetics();
+  loadSavedTexts();
+  applyHeroBg();
+  loadDarkMode();
+  renderLanding();
+  loadSocialLinks();
+  updatePositions();
+  renderIcarousel();
+
+  // Handle ?admin=1
   const params = new URLSearchParams(window.location.search);
   if(params.has('admin')){
     history.replaceState(null,'',window.location.pathname);
     setTimeout(()=>{
-      document.getElementById('admin-key').value = '';
-      document.getElementById('admin-key-err').style.display = 'none';
       openOv('admin-ov');
-      setTimeout(()=>{ const i=document.getElementById('admin-key'); if(i)i.focus(); }, 200);
+      const i = document.getElementById('admin-key');
+      if(i) i.focus();
     }, 400);
   }
-})();
+
+  // Logo click counter (5 clicks = open admin)
+  let lcc=0, lct=null;
+  window.handleLogoClick = function(){
+    lcc++;
+    if(lct) clearTimeout(lct);
+    lct = setTimeout(()=>{ lcc=0; }, 3000);
+    if(lcc>=5){
+      lcc=0;
+      openOv('admin-ov');
+      const i=document.getElementById('admin-key');
+      if(i){ i.value=''; i.focus(); }
+      document.getElementById('admin-key-err').style.display='none';
+    }
+  };
+});
 
 </script>
 </body>

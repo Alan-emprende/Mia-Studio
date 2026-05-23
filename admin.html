@@ -1012,7 +1012,7 @@ body.dark-mode .btn-gold{
 <script src="shared.js"></script>
 <script>
 
-// ── ADMIN INIT ──────────────────────────────────────────
+// ── ADMIN.HTML INIT ─────────────────────────────────────
 function admLogout(){
   currentUser = null;
   localStorage.removeItem(KS);
@@ -1021,26 +1021,33 @@ function admLogout(){
 }
 function doLogout(){ admLogout(); }
 
-// Check session on load
-(function initAdmin(){
+document.addEventListener('DOMContentLoaded', ()=>{
+  // Check session
   const s = localStorage.getItem(KS);
   if(!s){ window.location.href = 'index.html?admin=1'; return; }
-  try{
-    const u = JSON.parse(s);
-    if(!u || u.role !== 'admin'){ window.location.href = 'index.html'; return; }
-    currentUser = u;
-    document.addEventListener('DOMContentLoaded', ()=>{
-      initFirebase();
-      loadSavedEstetics();
-      // Sync from cloud then load admin
-      if(_fbReady && _db){
-        _syncSiteFromCloud().then(()=>loadAdminData()).catch(()=>loadAdminData());
-      } else {
-        loadAdminData();
-      }
-    });
-  }catch(e){ window.location.href = 'index.html'; }
-})();
+
+  let u;
+  try{ u = JSON.parse(s); } catch(e){ window.location.href = 'index.html'; return; }
+  if(!u || u.role !== 'admin'){ window.location.href = 'index.html'; return; }
+
+  currentUser = u;
+
+  // Init Firebase (non-blocking)
+  initFirebase();
+  loadSavedEstetics();
+
+  // Load admin panel immediately (don't wait for Firestore)
+  loadAdminData();
+
+  // Then sync from cloud in background (non-blocking)
+  if(_fbReady && _db){
+    _syncSiteFromCloud().then(()=>{
+      // Refresh current admin page silently
+      const active = document.querySelector('.adm-ni.active');
+      if(active && active.dataset.adm) admPage(active.dataset.adm);
+    }).catch(()=>{});
+  }
+});
 
 </script>
 </body>

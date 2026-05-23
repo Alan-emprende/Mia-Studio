@@ -658,15 +658,8 @@ function applyText(id,val){const el=document.getElementById(id);if(el)el.textCon
 function scrollTo2(id){const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth'});}
 
 // ═══ INIT ═══
-document.addEventListener('DOMContentLoaded',()=>{
-  initFirebase();
-  loadSavedEstetics();
-  loadSavedTexts();
-  applyHeroBg();
-  checkSession();
-  renderLanding();
-  setTimeout(()=>checkUrlAdmin(), 300);
-});
+// [PAGE_INIT removed: document.addEventListener('DOMContentLoa...]
+
 
 // ═══════════════════════════════════════════════════════
 // ADMIN PANEL — PART 2
@@ -1579,17 +1572,8 @@ function getTakenSlots(dateStr){
 
   // touch / drag support
   let dragStartX = 0;
-  document.addEventListener('DOMContentLoaded', ()=>{
-    updatePositions();
-    renderIcarousel();
-    const stage = document.querySelector('.icar-stage');
-    if(!stage) return;
-    stage.addEventListener('touchstart', e=>{ dragStartX = e.touches[0].clientX; }, {passive:true});
-    stage.addEventListener('touchend', e=>{
-      const dx = e.changedTouches[0].clientX - dragStartX;
-      if(Math.abs(dx) > 40) icarRotate(dx < 0 ? 1 : -1);
-    }, {passive:true});
-  });
+  // [PAGE_INIT removed: document.addEventListener('DOMContentLoa...]
+
 })();
 
 function renderIcarousel(){
@@ -2614,15 +2598,8 @@ loginOk = function(u){
 
 // ═══ PATCH INIT ═══
 const _origDOMLoaded = document.addEventListener;
-document.addEventListener('DOMContentLoaded', ()=>{
-  loadDarkMode();
-  renderNotifPanel();
-  // push a welcome notif on first visit ever
-  if(!localStorage.getItem('ms_first_visit')){
-    localStorage.setItem('ms_first_visit','1');
-    pushNotif('👋','¡Bienvenida a Mira Estudio! Explorá los cursos disponibles.');
-  }
-});
+// [PAGE_INIT removed: document.addEventListener('DOMContentLoa...]
+
 
 
 // ═══════════════════════════════════════════════════════
@@ -3031,19 +3008,8 @@ admSaveColors = function() { _baseAdmSaveColors(); showSaveInd('🎨 Colores gua
 // ═══════════════════════════════════════════════════════
 // DOMContentLoaded extras
 // ═══════════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
-  loadSocialLinks();
-  // Seed demo chat messages on first load
-  const chat = getChat();
-  if (!chat['general']) {
-    chat['general'] = [
-      { id: 1, user: 'Valentina L.', text: '¡Hola a todas! Acabo de terminar el curso de clásicas 🎉', time: '10:30', date: 'hoy', read: false },
-      { id: 2, user: 'Sofía M.', text: 'Felicitaciones Vale! Yo estoy en el módulo 2 todavía 😅', time: '10:35', date: 'hoy', read: false },
-      { id: 3, user: 'Valentina L.', text: 'No te preocupes, lo mejor está en el módulo 3!', time: '10:37', date: 'hoy', read: false },
-    ];
-    saveChat(chat);
-  }
-});
+// [PAGE_INIT removed: document.addEventListener('DOMContentLoa...]
+
 
 
 function showVerifyBanner(email){
