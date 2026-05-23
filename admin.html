@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title id="site-title">Mira Estudio — Admin</title>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<title>Mira Estudio — Admin</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -13,9 +12,9 @@
 :root{
   --c1:#8C0026;--c1d:#620018;--c1l:#B0003A;
   --gold:#C9A84C;--goldl:#E8D5A0;--goldp:#FDF5DC;--goldd:#9A7A2A;
-  --dark:#F0E6D3;--darkm:#D8CABC;
-  --cr:#0D0005;--crd:#2A0818;--sw:#160008;
-  --muted:#A07880;
+  --dark:#1A0008;--darkm:#3B000F;
+  --cr:#FFF8F0;--crd:#F5EBD8;--sw:#FFFAF5;
+  --muted:#7A4A52;
   --fd:'Cormorant Garamond',serif;
   --fb:'DM Sans',sans-serif;
   --r1:6px;--r2:14px;--r3:22px;
@@ -734,8 +733,8 @@ body{font-family:var(--fb);background:var(--cr);color:var(--dark);min-height:100
 /* ── DARK MODE ── */
 /* Default IS dark mode — light mode overrides below */
 body.light-mode{
-  --cr:#FFF8F0;--crd:#E8D8CC;--sw:#FFFFFF;--muted:#7A4A52;
-  --dark:#1A0008;--darkm:#3B000F;
+  --cr:#FFF8F0;--crd:#E8D8CC;--sw:#FFFFFF;--muted:#8A6A5A;
+  --dark:#1A0008;--darkm:#3A1020;
   background:var(--cr);color:var(--dark);
 }
 body.light-mode .topbar{background:#FFFFFF;border-color:#E8D8CC;}
@@ -976,27 +975,346 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--gold);outline-of
   .main-content{margin-left:0 !important;}
 }
 
-
-/* Fix elements that use --dark as background */
-body.dark-mode .sec-dark,
-body.dark-mode .icar-section,
-body.dark-mode .footer{
-  background:var(--c1d) !important;
-  color:var(--goldl);
-}
-body.dark-mode .sidebar{
-  background:#130006 !important;
-  border-color:#2A0818;
-}
-body.dark-mode .btn-p,
-body.dark-mode .btn-gold{
-  color:var(--dark) !important;
-}
-
+/* Admin always visible */
+#view-admin.active{display:flex !important;}
 </style>
 </head>
 <body class="dark-mode">
 
+<div id="view-admin" class="view" style="flex-direction:row;">
+  <aside class="adm-sb">
+    <div class="adm-sb-top">
+      <div class="adm-sb-brand">⚙ Panel de Admin</div>
+      <div class="adm-sb-sub">Mira Estudio</div>
+    </div>
+    <nav class="adm-nav">
+      <div class="adm-group">Diseño</div>
+      <button class="adm-ni" data-adm="estetica" onclick="admPage('estetica')">🎨 Estética & Colores</button>
+      <button class="adm-ni" data-adm="textos" onclick="admPage('textos')">📝 Textos Landing</button>
+      <div class="adm-group">Productos</div>
+      <button class="adm-ni" data-adm="cursos" onclick="admPage('cursos')">📚 Cursos</button>
+      <button class="adm-ni" data-adm="ebooks" onclick="admPage('ebooks')">📖 Ebooks</button>
+      <button class="adm-ni" data-adm="features" onclick="admPage('features')">✨ Beneficios</button>
+      <div class="adm-group">Información</div>
+      <button class="adm-ni" data-adm="faq" onclick="admPage('faq')">❓ FAQ</button>
+      <button class="adm-ni" data-adm="info" onclick="admPage('info')">ℹ️ Info General</button>
+      <button class="adm-ni" data-adm="recursos" onclick="admPage('recursos')">📎 Recursos</button>
+      <div class="adm-group">Analíticas</div>
+      <button class="adm-ni" data-adm="analytics" onclick="admPage('analytics')">📊 Analíticas</button>
+      <div class="adm-group">Gestión</div>
+      <button class="adm-ni" data-adm="turnos" onclick="admPage('turnos')">📅 Turnos</button>
+      <button class="adm-ni" data-adm="usuarios" onclick="admPage('usuarios')">👥 Usuarios</button>
+      <button class="adm-ni" data-adm="social" onclick="admPage('social')">🌐 Redes Sociales</button>
+      <button class="adm-ni" data-adm="config" onclick="admPage('config')">⚙️ Configuración</button>
+    </nav>
+    <button class="adm-exit" onclick="admForcSync()" style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.25);color:var(--goldd);margin-bottom:6px;">☁ Sincronizar</button>
+    <button class="adm-exit" onclick="admLogout()">← Volver al sitio</button>
+  </aside>
+
+  <div class="adm-body">
+
+    <!-- ESTÉTICA -->
+    <div class="adm-pg" id="adm-estetica">
+      <div class="adm-pghdr"><h2>🎨 Estética & Colores</h2><p>Personalizá los colores, el fondo del hero y el logo.</p></div>
+      <div class="acard">
+        <h3>Colores del sitio</h3>
+        <div class="adm-grid2">
+          <div>
+            <div class="color-line"><label>🔴 Carmesí principal</label><input type="color" id="col-c1" value="#8C0026" oninput="admPreviewColor('--c1',this.value)"></div>
+            <div class="color-line"><label>🔴 Carmesí oscuro</label><input type="color" id="col-c1d" value="#620018" oninput="admPreviewColor('--c1d',this.value)"></div>
+            <div class="color-line"><label>🔴 Carmesí claro</label><input type="color" id="col-c1l" value="#B0003A" oninput="admPreviewColor('--c1l',this.value)"></div>
+          </div>
+          <div>
+            <div class="color-line"><label>✨ Dorado principal</label><input type="color" id="col-gold" value="#C9A84C" oninput="admPreviewColor('--gold',this.value)"></div>
+            <div class="color-line"><label>🌑 Fondo oscuro</label><input type="color" id="col-dark" value="#1A0008" oninput="admPreviewColor('--dark',this.value)"></div>
+            <div class="color-line"><label>🍦 Fondo crema</label><input type="color" id="col-cr" value="#FFF8F0" oninput="admPreviewColor('--cr',this.value)"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap;">
+          <button class="abtn" onclick="admSaveColors()">Guardar colores</button>
+          <button class="abtn-g" onclick="admResetColors()">Resetear a defaults</button>
+        </div>
+      </div>
+      <div class="acard">
+        <h3>Fondo del Hero (portada)</h3>
+        <div class="adm-grid2">
+          <div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Subí una imagen o video para reemplazar el degradé. El overlay carmesí se mantiene sobre el fondo.</p>
+            <div class="file-drop" onclick="document.getElementById('hero-img-inp').click()">
+              <div style="font-size:28px;">🖼</div><p>Click para subir imagen (JPG/PNG/WEBP)</p>
+              <input type="file" id="hero-img-inp" accept="image/*" style="display:none;" onchange="admUploadHeroBg(this,'image')">
+            </div>
+            <div class="file-drop" style="margin-top:9px;" onclick="document.getElementById('hero-vid-inp').click()">
+              <div style="font-size:28px;">🎬</div><p>Click para subir video (MP4/WEBM)</p>
+              <input type="file" id="hero-vid-inp" accept="video/*" style="display:none;" onchange="admUploadHeroBg(this,'video')">
+            </div>
+            <button class="abtn-g" style="margin-top:9px;width:100%;" onclick="admClearHeroBg()">🗑 Quitar fondo personalizado</button>
+          </div>
+          <div>
+            <p style="font-size:12px;color:var(--muted);margin-bottom:8px;">Vista previa:</p>
+            <div id="adm-bg-prev" style="width:100%;height:160px;border-radius:var(--r1);border:1px solid var(--crd);overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1A0008,#620018);">
+              <span style="color:rgba(255,255,255,.35);font-size:13px;">Degradé por defecto</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="acard">
+        <h3>Logo del sitio</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Subí un PNG con fondo transparente para que el logo se vea bien sobre el fondo oscuro.</p>
+        <div class="file-drop" onclick="document.getElementById('logo-inp').click()">
+          <div style="font-size:28px;">🏷</div><p>Click para subir logo</p>
+          <input type="file" id="logo-inp" accept="image/*" style="display:none;" onchange="admUploadLogo(this)">
+        </div>
+        <div id="logo-prev-wrap" style="display:none;margin-top:12px;display:flex;align-items:center;gap:12px;">
+          <img id="logo-prev" style="height:54px;object-fit:contain;" alt="">
+          <button class="abtn-del" onclick="admClearLogo()">Quitar logo</button>
+        </div>
+      </div>
+      <div class="acard">
+        <h3>Nombre del sitio</h3>
+        <div class="fg"><label>Nombre visible en el nav y footer</label><input type="text" id="est-sitename" placeholder="Mira Estudio"></div>
+        <button class="abtn" onclick="admSaveSiteName('est-sitename')">Guardar nombre</button>
+      </div>
+    </div>
+
+    <!-- TEXTOS -->
+    <div class="adm-pg" id="adm-textos">
+      <div class="adm-pghdr"><h2>📝 Textos de la Landing</h2><p>Editá todos los textos visibles en la página de inicio.</p></div>
+      <div class="acard">
+        <h3>Hero principal</h3>
+        <div class="fg"><label>Etiqueta (tag superior)</label><input type="text" id="txt-hero-tag" placeholder="✦ Cursos de pestañas profesionales"></div>
+        <div class="fg"><label>Título principal H1</label><input type="text" id="txt-hero-h1" placeholder="Domina el arte de las pestañas perfectas"></div>
+        <div class="fg"><label>Subtítulo / descripción</label><textarea id="txt-hero-sub" rows="2"></textarea></div>
+        <div class="adm-grid2">
+          <div class="fg"><label>Botón principal</label><input type="text" id="txt-hero-btn1" placeholder="Comenzar gratis"></div>
+          <div class="fg"><label>Botón secundario</label><input type="text" id="txt-hero-btn2" placeholder="Ver cursos →"></div>
+        </div>
+        <button class="abtn" onclick="admSaveTextos('hero')">Guardar hero</button>
+      </div>
+      <div class="acard">
+        <h3>Estadísticas (bajo el hero)</h3>
+        <div class="adm-grid2">
+          <div>
+            <div class="fg"><label>Stat 1 — Número</label><input type="text" id="txt-s1v" placeholder="+1.200"></div>
+            <div class="fg"><label>Stat 1 — Etiqueta</label><input type="text" id="txt-s1l" placeholder="Alumnas activas"></div>
+          </div>
+          <div>
+            <div class="fg"><label>Stat 2 — Número</label><input type="text" id="txt-s2v" placeholder="8"></div>
+            <div class="fg"><label>Stat 2 — Etiqueta</label><input type="text" id="txt-s2l" placeholder="Cursos disponibles"></div>
+          </div>
+          <div>
+            <div class="fg"><label>Stat 3 — Número</label><input type="text" id="txt-s3v" placeholder="98%"></div>
+            <div class="fg"><label>Stat 3 — Etiqueta</label><input type="text" id="txt-s3l" placeholder="Satisfacción"></div>
+          </div>
+          <div>
+            <div class="fg"><label>Stat 4 — Número</label><input type="text" id="txt-s4v" placeholder="∞"></div>
+            <div class="fg"><label>Stat 4 — Etiqueta</label><input type="text" id="txt-s4l" placeholder="Acceso de por vida"></div>
+          </div>
+        </div>
+        <button class="abtn" onclick="admSaveTextos('stats')">Guardar estadísticas</button>
+      </div>
+      <div class="acard">
+        <h3>Sección "Nuestro Método"</h3>
+        <div class="adm-grid2">
+          <div class="fg"><label>Etiqueta</label><input type="text" id="txt-feat-lbl" placeholder="Nuestro Método"></div>
+          <div class="fg"><label>Título</label><input type="text" id="txt-feat-tit" placeholder="Todo lo que necesitás para crecer..."></div>
+        </div>
+        <button class="abtn" onclick="admSaveTextos('feat')">Guardar</button>
+      </div>
+      <div class="acard">
+        <h3>CTA — Llamado a la acción</h3>
+        <div class="adm-grid2">
+          <div class="fg"><label>Etiqueta</label><input type="text" id="txt-cta-lbl" placeholder="Únete hoy"></div>
+          <div class="fg"><label>Botón</label><input type="text" id="txt-cta-btn" placeholder="Crear mi cuenta gratis"></div>
+        </div>
+        <div class="fg"><label>Título</label><input type="text" id="txt-cta-tit" placeholder="¿Lista para transformar tu carrera?"></div>
+        <div class="fg"><label>Texto</label><textarea id="txt-cta-txt" rows="2"></textarea></div>
+        <button class="abtn" onclick="admSaveTextos('cta')">Guardar CTA</button>
+      </div>
+      <div class="acard">
+        <h3>Footer</h3>
+        <div class="fg"><label>Texto copyright</label><input type="text" id="txt-footer-txt" placeholder="© 2025 Mira Estudio..."></div>
+        <div class="fg"><label>Subtexto</label><input type="text" id="txt-footer-sub" placeholder="Hecho con ♡..."></div>
+        <button class="abtn" onclick="admSaveTextos('footer')">Guardar footer</button>
+      </div>
+      <div class="acard">
+        <h3>Sección Turnos</h3>
+        <div class="fg"><label>Título</label><input type="text" id="txt-turno-tit" placeholder="Sacar turno"></div>
+        <div class="fg"><label>Descripción</label><textarea id="txt-turno-desc" rows="2"></textarea></div>
+        <button class="abtn" onclick="admSaveTextos('turno')">Guardar</button>
+      </div>
+      <div class="acard">
+        <h3>Sección Comunidad</h3>
+        <div class="fg"><label>Título</label><input type="text" id="txt-com-tit" placeholder="Comunidad Mira Estudio"></div>
+        <div class="fg"><label>Texto</label><textarea id="txt-com-txt" rows="2"></textarea></div>
+        <button class="abtn" onclick="admSaveTextos('com')">Guardar</button>
+      </div>
+    </div>
+
+    <!-- COURSE EDITOR PAGE -->
+    <div class="adm-pg editor-pg" id="adm-curso-editor" style="padding:0;">
+      <div class="editor-pg-hdr">
+        <button class="editor-pg-back" onclick="admCloseEditor()">← Volver a Cursos</button>
+        <div class="editor-pg-title" id="editor-pg-title">Editar curso</div>
+        <button class="editor-pg-save" onclick="admSaveCurso(window._editorIsNew||false)">✓ Guardar cambios</button>
+      </div>
+      <div class="editor-pg-body">
+        <div id="cmod-body"></div>
+      </div>
+    </div>
+
+    <!-- CURSOS -->
+    <div class="adm-pg" id="adm-cursos">
+      <div class="adm-pghdr"><h2>📚 Cursos</h2><p>Editá, agregá o eliminá cursos con sus módulos y clases.</p></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+        <button class="abtn-add" onclick="admNewCurso()">+ Nuevo curso</button>
+      </div>
+      <div id="adm-cursos-list"></div>
+    </div>
+
+    <!-- EBOOKS -->
+    <div class="adm-pg" id="adm-ebooks">
+      <div class="adm-pghdr"><h2>📖 Ebooks & Material</h2><p>Gestioná los ebooks descargables.</p></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+        <button class="abtn-add" onclick="admNewEbook()">+ Nuevo ebook</button>
+      </div>
+      <div id="adm-ebooks-list"></div>
+    </div>
+
+    <!-- FEATURES -->
+    <div class="adm-pg" id="adm-features">
+      <div class="adm-pghdr"><h2>✨ Beneficios</h2><p>Tarjetas de beneficios en la landing page.</p></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+        <button class="abtn-add" onclick="admNewFeat()">+ Nueva tarjeta</button>
+      </div>
+      <div id="adm-feat-list"></div>
+      <div style="margin-top:14px;"><button class="abtn" onclick="admSaveFeats()">Guardar todos los beneficios</button></div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="adm-pg" id="adm-faq">
+      <div class="adm-pghdr"><h2>❓ Preguntas Frecuentes</h2><p>Preguntas y respuestas del modal de FAQ.</p></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+        <button class="abtn-add" onclick="admNewFAQ()">+ Nueva pregunta</button>
+      </div>
+      <div id="adm-faq-list"></div>
+      <div style="margin-top:14px;"><button class="abtn" onclick="admSaveFAQAll()">Guardar FAQ</button></div>
+    </div>
+
+    <!-- INFO -->
+    <div class="adm-pg" id="adm-info">
+      <div class="adm-pghdr"><h2>ℹ️ Información General</h2><p>Aparece cuando el usuario toca "Información" en el menú flotante.</p></div>
+      <div class="acard">
+        <div class="fg"><label>Texto de información</label><textarea id="adm-info-txt" rows="12" style="font-size:14px;line-height:1.7;"></textarea></div>
+        <button class="abtn" onclick="admSaveInfoTxt()">Guardar información</button>
+      </div>
+    </div>
+
+    <!-- RECURSOS -->
+    <div class="adm-pg" id="adm-recursos">
+      <div class="adm-pghdr"><h2>📎 Recursos descargables</h2><p>Archivos disponibles para alumnas en su panel.</p></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+        <button class="abtn-add" onclick="admNewRec()">+ Nuevo recurso</button>
+      </div>
+      <div id="adm-rec-list"></div>
+      <div style="margin-top:14px;"><button class="abtn" onclick="admSaveRecs()">Guardar recursos</button></div>
+    </div>
+
+    <!-- TURNOS -->
+    <!-- ANALÍTICAS -->
+    <div class="adm-pg" id="adm-analytics">
+      <div class="adm-pghdr"><h2>📊 Analíticas</h2><p>Estadísticas en tiempo real de la plataforma.</p></div>
+      <div class="analytics-grid" id="an-stats-grid"></div>
+      <div class="chart-wrap">
+        <div class="chart-title">📚 Progreso por curso</div>
+        <div id="an-courses-chart"></div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-title">⭐ Cursos más iniciados</div>
+        <div id="an-popular-chart"></div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-title">📅 Turnos por estado</div>
+        <div id="an-turnos-chart"></div>
+      </div>
+    </div>
+
+    <div class="adm-pg" id="adm-turnos">
+      <div class="adm-pghdr"><h2>📅 Turnos</h2><p>Configurá los horarios disponibles y gestioná las solicitudes.</p></div>
+      <div class="acard" style="margin-bottom:16px;">
+        <h3 style="font-family:var(--fd);font-size:16px;font-weight:500;color:var(--dark);margin-bottom:4px;">⏰ Horarios disponibles</h3>
+        <p style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">Configurá los días y horarios que las clientas pueden elegir. Sin configuración se usan los horarios por defecto.</p>
+        <div class="adm-slots-wrap" id="adm-slots-list"></div>
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:flex-end;">
+          <select id="adm-slot-day" style="flex:1;min-width:110px;"><option>Lunes</option><option>Martes</option><option>Miércoles</option><option>Jueves</option><option>Viernes</option><option>Sábado</option><option>Domingo</option></select>
+          <input type="time" id="adm-slot-time" style="flex:1;min-width:100px;">
+          <button class="abtn" onclick="admAddSlot()" style="white-space:nowrap;">+ Agregar</button>
+        </div>
+        <button class="abtn-g" style="margin-top:10px;font-size:12px;padding:6px 14px;" onclick="admResetSlots()">↺ Restaurar por defecto</button>
+      </div>
+      <div id="adm-turnos-content"></div>
+    </div>
+
+    <!-- USUARIOS -->
+    <div class="adm-pg" id="adm-usuarios">
+      <div class="adm-pghdr"><h2>👥 Usuarios registradas</h2><p>Alumnas con cuenta en la plataforma.</p></div>
+      <div id="adm-users-content"></div>
+    </div>
+
+    <!-- CONFIG -->
+    <div class="adm-pg" id="adm-config">
+      <div class="adm-pghdr"><h2>⚙️ Configuración</h2><p>Ajustes generales del panel de admin.</p></div>
+      <div class="acard">
+        <h3>Cambiar contraseña de admin</h3>
+        <div class="fg"><label>Nueva contraseña (mín. 6 caracteres)</label><input type="password" id="cfg-newpass" placeholder="••••••••"></div>
+        <div class="fg"><label>Confirmar contraseña</label><input type="password" id="cfg-confpass" placeholder="••••••••"></div>
+        <button class="abtn" onclick="admSavePassword()">Cambiar contraseña</button>
+        <p style="font-size:12px;color:var(--muted);margin-top:10px;">La clave actual por defecto es <strong>Mira2025</strong></p>
+      </div>
+      <div class="acard">
+        <h3>Nombre del sitio</h3>
+        <div class="fg"><label>Nombre</label><input type="text" id="cfg-sitename" placeholder="Mira Estudio"></div>
+        <button class="abtn" onclick="admSaveSiteName('cfg-sitename')">Guardar nombre</button>
+      </div>
+      <div class="acard">
+        <h3>Mensaje del dashboard</h3>
+        <div class="fg"><label>Subtítulo bajo el nombre de la alumna</label><input type="text" id="cfg-wsub" placeholder="Continuá donde lo dejaste y seguí avanzando."></div>
+        <button class="abtn" onclick="admSaveCfgDash()">Guardar</button>
+      </div>
+    </div>
+
+
+    <!-- REDES SOCIALES -->
+    <div class="adm-pg" id="adm-social">
+      <div class="adm-pghdr"><h2>🌐 Redes Sociales</h2><p>Configurá los canales de contacto. El WhatsApp activa un botón flotante verde en todo el sitio.</p></div>
+      <div class="acard">
+        <h3>Datos de contacto</h3>
+        <div class="fg"><label>📱 WhatsApp (número con código país, sin + ni espacios)</label>
+          <input type="text" id="soc-wa" placeholder="5491112345678">
+          <p style="font-size:11.5px;color:var(--muted);margin-top:4px;">Ejemplo Argentina: 5491112345678 · Cuando tiene valor, aparece un botón flotante verde en el sitio.</p>
+        </div>
+        <div class="adm-grid2">
+          <div class="fg"><label>📸 Instagram (sin @)</label><input type="text" id="soc-ig" placeholder="miraestudio"></div>
+          <div class="fg"><label>📘 Facebook</label><input type="text" id="soc-fb" placeholder="miraestudio"></div>
+        </div>
+        <div class="adm-grid2">
+          <div class="fg"><label>🌐 Sitio web</label><input type="text" id="soc-web" placeholder="https://miraestudio.com"></div>
+          <div class="fg"><label>✉️ Email</label><input type="text" id="soc-email" placeholder="hola@miraestudio.com"></div>
+        </div>
+        <button class="abtn" onclick="admSaveSocialPage()">Guardar y aplicar</button>
+      </div>
+      <div class="acard">
+        <h3>Vista previa</h3>
+        <div id="soc-preview" class="social-links"></div>
+      </div>
+    </div>
+
+    <!-- THEME PRESETS (injected into estética via JS) -->
+  </div><!-- /adm-body -->
+</div><!-- /view-admin -->
+
+<!-- COURSE EDITOR MODAL -->
+<!-- curso-modal removed: now uses full-page editor -->
 
 
 <!-- CERTIFICADO -->
@@ -1006,8 +1324,453 @@ body.dark-mode .btn-gold{
       <button class="cert-close" onclick="closeCert()">✕</button>
       <canvas id="cert-canvas" width="700" height="495"></canvas>
     </div>
+    <div class="cert-actions">
+      <button class="btn-gold" onclick="downloadCert()" style="font-size:14px;padding:10px 26px;">⬇ Descargar certificado</button>
+      <button class="btn-g" onclick="closeCert()" style="font-size:14px;padding:10px 20px;">Cerrar</button>
+    </div>
   </div>
 </div>
+
+
+<!-- ONBOARDING -->
+<div class="onboard-overlay" id="onboard-overlay">
+  <div class="onboard-card">
+    <div class="onboard-step active" id="ob-step-0">
+      <div class="onboard-step-icon">👁✨</div>
+      <div class="onboard-step-title">¡Bienvenida a Mira Estudio!</div>
+      <div class="onboard-step-desc">Te hacemos un tour rápido para que aproveches todo lo que tenés disponible.</div>
+      <div class="onboard-highlight"><span class="onboard-highlight-icon">📚</span><span class="onboard-highlight-text"><strong>Cursos profesionales</strong> — técnicas desde cero hasta avanzado, con video y materiales descargables.</span></div>
+      <div class="onboard-highlight"><span class="onboard-highlight-icon">📅</span><span class="onboard-highlight-text"><strong>Turnos online</strong> — solicitá tu cita directamente desde la plataforma.</span></div>
+    </div>
+    <div class="onboard-step" id="ob-step-1">
+      <div class="onboard-step-icon">🎬</div>
+      <div class="onboard-step-title">Video + Notas por clase</div>
+      <div class="onboard-step-desc">Cada lección tiene su video. Podés tomar notas privadas que se guardan automáticamente en tu dispositivo.</div>
+      <div class="onboard-highlight"><span class="onboard-highlight-icon">✓</span><span class="onboard-highlight-text">Marcá cada clase como completada para llevar tu progreso real.</span></div>
+      <div class="onboard-highlight"><span class="onboard-highlight-icon">🏆</span><span class="onboard-highlight-text">Al terminar un curso recibís tu <strong>certificado descargable</strong>.</span></div>
+    </div>
+    <div class="onboard-step" id="ob-step-2">
+      <div class="onboard-step-icon">⋮</div>
+      <div class="onboard-step-title">El menú flotante ⋮</div>
+      <div class="onboard-step-desc">El botón <strong>⋮</strong> en la esquina inferior derecha es tu acceso rápido a cursos, turnos, información y preguntas frecuentes.</div>
+      <div class="onboard-highlight"><span class="onboard-highlight-icon">🌙</span><span class="onboard-highlight-text">¿Preferís fondo oscuro? Usá el toggle 🌙 en la barra superior.</span></div>
+      <div class="onboard-highlight"><span class="onboard-highlight-icon">📈</span><span class="onboard-highlight-text">En <strong>Mi Progreso</strong> ves el avance por cada curso en tiempo real.</span></div>
+    </div>
+    <div class="onboard-footer">
+      <div class="onboard-dots">
+        <div class="onboard-dot active" id="ob-dot-0"></div>
+        <div class="onboard-dot" id="ob-dot-1"></div>
+        <div class="onboard-dot" id="ob-dot-2"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="onboard-skip" onclick="closeOnboard()">Saltar</button>
+        <button class="btn-crimson" id="ob-next-btn" onclick="onboardNext()" style="font-size:14px;padding:9px 22px;">Siguiente →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- WhatsApp FAB -->
+<a id="wa-fab" class="wa-fab" href="#" target="_blank" title="WhatsApp" style="display:none;">💬</a>
+<!-- Save indicator -->
+<div class="save-ind" id="save-ind">✓ Guardado</div>
+
+<!-- ADMIN PANEL PART 2 -->
+<div id="view-admin" class="view" style="flex-direction:row;">
+  <aside class="adm-sb">
+    <div class="adm-sb-top">
+      <div class="adm-sb-brand">⚙ Panel de Admin</div>
+      <div class="adm-sb-sub">Mira Estudio</div>
+    </div>
+    <nav class="adm-nav">
+      <div class="adm-group">Diseño</div>
+      <button class="adm-ni" data-adm="estetica" onclick="admPage('estetica')">🎨 Estética & Colores</button>
+      <button class="adm-ni" data-adm="textos" onclick="admPage('textos')">📝 Textos Landing</button>
+      <div class="adm-group">Productos</div>
+      <button class="adm-ni" data-adm="cursos" onclick="admPage('cursos')">📚 Cursos</button>
+      <button class="adm-ni" data-adm="ebooks" onclick="admPage('ebooks')">📖 Ebooks</button>
+      <button class="adm-ni" data-adm="features" onclick="admPage('features')">✨ Beneficios</button>
+      <div class="adm-group">Información</div>
+      <button class="adm-ni" data-adm="faq" onclick="admPage('faq')">❓ FAQ</button>
+      <button class="adm-ni" data-adm="info" onclick="admPage('info')">ℹ️ Info General</button>
+      <button class="adm-ni" data-adm="recursos" onclick="admPage('recursos')">📎 Recursos</button>
+      <div class="adm-group">Analíticas</div>
+      <button class="adm-ni" data-adm="analytics" onclick="admPage('analytics')">📊 Analíticas</button>
+      <div class="adm-group">Gestión</div>
+      <button class="adm-ni" data-adm="turnos" onclick="admPage('turnos')">📅 Turnos</button>
+      <button class="adm-ni" data-adm="usuarios" onclick="admPage('usuarios')">👥 Usuarios</button>
+      <button class="adm-ni" data-adm="social" onclick="admPage('social')">🌐 Redes Sociales</button>
+      <button class="adm-ni" data-adm="config" onclick="admPage('config')">⚙️ Configuración</button>
+    </nav>
+    <button class="adm-exit" onclick="admForcSync()" style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.25);color:var(--goldd);margin-bottom:6px;">☁ Sincronizar</button>
+    <button class="adm-exit" onclick="admLogout()">← Volver al sitio</button>
+  </aside>
+
+  <div class="adm-body">
+
+    <!-- ESTÉTICA -->
+    <div class="adm-pg" id="adm-estetica">
+      <div class="adm-pghdr"><h2>🎨 Estética & Colores</h2><p>Personalizá los colores, el fondo del hero y el logo.</p></div>
+      <div class="acard">
+        <h3>Colores del sitio</h3>
+        <div class="adm-grid2">
+          <div>
+            <div class="color-line"><label>🔴 Carmesí principal</label><input type="color" id="col-c1" value="#8C0026" oninput="admPreviewColor('--c1',this.value)"></div>
+            <div class="color-line"><label>🔴 Carmesí oscuro</label><input type="color" id="col-c1d" value="#620018" oninput="admPreviewColor('--c1d',this.value)"></div>
+            <div class="color-line"><label>🔴 Carmesí claro</label><input type="color" id="col-c1l" value="#B0003A" oninput="admPreviewColor('--c1l',this.value)"></div>
+          </div>
+          <div>
+            <div class="color-line"><label>✨ Dorado principal</label><input type="color" id="col-gold" value="#C9A84C" oninput="admPreviewColor('--gold',this.value)"></div>
+            <div class="color-line"><label>🌑 Fondo oscuro</label><input type="color" id="col-dark" value="#1A0008" oninput="admPreviewColor('--dark',this.value)"></div>
+            <div class="color-line"><label>🍦 Fondo crema</label><input type="color" id="col-cr" value="#FFF8F0" oninput="admPreviewColor('--cr',this.value)"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap;">
+          <button class="abtn" onclick="admSaveColors()">Guardar colores</button>
+          <button class="abtn-g" onclick="admResetColors()">Resetear a defaults</button>
+        </div>
+      </div>
+      <div class="acard">
+        <h3>Fondo del Hero (portada)</h3>
+        <div class="adm-grid2">
+          <div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Subí una imagen o video para reemplazar el degradé. El overlay carmesí se mantiene sobre el fondo.</p>
+            <div class="file-drop" onclick="document.getElementById('hero-img-inp').click()">
+              <div style="font-size:28px;">🖼</div><p>Click para subir imagen (JPG/PNG/WEBP)</p>
+              <input type="file" id="hero-img-inp" accept="image/*" style="display:none;" onchange="admUploadHeroBg(this,'image')">
+            </div>
+            <div class="file-drop" style="margin-top:9px;" onclick="document.getElementById('hero-vid-inp').click()">
+              <div style="font-size:28px;">🎬</div><p>Click para subir video (MP4/WEBM)</p>
+              <input type="file" id="hero-vid-inp" accept="video/*" style="display:none;" onchange="admUploadHeroBg(this,'video')">
+            </div>
+            <button class="abtn-g" style="margin-top:9px;width:100%;" onclick="admClearHeroBg()">🗑 Quitar fondo personalizado</button>
+          </div>
+          <div>
+            <p style="font-size:12px;color:var(--muted);margin-bottom:8px;">Vista previa:</p>
+            <div id="adm-bg-prev" style="width:100%;height:160px;border-radius:var(--r1);border:1px solid var(--crd);overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1A0008,#620018);">
+              <span style="color:rgba(255,255,255,.35);font-size:13px;">Degradé por defecto</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="acard">
+        <h3>Logo del sitio</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Subí un PNG con fondo transparente para que el logo se vea bien sobre el fondo oscuro.</p>
+        <div class="file-drop" onclick="document.getElementById('logo-inp').click()">
+          <div style="font-size:28px;">🏷</div><p>Click para subir logo</p>
+          <input type="file" id="logo-inp" accept="image/*" style="display:none;" onchange="admUploadLogo(this)">
+        </div>
+        <div id="logo-prev-wrap" style="display:none;margin-top:12px;display:flex;align-items:center;gap:12px;">
+          <img id="logo-prev" style="height:54px;object-fit:contain;" alt="">
+          <button class="abtn-del" onclick="admClearLogo()">Quitar logo</button>
+        </div>
+      </div>
+      <div class="acard">
+        <h3>Nombre del sitio</h3>
+        <div class="fg"><label>Nombre visible en el nav y footer</label><input type="text" id="est-sitename" placeholder="Mira Estudio"></div>
+        <button class="abtn" onclick="admSaveSiteName('est-sitename')">Guardar nombre</button>
+      </div>
+    </div>
+
+    <!-- TEXTOS -->
+    <div class="adm-pg" id="adm-textos">
+      <div class="adm-pghdr"><h2>📝 Textos de la Landing</h2><p>Editá todos los textos visibles en la página de inicio.</p></div>
+      <div class="acard">
+        <h3>Hero principal</h3>
+        <div class="fg"><label>Etiqueta (tag superior)</label><input type="text" id="txt-hero-tag" placeholder="✦ Cursos de pestañas profesionales"></div>
+        <div class="fg"><label>Título principal H1</label><input type="text" id="txt-hero-h1" placeholder="Domina el arte de las pestañas perfectas"></div>
+        <div class="fg"><label>Subtítulo / descripción</label><textarea id="txt-hero-sub" rows="2"></textarea></div>
+        <div class="adm-grid2">
+          <div class="fg"><label>Botón principal</label><input type="text" id="txt-hero-btn1" placeholder="Comenzar gratis"></div>
+          <div class="fg"><label>Botón secundario</label><input type="text" id="txt-hero-btn2" placeholder="Ver cursos →"></div>
+        </div>
+        <button class="abtn" onclick="admSaveTextos('hero')">Guardar hero</button>
+      </div>
+      <div class="acard">
+        <h3>Estadísticas (bajo el hero)</h3>
+        <div class="adm-grid2">
+          <div>
+            <div class="fg"><label>Stat 1 — Número</label><input type="text" id="txt-s1v" placeholder="+1.200"></div>
+            <div class="fg"><label>Stat 1 — Etiqueta</label><input type="text" id="txt-s1l" placeholder="Alumnas activas"></div>
+          </div>
+          <div>
+            <div class="fg"><label>Stat 2 — Número</label><input type="text" id="txt-s2v" placeholder="8"></div>
+            <div class="fg"><label>Stat 2 — Etiqueta</label><input type="text" id="txt-s2l" placeholder="Cursos disponibles"></div>
+          </div>
+          <div>
+            <div class="fg"><label>Stat 3 — Número</label><input type="text" id="txt-s3v" placeholder="98%"></div>
+            <div class="fg"><label>Stat 3 — Etiqueta</label><input type="text" id="txt-s3l" placeholder="Satisfacción"></div>
+          </div>
+          <div>
+            <div class="fg"><label>Stat 4 — Número</label><input type="text" id="txt-s4v" placeholder="∞"></div>
+            <div class="fg"><label>Stat 4 — Etiqueta</label><input type="text" id="txt-s4l" placeholder="Acceso de por vida"></div>
+          </div>
+        </div>
+        <button class="abtn" onclick="admSaveTextos('stats')">Guardar estadísticas</button>
+      </div>
+      <div class="acard">
+        <h3>Sección "Nuestro Método"</h3>
+        <div class="adm-grid2">
+          <div class="fg"><label>Etiqueta</label><input type="text" id="txt-feat-lbl" placeholder="Nuestro Método"></div>
+          <div class="fg"><label>Título</label><input type="text" id="txt-feat-tit" placeholder="Todo lo que necesitás para crecer..."></div>
+        </div>
+        <button class="abtn" onclick="admSaveTextos('feat')">Guardar</button>
+      </div>
+      <div class="acard">
+        <h3>CTA — Llamado a la acción</h3>
+        <div class="adm-grid2">
+          <div class="fg"><label>Etiqueta</label><input type="text" id="txt-cta-lbl" placeholder="Únete hoy"></div>
+          <div class="fg"><label>Botón</label><input type="text" id="txt-cta-btn" placeholder="Crear mi cuenta gratis"></div>
+        </div>
+        <div class="fg"><label>Título</label><input type="text" id="txt-cta-tit" placeholder="¿Lista para transformar tu carrera?"></div>
+        <div class="fg"><label>Texto</label><textarea id="txt-cta-txt" rows="2"></textarea></div>
+        <button class="abtn" onclick="admSaveTextos('cta')">Guardar CTA</button>
+      </div>
+      <div class="acard">
+        <h3>Footer</h3>
+        <div class="fg"><label>Texto copyright</label><input type="text" id="txt-footer-txt" placeholder="© 2025 Mira Estudio..."></div>
+        <div class="fg"><label>Subtexto</label><input type="text" id="txt-footer-sub" placeholder="Hecho con ♡..."></div>
+        <button class="abtn" onclick="admSaveTextos('footer')">Guardar footer</button>
+      </div>
+      <div class="acard">
+        <h3>Sección Turnos</h3>
+        <div class="fg"><label>Título</label><input type="text" id="txt-turno-tit" placeholder="Sacar turno"></div>
+        <div class="fg"><label>Descripción</label><textarea id="txt-turno-desc" rows="2"></textarea></div>
+        <button class="abtn" onclick="admSaveTextos('turno')">Guardar</button>
+      </div>
+      <div class="acard">
+        <h3>Sección Comunidad</h3>
+        <div class="fg"><label>Título</label><input type="text" id="txt-com-tit" placeholder="Comunidad Mira Estudio"></div>
+        <div class="fg"><label>Texto</label><textarea id="txt-com-txt" rows="2"></textarea></div>
+        <button class="abtn" onclick="admSaveTextos('com')">Guardar</button>
+      </div>
+    </div>
+
+    <!-- COURSE EDITOR PAGE -->
+    <div class="adm-pg editor-pg" id="adm-curso-editor" style="padding:0;">
+      <div class="editor-pg-hdr">
+        <button class="editor-pg-back" onclick="admCloseEditor()">← Volver a Cursos</button>
+        <div class="editor-pg-title" id="editor-pg-title">Editar curso</div>
+        <button class="editor-pg-save" onclick="admSaveCurso(window._editorIsNew||false)">✓ Guardar cambios</button>
+      </div>
+      <div class="editor-pg-body">
+        <div id="cmod-body"></div>
+      </div>
+    </div>
+
+    <!-- CURSOS -->
+    <div class="adm-pg" id="adm-cursos">
+      <div class="adm-pghdr"><h2>📚 Cursos</h2><p>Editá, agregá o eliminá cursos con sus módulos y clases.</p></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+        <button class="abtn-add" onclick="admNewCurso()">+ Nuevo curso</button>
+      </div>
+      <div id="adm-cursos-list"></div>
+    </div>
+
+    <!-- EBOOKS -->
+    <div class="adm-pg" id="adm-ebooks">
+      <div class="adm-pghdr"><h2>📖 Ebooks & Material</h2><p>Gestioná los ebooks descargables.</p></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+        <button class="abtn-add" onclick="admNewEbook()">+ Nuevo ebook</button>
+      </div>
+      <div id="adm-ebooks-list"></div>
+    </div>
+
+    <!-- FEATURES -->
+    <div class="adm-pg" id="adm-features">
+      <div class="adm-pghdr"><h2>✨ Beneficios</h2><p>Tarjetas de beneficios en la landing page.</p></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+        <button class="abtn-add" onclick="admNewFeat()">+ Nueva tarjeta</button>
+      </div>
+      <div id="adm-feat-list"></div>
+      <div style="margin-top:14px;"><button class="abtn" onclick="admSaveFeats()">Guardar todos los beneficios</button></div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="adm-pg" id="adm-faq">
+      <div class="adm-pghdr"><h2>❓ Preguntas Frecuentes</h2><p>Preguntas y respuestas del modal de FAQ.</p></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+        <button class="abtn-add" onclick="admNewFAQ()">+ Nueva pregunta</button>
+      </div>
+      <div id="adm-faq-list"></div>
+      <div style="margin-top:14px;"><button class="abtn" onclick="admSaveFAQAll()">Guardar FAQ</button></div>
+    </div>
+
+    <!-- INFO -->
+    <div class="adm-pg" id="adm-info">
+      <div class="adm-pghdr"><h2>ℹ️ Información General</h2><p>Aparece cuando el usuario toca "Información" en el menú flotante.</p></div>
+      <div class="acard">
+        <div class="fg"><label>Texto de información</label><textarea id="adm-info-txt" rows="12" style="font-size:14px;line-height:1.7;"></textarea></div>
+        <button class="abtn" onclick="admSaveInfoTxt()">Guardar información</button>
+      </div>
+    </div>
+
+    <!-- RECURSOS -->
+    <div class="adm-pg" id="adm-recursos">
+      <div class="adm-pghdr"><h2>📎 Recursos descargables</h2><p>Archivos disponibles para alumnas en su panel.</p></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+        <button class="abtn-add" onclick="admNewRec()">+ Nuevo recurso</button>
+      </div>
+      <div id="adm-rec-list"></div>
+      <div style="margin-top:14px;"><button class="abtn" onclick="admSaveRecs()">Guardar recursos</button></div>
+    </div>
+
+    <!-- TURNOS -->
+    <!-- ANALÍTICAS -->
+    <div class="adm-pg" id="adm-analytics">
+      <div class="adm-pghdr"><h2>📊 Analíticas</h2><p>Estadísticas en tiempo real de la plataforma.</p></div>
+      <div class="analytics-grid" id="an-stats-grid"></div>
+      <div class="chart-wrap">
+        <div class="chart-title">📚 Progreso por curso</div>
+        <div id="an-courses-chart"></div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-title">⭐ Cursos más iniciados</div>
+        <div id="an-popular-chart"></div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-title">📅 Turnos por estado</div>
+        <div id="an-turnos-chart"></div>
+      </div>
+    </div>
+
+    <div class="adm-pg" id="adm-turnos">
+      <div class="adm-pghdr"><h2>📅 Turnos</h2><p>Configurá los horarios disponibles y gestioná las solicitudes.</p></div>
+      <div class="acard" style="margin-bottom:16px;">
+        <h3 style="font-family:var(--fd);font-size:16px;font-weight:500;color:var(--dark);margin-bottom:4px;">⏰ Horarios disponibles</h3>
+        <p style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">Configurá los días y horarios que las clientas pueden elegir. Sin configuración se usan los horarios por defecto.</p>
+        <div class="adm-slots-wrap" id="adm-slots-list"></div>
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:flex-end;">
+          <select id="adm-slot-day" style="flex:1;min-width:110px;"><option>Lunes</option><option>Martes</option><option>Miércoles</option><option>Jueves</option><option>Viernes</option><option>Sábado</option><option>Domingo</option></select>
+          <input type="time" id="adm-slot-time" style="flex:1;min-width:100px;">
+          <button class="abtn" onclick="admAddSlot()" style="white-space:nowrap;">+ Agregar</button>
+        </div>
+        <button class="abtn-g" style="margin-top:10px;font-size:12px;padding:6px 14px;" onclick="admResetSlots()">↺ Restaurar por defecto</button>
+      </div>
+      <div id="adm-turnos-content"></div>
+    </div>
+
+    <!-- USUARIOS -->
+    <div class="adm-pg" id="adm-usuarios">
+      <div class="adm-pghdr"><h2>👥 Usuarios registradas</h2><p>Alumnas con cuenta en la plataforma.</p></div>
+      <div id="adm-users-content"></div>
+    </div>
+
+    <!-- CONFIG -->
+    <div class="adm-pg" id="adm-config">
+      <div class="adm-pghdr"><h2>⚙️ Configuración</h2><p>Ajustes generales del panel de admin.</p></div>
+      <div class="acard">
+        <h3>Cambiar contraseña de admin</h3>
+        <div class="fg"><label>Nueva contraseña (mín. 6 caracteres)</label><input type="password" id="cfg-newpass" placeholder="••••••••"></div>
+        <div class="fg"><label>Confirmar contraseña</label><input type="password" id="cfg-confpass" placeholder="••••••••"></div>
+        <button class="abtn" onclick="admSavePassword()">Cambiar contraseña</button>
+        <p style="font-size:12px;color:var(--muted);margin-top:10px;">La clave actual por defecto es <strong>Mira2025</strong></p>
+      </div>
+      <div class="acard">
+        <h3>Nombre del sitio</h3>
+        <div class="fg"><label>Nombre</label><input type="text" id="cfg-sitename" placeholder="Mira Estudio"></div>
+        <button class="abtn" onclick="admSaveSiteName('cfg-sitename')">Guardar nombre</button>
+      </div>
+      <div class="acard">
+        <h3>Mensaje del dashboard</h3>
+        <div class="fg"><label>Subtítulo bajo el nombre de la alumna</label><input type="text" id="cfg-wsub" placeholder="Continuá donde lo dejaste y seguí avanzando."></div>
+        <button class="abtn" onclick="admSaveCfgDash()">Guardar</button>
+      </div>
+    </div>
+
+
+    <!-- REDES SOCIALES -->
+    <div class="adm-pg" id="adm-social">
+      <div class="adm-pghdr"><h2>🌐 Redes Sociales</h2><p>Configurá los canales de contacto. El WhatsApp activa un botón flotante verde en todo el sitio.</p></div>
+      <div class="acard">
+        <h3>Datos de contacto</h3>
+        <div class="fg"><label>📱 WhatsApp (número con código país, sin + ni espacios)</label>
+          <input type="text" id="soc-wa" placeholder="5491112345678">
+          <p style="font-size:11.5px;color:var(--muted);margin-top:4px;">Ejemplo Argentina: 5491112345678 · Cuando tiene valor, aparece un botón flotante verde en el sitio.</p>
+        </div>
+        <div class="adm-grid2">
+          <div class="fg"><label>📸 Instagram (sin @)</label><input type="text" id="soc-ig" placeholder="miraestudio"></div>
+          <div class="fg"><label>📘 Facebook</label><input type="text" id="soc-fb" placeholder="miraestudio"></div>
+        </div>
+        <div class="adm-grid2">
+          <div class="fg"><label>🌐 Sitio web</label><input type="text" id="soc-web" placeholder="https://miraestudio.com"></div>
+          <div class="fg"><label>✉️ Email</label><input type="text" id="soc-email" placeholder="hola@miraestudio.com"></div>
+        </div>
+        <button class="abtn" onclick="admSaveSocialPage()">Guardar y aplicar</button>
+      </div>
+      <div class="acard">
+        <h3>Vista previa</h3>
+        <div id="soc-preview" class="social-links"></div>
+      </div>
+    </div>
+
+    <!-- THEME PRESETS (injected into estética via JS) -->
+  </div><!-- /adm-body -->
+</div><!-- /view-admin -->
+
+<!-- COURSE EDITOR MODAL -->
+<!-- curso-modal removed: now uses full-page editor -->
+
+
+<!-- CERTIFICADO -->
+<div class="cert-wrap" id="cert-wrap">
+  <div>
+    <div class="cert-card">
+      <button class="cert-close" onclick="closeCert()">✕</button>
+      <canvas id="cert-canvas" width="700" height="495"></canvas>
+    </div>
+    <div class="cert-actions">
+      <button class="btn-gold" onclick="downloadCert()" style="font-size:14px;padding:10px 26px;">⬇ Descargar certificado</button>
+      <button class="btn-g" onclick="closeCert()" style="font-size:14px;padding:10px 20px;">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ONBOARDING -->
+<div class="onboard-overlay" id="onboard-overlay">
+  <div class="onboard-card">
+    <div class="onboard-step active" id="ob-step-0">
+      <div class="onboard-step-icon">👁✨</div>
+      <div class="onboard-step-title">¡Bienvenida a Mira Estudio!</div>
+      <div class="onboard-step-desc">Te hacemos un tour rápido para que aproveches todo lo que tenés disponible.</div>
+      <div class="onboard-highlight"><span class="onboard-highlight-icon">📚</span><span class="onboard-highlight-text"><strong>Cursos profesionales</strong> — técnicas desde cero hasta avanzado, con video y materiales descargables.</span></div>
+      <div class="onboard-highlight"><span class="onboard-highlight-icon">📅</span><span class="onboard-highlight-text"><strong>Turnos online</strong> — solicitá tu cita directamente desde la plataforma.</span></div>
+    </div>
+    <div class="onboard-step" id="ob-step-1">
+      <div class="onboard-step-icon">🎬</div>
+      <div class="onboard-step-title">Video + Notas por clase</div>
+      <div class="onboard-step-desc">Cada lección tiene su video. Podés tomar notas privadas que se guardan automáticamente en tu dispositivo.</div>
+      <div class="onboard-highlight"><span class="onboard-highlight-icon">✓</span><span class="onboard-highlight-text">Marcá cada clase como completada para llevar tu progreso real.</span></div>
+      <div class="onboard-highlight"><span class="onboard-highlight-icon">🏆</span><span class="onboard-highlight-text">Al terminar un curso recibís tu <strong>certificado descargable</strong>.</span></div>
+    </div>
+    <div class="onboard-step" id="ob-step-2">
+      <div class="onboard-step-icon">⋮</div>
+      <div class="onboard-step-title">El menú flotante ⋮</div>
+      <div class="onboard-step-desc">El botón <strong>⋮</strong> en la esquina inferior derecha es tu acceso rápido a cursos, turnos, información y preguntas frecuentes.</div>
+      <div class="onboard-highlight"><span class="onboard-highlight-icon">🌙</span><span class="onboard-highlight-text">¿Preferís fondo oscuro? Usá el toggle 🌙 en la barra superior.</span></div>
+      <div class="onboard-highlight"><span class="onboard-highlight-icon">📈</span><span class="onboard-highlight-text">En <strong>Mi Progreso</strong> ves el avance por cada curso en tiempo real.</span></div>
+    </div>
+    <div class="onboard-footer">
+      <div class="onboard-dots">
+        <div class="onboard-dot active" id="ob-dot-0"></div>
+        <div class="onboard-dot" id="ob-dot-1"></div>
+        <div class="onboard-dot" id="ob-dot-2"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="onboard-skip" onclick="closeOnboard()">Saltar</button>
+        <button class="btn-crimson" id="ob-next-btn" onclick="onboardNext()" style="font-size:14px;padding:9px 22px;">Siguiente →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- WhatsApp FAB -->
+<a id="wa-fab" class="wa-fab" href="#" target="_blank" title="WhatsApp" style="display:none;">💬</a>
+<!-- Save indicator -->
+<div class="save-ind" id="save-ind">✓ Guardado</div>
 
 <script src="shared.js"></script>
 <script>
@@ -1022,7 +1785,6 @@ function admLogout(){
 function doLogout(){ admLogout(); }
 
 document.addEventListener('DOMContentLoaded', ()=>{
-  // Check session
   const s = localStorage.getItem(KS);
   if(!s){ window.location.href = 'index.html?admin=1'; return; }
 
@@ -1032,21 +1794,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   currentUser = u;
 
+  // Make view-admin visible (it starts as display:none via .view class)
+  const vAdmin = document.getElementById('view-admin');
+  if(vAdmin){
+    vAdmin.classList.add('active');
+    vAdmin.style.minHeight = '100vh';
+  }
+
   // Init Firebase (non-blocking)
   initFirebase();
   loadSavedEstetics();
 
-  // Load admin panel immediately (don't wait for Firestore)
+  // Load admin panel immediately
   loadAdminData();
 
-  // Then sync from cloud in background (non-blocking)
-  if(_fbReady && _db){
-    _syncSiteFromCloud().then(()=>{
-      // Refresh current admin page silently
-      const active = document.querySelector('.adm-ni.active');
-      if(active && active.dataset.adm) admPage(active.dataset.adm);
-    }).catch(()=>{});
-  }
+  // Sync from cloud in background
+  setTimeout(()=>{
+    if(_fbReady && _db){
+      _syncSiteFromCloud().then(()=>{
+        const active = document.querySelector('.adm-ni.active');
+        if(active && active.dataset.adm) admPage(active.dataset.adm);
+      }).catch(()=>{});
+    }
+  }, 2000);
 });
 
 </script>
