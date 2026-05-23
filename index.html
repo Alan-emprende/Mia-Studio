@@ -13,9 +13,9 @@
 :root{
   --c1:#8C0026;--c1d:#620018;--c1l:#B0003A;
   --gold:#C9A84C;--goldl:#E8D5A0;--goldp:#FDF5DC;--goldd:#9A7A2A;
-  --dark:#1A0008;--darkm:#3B000F;
-  --cr:#FFF8F0;--crd:#F5EBD8;--sw:#FFFAF5;
-  --muted:#7A4A52;
+  --dark:#F0E6D3;--darkm:#D8CABC;
+  --cr:#0D0005;--crd:#2A0818;--sw:#160008;
+  --muted:#A07880;
   --fd:'Cormorant Garamond',serif;
   --fb:'DM Sans',sans-serif;
   --r1:6px;--r2:14px;--r3:22px;
@@ -403,7 +403,7 @@ body{font-family:var(--fb);background:var(--cr);color:var(--dark);min-height:100
 
 
 /* ── INSTAGRAM CAROUSEL ── */
-.icar-section{background:var(--dark);padding:0 0 64px;position:relative;overflow:hidden;}
+.icar-section{background:linear-gradient(180deg,var(--c1d),#0D0005);padding:0 0 64px;position:relative;overflow:hidden;}
 .icar-title{text-align:center;padding:40px 5vw 28px;position:relative;z-index:2;}
 .icar-title h2{font-family:var(--fd);font-size:clamp(22px,3vw,32px);font-weight:300;color:var(--goldl);letter-spacing:.04em;}
 .icar-title p{font-size:14px;color:rgba(255,248,240,.45);margin-top:6px;}
@@ -734,8 +734,8 @@ body{font-family:var(--fb);background:var(--cr);color:var(--dark);min-height:100
 /* ── DARK MODE ── */
 /* Default IS dark mode — light mode overrides below */
 body.light-mode{
-  --cr:#FFF8F0;--crd:#E8D8CC;--sw:#FFFFFF;--muted:#8A6A5A;
-  --dark:#1A0008;--darkm:#3A1020;
+  --cr:#FFF8F0;--crd:#E8D8CC;--sw:#FFFFFF;--muted:#7A4A52;
+  --dark:#1A0008;--darkm:#3B000F;
   background:var(--cr);color:var(--dark);
 }
 body.light-mode .topbar{background:#FFFFFF;border-color:#E8D8CC;}
@@ -974,6 +974,23 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--gold);outline-of
   .sidebar{position:fixed;left:-260px;top:0;height:100vh;z-index:150;transition:left .28s cubic-bezier(.4,0,.2,1);box-shadow:4px 0 24px rgba(0,0,0,.3);}
   .sidebar.open{left:0;}
   .main-content{margin-left:0 !important;}
+}
+
+
+/* Fix elements that use --dark as background */
+body.dark-mode .sec-dark,
+body.dark-mode .icar-section,
+body.dark-mode .footer{
+  background:var(--c1d) !important;
+  color:var(--goldl);
+}
+body.dark-mode .sidebar{
+  background:#130006 !important;
+  border-color:#2A0818;
+}
+body.dark-mode .btn-p,
+body.dark-mode .btn-gold{
+  color:var(--dark) !important;
 }
 
 </style>
