@@ -1084,3 +1084,39 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;}
   .rvl{opacity:1;transform:none;}
 }
+
+/* ═══ RONDA 2: TESTIMONIOS ═══ */
+.reviews-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:18px;max-width:1100px;}
+.review-card{background:rgba(255,255,255,.04);border:1px solid rgba(201,168,76,.18);border-radius:var(--r3);padding:26px 24px;display:flex;flex-direction:column;gap:14px;transition:.25s;}
+.review-card:hover{border-color:rgba(201,168,76,.4);background:rgba(201,168,76,.06);transform:translateY(-3px);}
+.review-stars{color:var(--gold);font-size:15px;letter-spacing:3px;}
+.review-text{font-family:var(--fd);font-size:17px;line-height:1.55;color:rgba(255,248,240,.85);font-style:italic;flex:1;}
+.review-who{display:flex;align-items:center;gap:11px;}
+.review-av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--c1),var(--c1l));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:16px;flex-shrink:0;border:1px solid rgba(201,168,76,.4);}
+.review-name{font-size:13.5px;font-weight:500;color:var(--dark);}
+.review-role{font-size:12px;color:rgba(255,248,240,.45);}
+
+/* ═══ RONDA 2: FAQ ACORDEÓN EN LA LANDING ═══ */
+.faq-land{max-width:720px;}
+.faq-item{border-bottom:1px solid rgba(26,0,8,.12);}
+.faq-q{width:100%;background:none;border:none;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px 2px;font-family:var(--fd);font-size:18.5px;font-weight:500;color:var(--cr);cursor:pointer;transition:color .2s;}
+.faq-q:hover{color:var(--c1);}
+.faq-chev{font-size:14px;color:var(--goldd);transition:transform .3s ease;flex-shrink:0;}
+.faq-item.open .faq-chev{transform:rotate(180deg);}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .35s ease,padding .35s ease;}
+.faq-item.open .faq-a{max-height:320px;padding-bottom:18px;}
+.faq-a p{font-size:14.5px;line-height:1.7;color:rgba(26,0,8,.65);max-width:640px;}
+
+/* ═══ RONDA 2: MENÚ MÓVIL DE LA LANDING ═══ */
+.lnav-burger{display:none;background:none;border:1px solid rgba(201,168,76,.4);color:var(--goldl);width:38px;height:38px;border-radius:10px;font-size:17px;cursor:pointer;align-items:center;justify-content:center;transition:.2s;}
+.lnav-burger:hover{background:rgba(201,168,76,.15);}
+@media(max-width:768px){
+  .lnav-burger{display:flex;}
+  .lnav .nav-links{display:none;}
+  .lnav.menu-open .nav-links{display:flex;flex-direction:column;position:absolute;top:70px;left:0;right:0;background:rgba(26,0,8,.97);backdrop-filter:blur(14px);border-bottom:1px solid rgba(201,168,76,.25);padding:20px 6vw 24px;gap:4px;}
+  .lnav.menu-open .nav-links a{padding:12px 4px;font-size:16px;border-bottom:1px solid rgba(201,168,76,.1);}
+}
+@media(max-width:480px){
+  .nav-acts .btn-g,.nav-acts .btn-p{padding:7px 13px;font-size:12px;}
+  .reviews-grid{grid-template-columns:1fr;}
+}

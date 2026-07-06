@@ -352,6 +352,8 @@ function applyHeroBg(){
 // ═══ LANDING RENDER ═══
 function renderLanding(){
   if(typeof renderIcarousel==="function")renderIcarousel();
+  if(typeof renderReviewsLanding==='function')renderReviewsLanding();
+  if(typeof renderFaqLanding==='function')renderFaqLanding();
   // features
   const feats=gFt();
   const fg=document.getElementById('feat-grid');
@@ -759,7 +761,7 @@ function admPage(name){
   const pg=document.getElementById('adm-'+name);
   if(pg)pg.classList.add('active');
   const renders={estetica:admRenderEstetica,textos:admRenderTextos,cursos:admRenderCursosList,
-    ebooks:admRenderEbooksList,features:admRenderFeatsList,faq:admRenderFAQList,
+    ebooks:admRenderEbooksList,features:admRenderFeatsList,faq:admRenderFAQList,reviews:admRenderReviewsList,
     info:admRenderInfoPage,recursos:admRenderRecsList,
     analytics:function(){renderAnalytics();loadTurnosCloud().then(ok=>{if(ok)renderAnalytics();});},
     turnos:function(){admRenderTurnosList();admRenderSlots();loadTurnosCloud().then(ok=>{if(ok)admRenderTurnosList();});},
@@ -3523,7 +3525,7 @@ function switchCarousel(tab){
 (function(){
   if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if(!('IntersectionObserver' in window)) return;
-  var SEL='.feat-card,.cpc,.sec-tit,.ebook-card,.course-card,.cc,.scard,.prog-course-row,.ritem';
+  var SEL='.feat-card,.cpc,.sec-tit,.ebook-card,.course-card,.cc,.scard,.prog-course-row,.ritem,.review-card,.faq-item';
   var io=new IntersectionObserver(function(entries){
     entries.forEach(function(e){
       if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}
@@ -3555,3 +3557,96 @@ function switchCarousel(tab){
     setInterval(rvlRescue,1500);
   });
 })();
+
+
+// ═══ TESTIMONIOS (landing + admin) ═══
+// Datos en localStorage 'ms_reviews', sincronizados con Firestore site/reviews_list.
+// Estructura: [{name, role, stars(1-5), text}]
+const gRev=()=>{try{return JSON.parse(localStorage.getItem('ms_reviews')||'[]');}catch(e){return[];}};
+const sRev=v=>{localStorage.setItem('ms_reviews',JSON.stringify(v));_fsSet('reviews_list',v);};
+function _escHtml(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function renderReviewsLanding(){
+  const sec=document.getElementById('reviews-sec');
+  const grid=document.getElementById('reviews-grid');
+  if(!sec||!grid)return;
+  const list=gRev().filter(r=>r&&r.text);
+  if(!list.length){sec.style.display='none';return;}
+  sec.style.display='';
+  grid.innerHTML=list.map(r=>{
+    const stars='★'.repeat(Math.max(1,Math.min(5,parseInt(r.stars)||5)));
+    const ini=_escHtml((r.name||'A').trim().charAt(0).toUpperCase());
+    return `<div class="review-card">
+      <div class="review-stars">${stars}</div>
+      <p class="review-text">“${_escHtml(r.text)}”</p>
+      <div class="review-who">
+        <div class="review-av">${ini}</div>
+        <div><div class="review-name">${_escHtml(r.name||'Alumna')}</div><div class="review-role">${_escHtml(r.role||'')}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Admin CRUD (mismo patrón que FAQ)
+function admRenderReviewsList(){
+  const list=gRev();const el=document.getElementById('adm-reviews-list');if(!el)return;
+  if(!list.length){
+    el.innerHTML='<div class="acard" style="text-align:center;padding:30px;"><div style="font-size:34px;margin-bottom:10px;">⭐</div><p style="color:var(--muted);">Todavía no cargaste testimonios. Agregá opiniones reales de tus alumnas y aparecerán en la página principal.</p></div>';
+    return;
+  }
+  el.innerHTML=list.map((r,idx)=>`
+    <div class="arow">
+      <div class="arow-main">
+        <div class="adm-grid3" style="gap:8px;margin-bottom:7px;">
+          <div class="fg" style="margin:0;"><label>Nombre</label><input type="text" id="rev-name-${idx}" value="${_escHtml(r.name)}"></div>
+          <div class="fg" style="margin:0;"><label>Curso / detalle</label><input type="text" id="rev-role-${idx}" value="${_escHtml(r.role)}" placeholder="Ej: Extensiones Clásicas"></div>
+          <div class="fg" style="margin:0;"><label>Estrellas</label><select id="rev-stars-${idx}">${[5,4,3,2,1].map(n=>`<option value="${n}" ${(parseInt(r.stars)||5)===n?'selected':''}>${'★'.repeat(n)}</option>`).join('')}</select></div>
+        </div>
+        <div class="fg" style="margin:0;"><label>Testimonio</label><textarea id="rev-text-${idx}" rows="2">${_escHtml(r.text)}</textarea></div>
+      </div>
+      <div class="arow-acts"><button class="abtn-del" onclick="admDeleteReviewItem(${idx})">✕</button></div>
+    </div>`).join('');
+}
+function admNewReview(){const l=gRev();l.push({name:'',role:'',stars:5,text:''});sRev(l);admRenderReviewsList();}
+function admSaveReviewsAll(){
+  const l=gRev();
+  l.forEach((_,idx)=>{
+    l[idx].name=document.getElementById('rev-name-'+idx).value.trim();
+    l[idx].role=document.getElementById('rev-role-'+idx).value.trim();
+    l[idx].stars=parseInt(document.getElementById('rev-stars-'+idx).value)||5;
+    l[idx].text=document.getElementById('rev-text-'+idx).value.trim();
+  });
+  sRev(l.filter(r=>r.text||r.name));
+  toast('✅ Testimonios guardados');admRenderReviewsList();
+}
+function admDeleteReviewItem(idx){const l=gRev().filter((_,i)=>i!==idx);sRev(l);admRenderReviewsList();}
+
+// ═══ FAQ EN LA LANDING (acordeón) ═══
+function renderFaqLanding(){
+  const el=document.getElementById('faq-landing-list');if(!el)return;
+  const faqs=gF();
+  if(!faqs.length){const sec=document.getElementById('faq-sec');if(sec)sec.style.display='none';return;}
+  el.innerHTML=faqs.map(f=>`
+    <div class="faq-item">
+      <button class="faq-q" onclick="faqToggle(this)">${_escHtml(f.q)}<span class="faq-chev">▾</span></button>
+      <div class="faq-a"><p>${_escHtml(f.a)}</p></div>
+    </div>`).join('');
+}
+function faqToggle(btn){
+  const item=btn.closest('.faq-item');
+  const abierto=item.classList.contains('open');
+  document.querySelectorAll('#faq-landing-list .faq-item.open').forEach(i=>i.classList.remove('open'));
+  if(!abierto)item.classList.add('open');
+}
+
+// ═══ MENÚ MÓVIL DE LA LANDING ═══
+function toggleLandingMenu(){
+  const nav=document.querySelector('.lnav');
+  if(nav)nav.classList.toggle('menu-open');
+}
+document.addEventListener('click',function(e){
+  const nav=document.querySelector('.lnav.menu-open');
+  if(!nav)return;
+  // Cerrar al tocar un link del menú o fuera del nav
+  if(e.target.closest('.nav-links a')||!e.target.closest('.lnav'))nav.classList.remove('menu-open');
+});

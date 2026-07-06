@@ -30,6 +30,7 @@
     <div class="nav-acts">
       <button class="btn-g" onclick="openAuth('l')">Iniciar sesión</button>
       <button class="btn-p" onclick="openAuth('r')">Comenzar</button>
+      <button class="lnav-burger" onclick="toggleLandingMenu()" aria-label="Abrir menú">☰</button>
     </div>
   </nav>
 
@@ -176,6 +177,20 @@
     <div class="sec-tit" style="color:var(--cr);" id="courses-land-tit">Elige tu camino<br><em style="color:var(--goldl);">hacia la excelencia</em></div>
     <div class="cpc-grid" id="landing-courses-grid"></div>
     <div style="text-align:center;margin-top:30px;"><button class="btn-gold" onclick="openAuth('r')" id="land-see-all">Ver todos los cursos</button></div>
+  </section>
+
+  <!-- TESTIMONIOS (solo aparece si hay testimonios cargados en el panel admin) -->
+  <section class="sec" id="reviews-sec" style="display:none;">
+    <div class="sec-lbl">Testimonios</div>
+    <div class="sec-tit" style="color:var(--dark);">Lo que dicen<br><em style="color:var(--goldl);">nuestras alumnas</em></div>
+    <div class="reviews-grid" id="reviews-grid"></div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="sec sec-dark" id="faq-sec">
+    <div class="sec-lbl">Dudas frecuentes</div>
+    <div class="sec-tit" style="color:var(--cr);">Preguntas<br><em>frecuentes</em></div>
+    <div class="faq-land" id="faq-landing-list"></div>
   </section>
 
   <section class="sec sec-cta" id="cta-sec">
