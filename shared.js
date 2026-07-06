@@ -43,11 +43,52 @@ async function _fsGet(key){if(!_fbReady||!_db)return null;try{const d=await _db.
 async function _fsSet(key,value){if(!_fbReady||!_db)return;try{const s=JSON.stringify(value);if(s.length>900000)return;await _db.collection('site').doc(key).set({v:value,t:Date.now()});}catch(e){}}
 async function _syncSiteFromCloud(){
   if(!_fbReady||!_db)return;
-  const KEYS=[{ls:KC,fs:'courses'},{ls:KF,fs:'faq'},{ls:KI,fs:'info'},{ls:KFT,fs:'features'},{ls:KR,fs:'recursos'},{ls:KEB,fs:'ebooks'},{ls:KCF,fs:'config'},{ls:KES,fs:'estetics'},{ls:'ms_banner',fs:'banner'},{ls:'ms_social',fs:'social'},{ls:KSL,fs:'slots'},{ls:'ms_reviews',fs:'reviews_list'}];
+  const KEYS=[{ls:KC,fs:'courses'},{ls:KF,fs:'faq'},{ls:KI,fs:'info'},{ls:KFT,fs:'features'},{ls:KR,fs:'recursos'},{ls:KEB,fs:'ebooks'},{ls:KCF,fs:'config'},{ls:KES,fs:'estetics'},{ls:'ms_banner',fs:'banner'},{ls:'ms_social',fs:'social'},{ls:KSL,fs:'slots'},{ls:'ms_reviews',fs:'reviews_list'},{ls:'ms_taken',fs:'taken'}];
   for(const {ls,fs} of KEYS){try{const v=await _fsGet(fs);if(v!==null){const lc=localStorage.getItem(ls);if(lc!==JSON.stringify(v)){localStorage.setItem(ls,JSON.stringify(v));}}}catch(e){}}
 }
 async function _saveUserProfile(uid,data){if(!_fbReady||!_db)return;try{await _db.collection('users').doc(uid).set(data,{merge:true});}catch(e){}}
 async function _loadUserProfile(uid){if(!_fbReady||!_db)return null;try{const d=await _db.collection('users').doc(uid).get();return d.exists?d.data():null;}catch(e){return null;}}
+
+// ════════════ TURNOS EN LA NUBE ════════════
+// Cada turno es un documento propio en la colección 'turnos' (así no se pisan
+// entre distintas clientas/dispositivos). La disponibilidad de horarios se publica
+// aparte en site/taken como {fecha:[horas]}, sin datos personales.
+function _cacheTakenLocal(date,time,taken){
+  if(!date||!time)return;
+  let m={};try{m=JSON.parse(localStorage.getItem('ms_taken')||'{}');}catch(e){}
+  const arr=m[date]||[];
+  m[date]=taken?(arr.includes(time)?arr:[...arr,time]):arr.filter(t=>t!==time);
+  localStorage.setItem('ms_taken',JSON.stringify(m));
+}
+async function _updateTakenSlot(date,time,taken){
+  _cacheTakenLocal(date,time,taken);
+  if(!_fbReady||!_db||!date||!time)return;
+  try{
+    const FV=firebase.firestore.FieldValue;
+    await _db.collection('site').doc('taken').set({v:{[date]:taken?FV.arrayUnion(time):FV.arrayRemove(time)}},{merge:true});
+  }catch(e){}
+}
+async function _turnoCloudSave(t){
+  if(!_fbReady||!_db)return;
+  try{
+    const data={...t};
+    if(currentUser&&currentUser.uid)data.uid=currentUser.uid;
+    if(currentUser&&currentUser.email)data.email=currentUser.email;
+    await _db.collection('turnos').doc(String(t.id)).set(data,{merge:true});
+  }catch(e){console.warn('turno cloud:',e.message);}
+}
+async function _turnoCloudDelete(id){if(!_fbReady||!_db)return;try{await _db.collection('turnos').doc(String(id)).delete();}catch(e){}}
+// Para el panel admin: baja todos los turnos de la nube (la nube manda)
+async function loadTurnosCloud(){
+  if(!_fbReady||!_db)return false;
+  try{
+    const snap=await _db.collection('turnos').get();
+    const list=snap.docs.map(d=>d.data()).sort((a,b)=>(b.id||0)-(a.id||0));
+    if(!list.length&&gT().length)return false; // nube vacía pero hay locales: no borrar
+    localStorage.setItem(KT,JSON.stringify(list));
+    return true;
+  }catch(e){return false;}
+}
 
 // ═══ DEFAULT DATA ═══
 const DEF_COURSES=[
@@ -125,7 +166,9 @@ const sc=v=>{
   _fsSet('courses',v);
 };
 const gT=()=>JSON.parse(localStorage.getItem(KT)||'[]');
-const sT=v=>{localStorage.setItem(KT,JSON.stringify(v));_fsSet('turnos_list',v);};
+// sT guarda solo localmente: cada turno se sube individualmente con _turnoCloudSave
+// (antes se subía la lista entera a site/turnos_list y una clienta pisaba los turnos de otra)
+const sT=v=>{localStorage.setItem(KT,JSON.stringify(v));};
 const gF=()=>{const d=localStorage.getItem(KF);return d?JSON.parse(d):[...DEF_FAQ];}
 const sF=v=>{localStorage.setItem(KF,JSON.stringify(v));_fsSet('faq',v);};
 const gFt=()=>{const d=localStorage.getItem(KFT);return d?JSON.parse(d):[...DEF_FEATS];}
@@ -453,8 +496,9 @@ function saveTurnoForm(nameId,telId,servId,dateId,msgId){
   const name=document.getElementById(nameId).value.trim(),tel=document.getElementById(telId).value.trim();
   if(!name||!tel){toast('⚠️ Nombre y teléfono son requeridos');return false;}
   const t=gT();
-  t.push({id:Date.now(),name,tel,serv:document.getElementById(servId).value,date:document.getElementById(dateId).value,msg:document.getElementById(msgId).value.trim(),ts:new Date().toLocaleDateString('es-AR')});
-  sT(t);
+  const turno={id:Date.now(),name,tel,serv:document.getElementById(servId).value,date:document.getElementById(dateId).value,msg:document.getElementById(msgId).value.trim(),status:'pending',ts:new Date().toLocaleDateString('es-AR')};
+  t.push(turno);
+  sT(t);_turnoCloudSave(turno);
   [nameId,telId,dateId,msgId].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   toast('✅ Solicitud enviada. Te contactamos pronto!');return true;
 }
@@ -597,6 +641,19 @@ function setProgress(courseId,lessonId,done){
   const p=getProgress(courseId);
   if(done)p[lessonId]=true;else delete p[lessonId];
   localStorage.setItem('prog_'+courseId,JSON.stringify(p));
+  _saveProgressCloud(courseId,p);
+}
+// Sube el progreso del curso a users/{uid} para que no se pierda al cambiar de dispositivo
+function _saveProgressCloud(courseId,p){
+  if(!_fbReady||!_db||!currentUser||!currentUser.uid)return;
+  const ref=_db.collection('users').doc(currentUser.uid);
+  ref.update({['progress.'+courseId]:p}).catch(()=>ref.set({progress:{[courseId]:p}},{merge:true}).catch(()=>{}));
+}
+function _saveNoteCloud(courseId,lessonId,text){
+  if(!_fbReady||!_db||!currentUser||!currentUser.uid)return;
+  const key=courseId+'_'+lessonId;
+  const ref=_db.collection('users').doc(currentUser.uid);
+  ref.update({['notes.'+key]:text}).catch(()=>ref.set({notes:{[key]:text}},{merge:true}).catch(()=>{}));
 }
 
 function markLessonDone(){
@@ -672,10 +729,21 @@ function loadAdminData(){
     _syncSiteFromCloud().then(()=>{
       admPage('estetica');
       toast('✅ Datos actualizados');
+      _admCheckCloudAuth();
     }).catch(()=>admPage('estetica'));
   } else {
     admPage('estetica');
   }
+}
+// Avisa si el panel se abrió sin sesión de Firebase: con las reglas de seguridad
+// activas, los cambios no se guardan en la nube si no iniciaste sesión con tu cuenta.
+function _admCheckCloudAuth(){
+  if(!_fbReady||!_auth)return;
+  setTimeout(()=>{
+    if(!_auth.currentUser){
+      toast('⚠️ No iniciaste sesión con tu cuenta de administradora — los cambios podrían quedar solo en este dispositivo');
+    }
+  },3500);
 }
 
 function admLogout(){
@@ -692,7 +760,9 @@ function admPage(name){
   if(pg)pg.classList.add('active');
   const renders={estetica:admRenderEstetica,textos:admRenderTextos,cursos:admRenderCursosList,
     ebooks:admRenderEbooksList,features:admRenderFeatsList,faq:admRenderFAQList,
-    info:admRenderInfoPage,recursos:admRenderRecsList,analytics:renderAnalytics,turnos:function(){admRenderTurnosList();admRenderSlots();},
+    info:admRenderInfoPage,recursos:admRenderRecsList,
+    analytics:function(){renderAnalytics();loadTurnosCloud().then(ok=>{if(ok)renderAnalytics();});},
+    turnos:function(){admRenderTurnosList();admRenderSlots();loadTurnosCloud().then(ok=>{if(ok)admRenderTurnosList();});},
     usuarios:admRenderUsersList,config:admRenderConfig};
   if(renders[name])renders[name]();
 }
@@ -1432,7 +1502,11 @@ function getSlotsForDate(dateStr){
   return row?row.times:[];
 }
 function getTakenSlots(dateStr){
-  return gT().filter(t=>t.date===dateStr&&t.status!=='cancelled').map(t=>t.time);
+  // Combina turnos locales + horarios ocupados publicados en la nube (site/taken)
+  const local=gT().filter(t=>t.date===dateStr&&t.status!=='cancelled').map(t=>t.time);
+  let cloud=[];
+  try{cloud=(JSON.parse(localStorage.getItem('ms_taken')||'{}'))[dateStr]||[];}catch(e){}
+  return [...new Set([...local,...cloud])];
 }
 
 (function(){
@@ -1564,6 +1638,7 @@ function getTakenSlots(dateStr){
     const serv=window._selServ||'Consulta';
     const turno={id:Date.now(),name,tel,serv,date,time:window._selSlot,msg:document.getElementById('ict-msg').value.trim(),status:'pending',ts:new Date().toLocaleDateString('es-AR')};
     const t=gT();t.push(turno);sT(t);
+    _turnoCloudSave(turno);_updateTakenSlot(turno.date,turno.time,true);
     if(typeof pushNotif==='function')pushNotif('📅','Turno solicitado correctamente');
     const confirmTxt=document.getElementById('ict-confirm-txt');
     if(confirmTxt)confirmTxt.innerHTML='<strong>'+serv+'</strong><br>📅 '+date+' a las <strong>'+window._selSlot+'</strong><br>📱 Te contactamos al '+tel;
@@ -1860,6 +1935,7 @@ function saveNote(){
   clearTimeout(noteSaveTimer);
   noteSaveTimer = setTimeout(() => {
     localStorage.setItem(getNoteKey(currentCourseId, l.id), ta.value);
+    _saveNoteCloud(currentCourseId, l.id, ta.value);
     const saved = document.getElementById('notes-saved');
     if(saved){ saved.classList.add('show'); setTimeout(()=>saved.classList.remove('show'), 2000); }
   }, 600);
@@ -2009,7 +2085,11 @@ function admRenderTurnosList(){
 
 function admDeleteTurno(id){
   if(!confirm('¿Eliminar este turno?'))return;
-  const t=gT().filter(x=>x.id!==id);sT(t);admRenderTurnosList();toast('Turno eliminado');
+  const all=gT();const borrado=all.find(x=>x.id===id);
+  sT(all.filter(x=>x.id!==id));
+  _turnoCloudDelete(id);
+  if(borrado)_updateTakenSlot(borrado.date,borrado.time,false);
+  admRenderTurnosList();toast('Turno eliminado');
 }
 function changeTurnoStatus(id, newStatus, selectEl){
   const turnos = gT();
@@ -2017,6 +2097,8 @@ function changeTurnoStatus(id, newStatus, selectEl){
   if(!t) return;
   t.status = newStatus;
   sT(turnos);
+  if(_fbReady&&_db)_db.collection('turnos').doc(String(id)).set({status:newStatus},{merge:true}).catch(()=>{});
+  _updateTakenSlot(t.date,t.time,newStatus!=='cancelled');
   const classMap = {pending:'ts-pending',confirmed:'ts-confirmed',cancelled:'ts-cancelled'};
   selectEl.className = 'turno-status ' + (classMap[newStatus]||'ts-pending');
   toast(newStatus==='confirmed'?'✅ Turno confirmado':newStatus==='cancelled'?'❌ Turno cancelado':'⏳ Marcado como pendiente');
@@ -2031,8 +2113,8 @@ function openWhatsApp(tel, name, serv, date){
 function exportTurnosCSV(){
   const turnos = gT();
   if(!turnos.length){ toast('No hay turnos para exportar'); return; }
-  const rows = [['Nombre','Teléfono','Servicio','Fecha','Estado','Mensaje','Recibido']];
-  turnos.forEach(t => rows.push([t.name||'',t.tel||'',t.serv||'',t.date||'',t.status||'pending',t.msg||'',t.ts||'']));
+  const rows = [['Nombre','Teléfono','Servicio','Fecha','Hora','Estado','Mensaje','Recibido']];
+  turnos.forEach(t => rows.push([t.name||'',t.tel||'',t.serv||'',t.date||'',t.time||'',t.status||'pending',t.msg||'',t.ts||'']));
   const csv = rows.map(r => r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
@@ -3107,19 +3189,54 @@ function hasEbook(ebookId){
   return getPurchasedEbooks().includes(String(ebookId));
 }
 
-// Load purchases from Firestore on login
+// Carga TODOS los datos de la alumna desde Firestore al iniciar sesión:
+// compras de ebooks + progreso de lecciones + notas. Fusiona nube y local
+// (unión de ambos) y sube a la nube lo que solo existía en este dispositivo.
 async function loadUserPurchases(){
   if(!_fbReady||!_db||!currentUser?.uid) return;
   try{
-    const doc=await _db.collection('users').doc(currentUser.uid).get();
-    if(doc.exists){
-      const data=doc.data();
-      if(data.purchasedEbooks){
-        const key='ms_purchased_'+currentUser.email;
-        localStorage.setItem(key, JSON.stringify(data.purchasedEbooks));
-        renderEbooks(); // refresh ebook cards
+    const ref=_db.collection('users').doc(currentUser.uid);
+    const doc=await ref.get();
+    const data=doc.exists?doc.data():{};
+    // ── Ebooks comprados ──
+    if(data.purchasedEbooks){
+      const key='ms_purchased_'+currentUser.email;
+      localStorage.setItem(key, JSON.stringify(data.purchasedEbooks));
+      if(typeof renderEbooks==='function')renderEbooks();
+    }
+    const upd={};
+    // ── Progreso de lecciones: unión nube + local ──
+    const cloudProg=data.progress||{};
+    const pushProg={};
+    gc().forEach(c=>{
+      const local=getProgress(c.id);
+      const cloud=cloudProg[c.id]||{};
+      const merged={...cloud,...local};
+      if(Object.keys(merged).length){
+        localStorage.setItem('prog_'+c.id,JSON.stringify(merged));
+        if(Object.keys(merged).length>Object.keys(cloud).length)pushProg[c.id]=merged;
+      }
+    });
+    if(Object.keys(pushProg).length)upd.progress=pushProg;
+    // ── Notas: bajar las de la nube, subir las que solo están acá ──
+    const cloudNotes=data.notes||{};
+    Object.entries(cloudNotes).forEach(([k,v])=>{
+      const lk='note_'+k;
+      if(v&&!localStorage.getItem(lk))localStorage.setItem(lk,v);
+    });
+    const pushNotes={};
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&k.indexOf('note_')===0){
+        const ck=k.slice(5);const v=localStorage.getItem(k);
+        if(v&&!(ck in cloudNotes))pushNotes[ck]=v;
       }
     }
+    if(Object.keys(pushNotes).length)upd.notes=pushNotes;
+    if(Object.keys(upd).length)ref.set(upd,{merge:true}).catch(()=>{});
+    // Refrescar la UI con el progreso ya sincronizado
+    if(typeof updateDashStats==='function')try{updateDashStats();}catch(e){}
+    if(typeof renderCarouselCourses==='function')try{renderCarouselCourses();}catch(e){}
   }catch(e){}
 }
 
@@ -3280,6 +3397,7 @@ function saveTurno(){
   const serv=_dashServ.t||'Consulta';
   const turno={id:Date.now(),name,tel,serv,date,time:_dashSlot.t,msg:document.getElementById('t-msg')?.value.trim()||'',status:'pending',ts:new Date().toLocaleDateString('es-AR')};
   const arr=gT();arr.push(turno);sT(arr);
+  _turnoCloudSave(turno);_updateTakenSlot(turno.date,turno.time,true);
   const txt=document.getElementById('t-confirm-txt');
   if(txt)txt.innerHTML='<strong>'+serv+'</strong><br>📅 '+date+' a las <strong>'+_dashSlot.t+'</strong><br>📱 Te contactamos al '+tel;
   dashNextStep('t',2);
@@ -3294,6 +3412,7 @@ function saveTurno2(){
   const serv=_dashServ.t2||'Consulta';
   const turno={id:Date.now(),name,tel,serv,date,time:_dashSlot.t2,msg:document.getElementById('t2-msg')?.value.trim()||'',status:'pending',ts:new Date().toLocaleDateString('es-AR')};
   const arr=gT();arr.push(turno);sT(arr);
+  _turnoCloudSave(turno);_updateTakenSlot(turno.date,turno.time,true);
   const txt=document.getElementById('t2-confirm-txt');
   if(txt)txt.innerHTML='<strong>'+serv+'</strong><br>📅 '+date+' a las <strong>'+_dashSlot.t2+'</strong><br>📱 Te contactamos al '+tel;
   dashNextStep('t2',2);
