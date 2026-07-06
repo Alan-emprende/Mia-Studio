@@ -324,6 +324,30 @@
         </div>
       </div>
     </div>
+
+  </div>
+</div>
+
+
+<!-- ══ REPRODUCTOR DE CURSO (vista propia, reconstruida jul 2026) ══ -->
+<div id="view-course-viewer" class="view">
+  <div class="vtop">
+    <div id="vtop-cover" style="position:absolute;inset:0;pointer-events:none;display:none;"></div>
+    <button class="vback" onclick="backDash()" style="position:relative;">← Volver</button>
+    <div class="vcname" id="vcname" style="position:relative;">Curso</div>
+    <button class="vback" id="vs-toggle" style="display:none;position:relative;" onclick="document.querySelector('.vs').classList.toggle('open')">☰ Clases</button>
+    <div class="vpw" style="position:relative;"><div class="vpbar"><div class="vpfill" id="vpf" style="width:0%;"></div></div><div class="vpt" id="vpt">0% completado</div></div>
+  </div>
+  <div class="vbody">
+    <aside class="vs">
+      <div class="vs-hdr">
+        <h3 id="vsh-tit">Curso</h3>
+        <p id="vsh-meta">— módulos · — clases</p>
+        <div class="vpbar" style="width:100%;margin-top:10px;"><div class="vpfill" id="vs-prog-fill" style="width:0%;"></div></div>
+        <p id="vs-prog-txt" style="font-size:11px;color:var(--muted);margin-top:4px;">0%</p>
+      </div>
+      <div id="vmodules"></div>
+    </aside>
     <div class="vmain">
       <div class="vid-area" id="vid-area">
         <div class="vid-ph" id="vid-ph">

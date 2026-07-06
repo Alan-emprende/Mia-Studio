@@ -43,7 +43,7 @@ async function _fsGet(key){if(!_fbReady||!_db)return null;try{const d=await _db.
 async function _fsSet(key,value){if(!_fbReady||!_db)return;try{const s=JSON.stringify(value);if(s.length>900000)return;await _db.collection('site').doc(key).set({v:value,t:Date.now()});}catch(e){}}
 async function _syncSiteFromCloud(){
   if(!_fbReady||!_db)return;
-  const KEYS=[{ls:KC,fs:'courses'},{ls:KF,fs:'faq'},{ls:KI,fs:'info'},{ls:KFT,fs:'features'},{ls:KR,fs:'recursos'},{ls:KEB,fs:'ebooks'},{ls:KCF,fs:'config'},{ls:KES,fs:'estetics'},{ls:'ms_banner',fs:'banner'},{ls:'ms_social',fs:'social'},{ls:KSL,fs:'slots'},{ls:'ms_reviews',fs:'reviews_list'},{ls:'ms_taken',fs:'taken'}];
+  const KEYS=[{ls:KC,fs:'courses'},{ls:KF,fs:'faq'},{ls:KI,fs:'info'},{ls:KFT,fs:'features'},{ls:KR,fs:'recursos'},{ls:KEB,fs:'ebooks'},{ls:KCF,fs:'config'},{ls:KES,fs:'estetics'},{ls:'ms_banner',fs:'banner'},{ls:'ms_social',fs:'social'},{ls:KSL,fs:'slots'},{ls:'ms_reviews',fs:'reviews_list'},{ls:'ms_taken',fs:'taken'},{ls:'ms_services',fs:'services'}];
   for(const {ls,fs} of KEYS){try{const v=await _fsGet(fs);if(v!==null){const lc=localStorage.getItem(ls);if(lc!==JSON.stringify(v)){localStorage.setItem(ls,JSON.stringify(v));}}}catch(e){}}
 }
 async function _saveUserProfile(uid,data){if(!_fbReady||!_db)return;try{await _db.collection('users').doc(uid).set(data,{merge:true});}catch(e){}}
@@ -354,6 +354,7 @@ function renderLanding(){
   if(typeof renderIcarousel==="function")renderIcarousel();
   if(typeof renderReviewsLanding==='function')renderReviewsLanding();
   if(typeof renderFaqLanding==='function')renderFaqLanding();
+  if(typeof renderServicesLanding==='function')renderServicesLanding();
   // features
   const feats=gFt();
   const fg=document.getElementById('feat-grid');
@@ -382,6 +383,7 @@ function setupDash(u){
   const pe=document.getElementById('pemail');if(pe)pe.textContent=u.email;
   document.getElementById('sb-badge').textContent=gc().filter(c=>!c.locked).length;
   renderCarouselCourses();renderEbooks();renderResources();
+  if(typeof renderServiceButtonsDash==='function')renderServiceButtonsDash();
   updateDashStats();
 }
 
@@ -430,7 +432,7 @@ function buildPriceBadge(c){
 }
 function buildBuyBtn(c){
   const isFree=!c.price||c.price==='0'||c.price===''||c.price==='Gratis';
-  if(isFree) return `<button class="btn-buy btn-buy-free" onclick="event.stopPropagation();openViewer(${c.id})">▶ Comenzar gratis</button>`;
+  if(isFree) return `<button class="btn-buy btn-buy-free" onclick="event.stopPropagation();openViewer(${c.id})">▶ Entrar al curso</button>`;
   if(c.payLink) return `<button class="btn-buy" onclick="event.stopPropagation();buyCourse(${c.id})">🛒 Comprar ${c.price}</button>`;
   return `<button class="btn-buy" onclick="event.stopPropagation();openViewer(${c.id})">🛒 Comprar ${c.price}</button>`;
 }
@@ -544,7 +546,12 @@ function renderVModules(c){
 }
 function toggleMod(h){const l=h.nextElementSibling,c=h.querySelector('.mod-chev'),o=l.classList.contains('open');if(o){l.classList.remove('open');c.classList.remove('open');h.classList.remove('open');}else openMod(h);}
 function openMod(h){h.nextElementSibling.classList.add('open');h.querySelector('.mod-chev').classList.add('open');h.classList.add('open');}
-function selById(mid,lid){const idx=lessonFlat.findIndex(f=>f.mid===mid&&f.lid===lid);if(idx>=0)selLesson(lessonFlat[idx]);}
+function selById(mid,lid){
+  const idx=lessonFlat.findIndex(f=>f.mid===mid&&f.lid===lid);
+  if(idx>=0)selLesson(lessonFlat[idx]);
+  // En móvil, cerrar el índice de clases al elegir una
+  if(window.innerWidth<=768){const vs=document.querySelector('.vs');if(vs)vs.classList.remove('open');}
+}
 // ── VIDEO URL PARSER ────────────────────────────────
 function parseVideoUrl(raw){
   if(!raw||!raw.trim())return null;
@@ -761,7 +768,7 @@ function admPage(name){
   const pg=document.getElementById('adm-'+name);
   if(pg)pg.classList.add('active');
   const renders={estetica:admRenderEstetica,textos:admRenderTextos,cursos:admRenderCursosList,
-    ebooks:admRenderEbooksList,features:admRenderFeatsList,faq:admRenderFAQList,reviews:admRenderReviewsList,
+    ebooks:admRenderEbooksList,features:admRenderFeatsList,faq:admRenderFAQList,reviews:admRenderReviewsList,servicios:admRenderServicesList,
     info:admRenderInfoPage,recursos:admRenderRecsList,
     analytics:function(){renderAnalytics();loadTurnosCloud().then(ok=>{if(ok)renderAnalytics();});},
     turnos:function(){admRenderTurnosList();admRenderSlots();loadTurnosCloud().then(ok=>{if(ok)admRenderTurnosList();});},
@@ -1599,7 +1606,7 @@ function getTakenSlots(dateStr){
   };
 
   window.icarSetServ=function(el,serv){
-    document.querySelectorAll('.icp-tserv').forEach(e=>e.classList.remove('sel'));
+    document.querySelectorAll('.icp-tserv,.service-card').forEach(e=>e.classList.remove('sel'));
     el.classList.add('sel');
     window._selServ=serv;
   };
@@ -1625,7 +1632,7 @@ function getTakenSlots(dateStr){
   window.icarResetForm=function(){
     window._selSlot='';window._selServ='';window._ictStep=0;
     ['ict-name','ict-tel','ict-date','ict-msg'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-    document.querySelectorAll('.icp-tserv').forEach(e=>e.classList.remove('sel'));
+    document.querySelectorAll('.icp-tserv,.service-card').forEach(e=>e.classList.remove('sel'));
     const grid=document.getElementById('ict-slots-grid');
     if(grid)grid.innerHTML='<div class="ict-no-slots">Seleccioná una fecha primero</div>';
     const selDiv=document.getElementById('ict-slot-selected');if(selDiv)selDiv.style.display='none';
@@ -3650,3 +3657,85 @@ document.addEventListener('click',function(e){
   // Cerrar al tocar un link del menú o fuera del nav
   if(e.target.closest('.nav-links a')||!e.target.closest('.lnav'))nav.classList.remove('menu-open');
 });
+
+
+// ═══ SERVICIOS (landing + dashboard + admin) ═══
+// Datos en localStorage 'ms_services', sincronizados con Firestore site/services.
+// Estructura: [{name, desc, dur, price}]  — se editan desde el panel admin.
+const DEF_SERVICES=[
+  {name:'Extensiones Clásicas',desc:'Técnica 1:1 — una extensión por pestaña natural. Un look elegante, definido y natural.',dur:'120 min',price:''},
+  {name:'Volumen Ruso',desc:'Abanicos de extensiones ultralivianas por pestaña. Más densidad y una mirada con impacto.',dur:'150 min',price:''},
+  {name:'Mega Volumen & Color',desc:'Máxima densidad, con opción de detalles de color a elección.',dur:'180 min',price:''},
+  {name:'Lifting & Laminado',desc:'Curvatura y nutrición de tus pestañas naturales, sin extensiones.',dur:'60 min',price:''},
+  {name:'Remoción Segura',desc:'Retiro profesional de extensiones cuidando tu pestaña natural.',dur:'30 min',price:''},
+  {name:'Consulta general',desc:'Asesoría personalizada para elegir el servicio ideal para vos.',dur:'20 min',price:'Gratis'},
+];
+const gServ=()=>{try{const d=localStorage.getItem('ms_services');const l=d?JSON.parse(d):null;return (l&&l.length)?l:JSON.parse(JSON.stringify(DEF_SERVICES));}catch(e){return JSON.parse(JSON.stringify(DEF_SERVICES));}};
+const sServ=v=>{localStorage.setItem('ms_services',JSON.stringify(v));_fsSet('services',v);};
+
+// Tarjetas de servicios en la landing (reemplaza la lista con emojis)
+function renderServicesLanding(){
+  const el=document.getElementById('icp-services-list');if(!el)return;
+  const list=gServ();
+  el.innerHTML=list.map((s,idx)=>{
+    const precio=s.price?_escHtml(s.price):'Consultar';
+    return `<div class="service-card" id="svc-${idx}">
+      <div class="service-head"><span class="service-name">${_escHtml(s.name)}</span><span class="service-price">${precio}</span></div>
+      <p class="service-desc">${_escHtml(s.desc||'')}</p>
+      <div class="service-foot">
+        <span class="service-dur">${_escHtml(s.dur||'')}</span>
+        <button class="service-btn" onclick="icarChooseService(${idx})">Reservar →</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function icarChooseService(idx){
+  const s=gServ()[idx];if(!s)return;
+  window._selServ=s.name;
+  document.querySelectorAll('.service-card').forEach(e=>e.classList.remove('sel'));
+  const card=document.getElementById('svc-'+idx);if(card)card.classList.add('sel');
+  const chosen=document.getElementById('ict-serv-chosen');
+  if(chosen){chosen.textContent='Servicio elegido: '+s.name;chosen.style.display='';}
+  // Llevar a la clienta al formulario de reserva
+  const form=document.querySelector('.icp-tform');
+  if(form)form.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// Botones de servicio del dashboard, generados desde los mismos datos
+function renderServiceButtonsDash(){
+  const list=gServ();
+  [['#cpanel-turnos .turno-service-list','setTurnoService'],['#explorer-turnos .turno-service-list','setTurnoService2']].forEach(([sel,fn])=>{
+    const el=document.querySelector(sel);if(!el)return;
+    el.innerHTML=list.map(s=>`<div class="tsv" onclick="${fn}('${_escHtml(s.name).replace(/'/g,'&#39;')}')"><span class="tsv-name">${_escHtml(s.name)}</span><span class="tsv-dur">${_escHtml(s.dur||'')}</span></div>`).join('');
+  });
+}
+
+// Admin CRUD (mismo patrón que FAQ/Testimonios)
+function admRenderServicesList(){
+  const list=gServ();const el=document.getElementById('adm-services-list');if(!el)return;
+  el.innerHTML=list.map((s,idx)=>`
+    <div class="arow">
+      <div class="arow-main">
+        <div class="adm-grid3" style="gap:8px;margin-bottom:7px;">
+          <div class="fg" style="margin:0;"><label>Nombre</label><input type="text" id="svc-name-${idx}" value="${_escHtml(s.name)}"></div>
+          <div class="fg" style="margin:0;"><label>Duración</label><input type="text" id="svc-dur-${idx}" value="${_escHtml(s.dur)}" placeholder="Ej: 90 min"></div>
+          <div class="fg" style="margin:0;"><label>Precio</label><input type="text" id="svc-price-${idx}" value="${_escHtml(s.price)}" placeholder="Vacío = Consultar"></div>
+        </div>
+        <div class="fg" style="margin:0;"><label>Descripción</label><textarea id="svc-desc-${idx}" rows="2">${_escHtml(s.desc)}</textarea></div>
+      </div>
+      <div class="arow-acts"><button class="abtn-del" onclick="admDeleteServiceItem(${idx})">✕</button></div>
+    </div>`).join('');
+}
+function admNewService(){const l=gServ();l.push({name:'Nuevo servicio',desc:'',dur:'',price:''});sServ(l);admRenderServicesList();}
+function admSaveServicesAll(){
+  const l=gServ();
+  l.forEach((_,idx)=>{
+    l[idx].name=document.getElementById('svc-name-'+idx).value.trim();
+    l[idx].dur=document.getElementById('svc-dur-'+idx).value.trim();
+    l[idx].price=document.getElementById('svc-price-'+idx).value.trim();
+    l[idx].desc=document.getElementById('svc-desc-'+idx).value.trim();
+  });
+  sServ(l.filter(s=>s.name));
+  toast('✅ Servicios guardados');admRenderServicesList();
+}
+function admDeleteServiceItem(idx){const l=gServ().filter((_,i)=>i!==idx);sServ(l);admRenderServicesList();}

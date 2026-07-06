@@ -73,7 +73,7 @@
       <button class="icar-arrow icar-arrow-left" onclick="icarRotate(-1)">&#8249;</button>
       <div class="icar-card" data-pos="-1" data-id="ebooks" onclick="icarClick(this)">
         <div class="icar-card-inner">
-          <div class="icar-card-emoji">📖</div>
+          <div class="icar-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10 5 7.5 4.4 4 4.4v13.8c3.5 0 6 .6 8 2.1 2-1.5 4.5-2.1 8-2.1V4.4c-3.5 0-6 .6-8 2.1z"/><path d="M12 6.5v13.8"/><path d="M6.8 8.6c1.2.1 2.3.3 3.2.7M6.8 11.6c1.2.1 2.3.3 3.2.7"/></svg></div>
           <div class="icar-card-label">Ebooks</div>
           <div class="icar-card-sub">Material descargable</div>
           <div class="icar-card-hint">Tocá para explorar</div>
@@ -81,7 +81,7 @@
       </div>
       <div class="icar-card" data-pos="0" data-id="cursos" onclick="icarClick(this)">
         <div class="icar-card-inner">
-          <div class="icar-card-emoji">📚</div>
+          <div class="icar-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.2 12 4.4l9.5 4.8L12 14 2.5 9.2z"/><path d="M6.5 11.2v4.6c0 1.5 2.5 2.8 5.5 2.8s5.5-1.3 5.5-2.8v-4.6"/><path d="M21.5 9.2v6"/></svg></div>
           <div class="icar-card-label">Cursos</div>
           <div class="icar-card-sub">Formación profesional</div>
           <div class="icar-card-hint">Tocá para explorar</div>
@@ -89,9 +89,9 @@
       </div>
       <div class="icar-card" data-pos="1" data-id="turnos" onclick="icarClick(this)">
         <div class="icar-card-inner">
-          <div class="icar-card-emoji">📅</div>
-          <div class="icar-card-label">Turnos</div>
-          <div class="icar-card-sub">Reservá tu cita</div>
+          <div class="icar-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 13.5S6 7.5 12 7.5s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="13.5" r="2.6"/><path d="M12 4.8V2.6M7 5.8 5.8 3.9M17 5.8l1.2-1.9"/></svg></div>
+          <div class="icar-card-label">Servicios</div>
+          <div class="icar-card-sub">Conocé y reservá tu cita</div>
           <div class="icar-card-hint">Tocá para explorar</div>
         </div>
       </div>
@@ -118,25 +118,21 @@
       <div class="icar-panel" id="icp-turnos">
         <div class="icp-turno">
           <div class="icp-tservs">
-            <div style="font-family:var(--fd);font-size:18px;color:var(--goldl);margin-bottom:8px;font-style:italic;">1. Elegí tu servicio</div>
-            <div class="icp-tserv" onclick="icarSetServ(this,'Extensiones Clásicas')"><span class="icp-tserv-icon">✨</span><span class="icp-tserv-name">Extensiones Clásicas</span></div>
-            <div class="icp-tserv" onclick="icarSetServ(this,'Volumen Ruso')"><span class="icp-tserv-icon">🌸</span><span class="icp-tserv-name">Volumen Ruso</span></div>
-            <div class="icp-tserv" onclick="icarSetServ(this,'Mega Volumen &amp; Color')"><span class="icp-tserv-icon">💎</span><span class="icp-tserv-name">Mega Volumen &amp; Color</span></div>
-            <div class="icp-tserv" onclick="icarSetServ(this,'Lifting &amp; Laminado')"><span class="icp-tserv-icon">🌙</span><span class="icp-tserv-name">Lifting &amp; Laminado</span></div>
-            <div class="icp-tserv" onclick="icarSetServ(this,'Remoción Segura')"><span class="icp-tserv-icon">✂</span><span class="icp-tserv-name">Remoción Segura</span></div>
-            <div class="icp-tserv" onclick="icarSetServ(this,'Consulta')"><span class="icp-tserv-icon">💬</span><span class="icp-tserv-name">Consulta general</span></div>
+            <div style="font-family:var(--fd);font-size:18px;color:var(--goldl);margin-bottom:10px;font-style:italic;">Nuestros servicios</div>
+            <div id="icp-services-list"></div>
           </div>
           <div class="icp-tform">
-            <div class="icp-tform-title">2. Reservá tu turno</div>
+            <div class="icp-tform-title">Reservá tu turno</div>
+            <div id="ict-serv-chosen" style="display:none;margin-bottom:10px;padding:7px 13px;background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.3);border-radius:50px;font-size:12.5px;color:var(--goldl);"></div>
             <div class="ict-steps-nav">
               <div class="ict-step-dot active" id="sdot-0"></div>
               <div class="ict-step-dot" id="sdot-1"></div>
               <div class="ict-step-dot" id="sdot-2"></div>
             </div>
             <div class="ict-step active" id="ict-step-0">
-              <div class="fg"><label>📅 Elegí la fecha</label><input type="date" id="ict-date" onchange="icarLoadSlots()"></div>
+              <div class="fg"><label>Elegí la fecha</label><input type="date" id="ict-date" onchange="icarLoadSlots()"></div>
               <div class="ict-slots-wrap">
-                <div class="ict-slots-label">⏰ Horarios disponibles</div>
+                <div class="ict-slots-label">Horarios disponibles</div>
                 <div class="ict-slots-grid" id="ict-slots-grid"><div class="ict-no-slots">Seleccioná una fecha primero</div></div>
               </div>
               <div id="ict-slot-selected" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.3);border-radius:50px;font-size:13px;color:var(--goldl);text-align:center;"></div>
@@ -153,7 +149,7 @@
               </div>
             </div>
             <div class="ict-step" id="ict-step-2" style="text-align:center;padding:16px 0;">
-              <div style="font-size:42px;margin-bottom:10px;">✅</div>
+              <div style="width:54px;height:54px;margin:0 auto 12px;border-radius:50%;border:1.5px solid var(--gold);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:26px;">✓</div>
               <div style="font-family:var(--fd);font-size:20px;color:var(--goldl);margin-bottom:8px;">¡Turno solicitado!</div>
               <div style="font-size:13px;color:rgba(255,248,240,.65);line-height:1.7;background:rgba(255,255,255,.05);border-radius:12px;padding:14px;" id="ict-confirm-txt"></div>
               <div style="font-size:12px;color:rgba(255,248,240,.4);margin-top:10px;">Te contactaremos para confirmar.</div>
