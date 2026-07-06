@@ -396,6 +396,9 @@ function backDash(){
     currentUser = u;
     // Init Firebase and sync
     document.addEventListener('DOMContentLoaded', ()=>{
+      // Activar la vista del dashboard (arranca oculta por la clase .view)
+      showView('dashboard');
+      showPage('home');
       initFirebase();
       loadDarkMode();
       loadSavedEstetics();
