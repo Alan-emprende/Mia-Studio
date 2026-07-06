@@ -3673,32 +3673,64 @@ const DEF_SERVICES=[
 const gServ=()=>{try{const d=localStorage.getItem('ms_services');const l=d?JSON.parse(d):null;return (l&&l.length)?l:JSON.parse(JSON.stringify(DEF_SERVICES));}catch(e){return JSON.parse(JSON.stringify(DEF_SERVICES));}};
 const sServ=v=>{localStorage.setItem('ms_services',JSON.stringify(v));_fsSet('services',v);};
 
-// Tarjetas de servicios en la landing (reemplaza la lista con emojis)
+// ── Catálogo estilo revista en la landing ──
+// Cada servicio puede tener varias imágenes (s.imgs) y un video (s.video).
+function _svcMedia(s){
+  const media=(s.imgs||[]).filter(Boolean).map(u=>({type:'img',src:u}));
+  if(s.video){
+    const v=parseVideoUrl(s.video);
+    if(v){
+      let thumb='';
+      const yt=s.video.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      if(yt)thumb='https://img.youtube.com/vi/'+yt[1]+'/hqdefault.jpg';
+      media.push({type:v.type==='mp4'?'mp4':'video',src:v.embed,thumb});
+    }
+  }
+  return media;
+}
+function _svcMainHtml(m){
+  if(!m)return '';
+  if(m.type==='img')return `<img src="${_escHtml(m.src)}" alt="" loading="lazy">`;
+  if(m.type==='mp4')return `<video src="${_escHtml(m.src)}" controls playsinline></video>`;
+  return `<iframe src="${_escHtml(m.src)}" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
+}
 function renderServicesLanding(){
   const el=document.getElementById('icp-services-list');if(!el)return;
   const list=gServ();
   el.innerHTML=list.map((s,idx)=>{
+    const media=_svcMedia(s);
+    const main=media.length?_svcMainHtml(media[0]):`<div class="svc-ph"><span>${_escHtml((s.name||'S').trim().charAt(0))}</span></div>`;
+    const thumbs=media.length>1?`<div class="svc-thumbs">${media.map((m,mi)=>{
+      const bg=m.type==='img'?`background-image:url('${_escHtml(m.src)}')`:(m.thumb?`background-image:url('${_escHtml(m.thumb)}')`:'');
+      return `<button class="svc-thumb${mi===0?' active':''}" id="svc-th-${idx}-${mi}" onclick="svcShowMedia(${idx},${mi})" style="${bg}" aria-label="Ver foto ${mi+1}">${m.type!=='img'?'<span class="svc-play">▶</span>':''}</button>`;
+    }).join('')}</div>`:'';
     const precio=s.price?_escHtml(s.price):'Consultar';
-    return `<div class="service-card" id="svc-${idx}">
-      <div class="service-head"><span class="service-name">${_escHtml(s.name)}</span><span class="service-price">${precio}</span></div>
-      <p class="service-desc">${_escHtml(s.desc||'')}</p>
-      <div class="service-foot">
-        <span class="service-dur">${_escHtml(s.dur||'')}</span>
-        <button class="service-btn" onclick="icarChooseService(${idx})">Reservar →</button>
+    return `<article class="svc-mag${idx%2?' rev':''}">
+      <div class="svc-media"><div class="svc-media-main" id="svc-main-${idx}">${main}</div>${thumbs}</div>
+      <div class="svc-info">
+        <span class="svc-num">${String(idx+1).padStart(2,'0')}</span>
+        <h3 class="svc-title">${_escHtml(s.name)}</h3>
+        <p class="svc-mag-desc">${_escHtml(s.desc||'')}</p>
+        <div class="svc-meta">${s.dur?`<span class="svc-dur2">${_escHtml(s.dur)}</span>`:''}<span class="svc-price2">${precio}</span></div>
+        <button class="btn-gold svc-book" onclick="icarChooseService(${idx})">Reservar turno</button>
       </div>
-    </div>`;
+    </article>`;
   }).join('');
 }
+function svcShowMedia(idx,mi){
+  const s=gServ()[idx];if(!s)return;
+  const media=_svcMedia(s);const m=media[mi];if(!m)return;
+  const main=document.getElementById('svc-main-'+idx);if(main)main.innerHTML=_svcMainHtml(m);
+  media.forEach((_,i)=>{const t=document.getElementById('svc-th-'+idx+'-'+i);if(t)t.classList.toggle('active',i===mi);});
+}
+// Al reservar: abre el modal con el servicio ya elegido
 function icarChooseService(idx){
   const s=gServ()[idx];if(!s)return;
   window._selServ=s.name;
-  document.querySelectorAll('.service-card').forEach(e=>e.classList.remove('sel'));
-  const card=document.getElementById('svc-'+idx);if(card)card.classList.add('sel');
   const chosen=document.getElementById('ict-serv-chosen');
   if(chosen){chosen.textContent='Servicio elegido: '+s.name;chosen.style.display='';}
-  // Llevar a la clienta al formulario de reserva
-  const form=document.querySelector('.icp-tform');
-  if(form)form.scrollIntoView({behavior:'smooth',block:'nearest'});
+  openOv('turno-modal');
+  if(typeof icarNextStep==='function')icarNextStep(0);
 }
 
 // Botones de servicio del dashboard, generados desde los mismos datos
@@ -3710,7 +3742,7 @@ function renderServiceButtonsDash(){
   });
 }
 
-// Admin CRUD (mismo patrón que FAQ/Testimonios)
+// Admin CRUD con galería de imágenes y video por servicio
 function admRenderServicesList(){
   const list=gServ();const el=document.getElementById('adm-services-list');if(!el)return;
   el.innerHTML=list.map((s,idx)=>`
@@ -3721,21 +3753,56 @@ function admRenderServicesList(){
           <div class="fg" style="margin:0;"><label>Duración</label><input type="text" id="svc-dur-${idx}" value="${_escHtml(s.dur)}" placeholder="Ej: 90 min"></div>
           <div class="fg" style="margin:0;"><label>Precio</label><input type="text" id="svc-price-${idx}" value="${_escHtml(s.price)}" placeholder="Vacío = Consultar"></div>
         </div>
-        <div class="fg" style="margin:0;"><label>Descripción</label><textarea id="svc-desc-${idx}" rows="2">${_escHtml(s.desc)}</textarea></div>
+        <div class="fg" style="margin-bottom:7px;"><label>Descripción</label><textarea id="svc-desc-${idx}" rows="2">${_escHtml(s.desc)}</textarea></div>
+        <div class="fg" style="margin-bottom:7px;"><label>Video (opcional — link de YouTube, Vimeo o MP4)</label><input type="text" id="svc-video-${idx}" value="${_escHtml(s.video||'')}" placeholder="https://youtube.com/..."></div>
+        <div class="fg" style="margin:0;"><label>Fotos del servicio (podés subir varias)</label>
+          <div class="svc-adm-imgs">
+            ${(s.imgs||[]).map((u,ui)=>`<div class="svc-adm-img" style="background-image:url('${_escHtml(u)}')"><button class="svc-adm-img-del" onclick="admDelServiceImg(${idx},${ui})" title="Quitar foto">✕</button></div>`).join('')}
+            <label class="svc-adm-add" title="Agregar fotos">+<input type="file" accept="image/*" multiple style="display:none;" onchange="admAddServiceImgs(${idx},event)"></label>
+          </div>
+        </div>
       </div>
       <div class="arow-acts"><button class="abtn-del" onclick="admDeleteServiceItem(${idx})">✕</button></div>
     </div>`).join('');
 }
-function admNewService(){const l=gServ();l.push({name:'Nuevo servicio',desc:'',dur:'',price:''});sServ(l);admRenderServicesList();}
-function admSaveServicesAll(){
+// Junta lo escrito en los inputs SIN guardar (para no perder texto al subir fotos)
+function admCollectServicesInputs(){
   const l=gServ();
   l.forEach((_,idx)=>{
-    l[idx].name=document.getElementById('svc-name-'+idx).value.trim();
-    l[idx].dur=document.getElementById('svc-dur-'+idx).value.trim();
-    l[idx].price=document.getElementById('svc-price-'+idx).value.trim();
-    l[idx].desc=document.getElementById('svc-desc-'+idx).value.trim();
+    const g=id=>document.getElementById(id);
+    if(g('svc-name-'+idx))l[idx].name=g('svc-name-'+idx).value.trim();
+    if(g('svc-dur-'+idx))l[idx].dur=g('svc-dur-'+idx).value.trim();
+    if(g('svc-price-'+idx))l[idx].price=g('svc-price-'+idx).value.trim();
+    if(g('svc-desc-'+idx))l[idx].desc=g('svc-desc-'+idx).value.trim();
+    if(g('svc-video-'+idx))l[idx].video=g('svc-video-'+idx).value.trim();
   });
+  return l;
+}
+function admNewService(){const l=admCollectServicesInputs();l.push({name:'Nuevo servicio',desc:'',dur:'',price:'',video:'',imgs:[]});sServ(l);admRenderServicesList();}
+function admSaveServicesAll(){
+  const l=admCollectServicesInputs();
   sServ(l.filter(s=>s.name));
   toast('✅ Servicios guardados');admRenderServicesList();
+  if(typeof renderServicesLanding==='function')renderServicesLanding();
 }
-function admDeleteServiceItem(idx){const l=gServ().filter((_,i)=>i!==idx);sServ(l);admRenderServicesList();}
+function admDeleteServiceItem(idx){
+  if(!confirm('¿Eliminar este servicio?'))return;
+  const l=admCollectServicesInputs().filter((_,i)=>i!==idx);sServ(l);admRenderServicesList();
+}
+async function admAddServiceImgs(idx,ev){
+  const files=[...(ev.target.files||[])];if(!files.length)return;
+  const l=admCollectServicesInputs();
+  if(!l[idx].imgs)l[idx].imgs=[];
+  toast('☁ Subiendo '+files.length+' foto'+(files.length>1?'s':'')+'...');
+  for(const f of files){
+    try{
+      const url=await uploadToCloudinary(f,'servicios');
+      l[idx].imgs.push(url);
+    }catch(e){toast('⚠️ '+e.message);}
+  }
+  sServ(l);admRenderServicesList();toast('✅ Fotos agregadas');
+}
+function admDelServiceImg(idx,ui){
+  const l=admCollectServicesInputs();
+  if(l[idx]&&l[idx].imgs){l[idx].imgs.splice(ui,1);sServ(l);admRenderServicesList();}
+}
