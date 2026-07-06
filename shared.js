@@ -3515,3 +3515,43 @@ function switchCarousel(tab){
 }
 
 
+
+
+// ═══ APARICIÓN SUAVE AL SCROLLEAR (Fase 3) ═══
+// Agrega la clase .rvl a tarjetas y títulos; cuando entran en pantalla
+// se les suma .in y el CSS hace el fade. Respeta "reducir movimiento".
+(function(){
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if(!('IntersectionObserver' in window)) return;
+  var SEL='.feat-card,.cpc,.sec-tit,.ebook-card,.course-card,.cc,.scard,.prog-course-row,.ritem';
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}
+    });
+  },{threshold:.12,rootMargin:'0px 0px -30px 0px'});
+  var stag=0;
+  function rvlScan(){
+    document.querySelectorAll(SEL).forEach(function(el){
+      if(el.classList.contains('rvl'))return;
+      el.classList.add('rvl');
+      el.style.transitionDelay=((stag++ % 6)*70)+'ms';
+      io.observe(el);
+    });
+  }
+  // Red de seguridad: si el observador no disparó (tab oculto, navegador viejo),
+  // mostrar igual todo lo que esté dentro de la pantalla.
+  function rvlRescue(){
+    document.querySelectorAll('.rvl:not(.in)').forEach(function(el){
+      var r=el.getBoundingClientRect();
+      if(r.top<window.innerHeight+40&&r.bottom>-40)el.classList.add('in');
+    });
+  }
+  document.addEventListener('DOMContentLoaded',function(){
+    rvlScan();
+    // Re-escanear cuando la página agrega tarjetas dinámicamente
+    new MutationObserver(function(muts){
+      for(var i=0;i<muts.length;i++){if(muts[i].addedNodes.length){rvlScan();break;}}
+    }).observe(document.body,{childList:true,subtree:true});
+    setInterval(rvlRescue,1500);
+  });
+})();

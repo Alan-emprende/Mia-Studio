@@ -989,3 +989,98 @@ body.dark-mode .btn-gold{
   color:var(--dark) !important;
 }
 
+
+
+/* ═══════════════════════════════════════════════════════
+   CAPA DE REFINAMIENTO ESTÉTICO (Fase 3 — jul 2026)
+   Micro-animaciones, jerarquía y pulido. Todo lo de esta
+   sección es visual: se puede borrar sin romper nada.
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Selección de texto y scrollbar con identidad ── */
+::selection{background:rgba(201,168,76,.35);color:#FFF8F0;}
+*{scrollbar-width:thin;scrollbar-color:rgba(201,168,76,.35) transparent;}
+*::-webkit-scrollbar{width:9px;height:9px;}
+*::-webkit-scrollbar-track{background:transparent;}
+*::-webkit-scrollbar-thumb{background:rgba(201,168,76,.3);border-radius:8px;}
+*::-webkit-scrollbar-thumb:hover{background:rgba(201,168,76,.5);}
+
+/* ── Accesibilidad: anillo de foco al navegar con teclado ── */
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--gold);outline-offset:2px;border-radius:4px;
+}
+
+/* ── Tipografía: títulos balanceados (evita palabras sueltas) ── */
+.hero h1,.sec-tit,.sec-heading{text-wrap:balance;}
+.hero p,.cpc-desc,.feat-card p{text-wrap:pretty;}
+
+/* ── Botones: relieve sutil al pasar y hundido al hacer clic ── */
+.btn-gold,.btn-p,.btn-crimson,.btn-g{transition:transform .18s ease,box-shadow .25s ease,background .2s ease,color .2s ease;}
+.btn-gold:hover,.btn-p:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(201,168,76,.32);}
+.btn-crimson:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(140,0,38,.4);}
+.btn-gold:active,.btn-p:active,.btn-crimson:active,.btn-g:active{transform:translateY(0) scale(.975);box-shadow:none;}
+
+/* ── Nav: subrayado dorado animado en los links ── */
+.nav-links a{position:relative;padding-bottom:3px;}
+.nav-links a::after{content:'';position:absolute;left:0;bottom:0;width:100%;height:1px;background:var(--gold);transform:scaleX(0);transform-origin:right;transition:transform .3s cubic-bezier(.16,1,.3,1);}
+.nav-links a:hover::after{transform:scaleX(1);transform-origin:left;}
+
+/* ── Hero: entrada escalonada al cargar la landing ── */
+@keyframes heroIn{from{opacity:0;transform:translateY(26px);}to{opacity:1;transform:none;}}
+.hero-content>*{animation:heroIn .8s cubic-bezier(.16,1,.3,1) backwards;}
+.hero-content>*:nth-child(1){animation-delay:.05s;}
+.hero-content>*:nth-child(2){animation-delay:.15s;}
+.hero-content>*:nth-child(3){animation-delay:.25s;}
+.hero-content>*:nth-child(4){animation-delay:.35s;}
+.hero-content>*:nth-child(5){animation-delay:.45s;}
+.hero-content>*:nth-child(6){animation-delay:.55s;}
+/* Anillos ornamentales: respiración lenta y elegante */
+@keyframes ringBreathe{0%,100%{opacity:1;transform:translate(-50%,-50%) scale(1);}50%{opacity:.55;transform:translate(-50%,-50%) scale(1.03);}}
+.hero-ornament{animation:ringBreathe 7s ease-in-out infinite;}
+.h-o2{animation-delay:1.2s;}.h-o3{animation-delay:2.4s;}
+
+/* ── Aparición suave al scrollear (clase .rvl la pone shared.js) ── */
+.rvl{opacity:0;transform:translateY(22px);transition:opacity .65s ease,transform .65s cubic-bezier(.16,1,.3,1);}
+.rvl.in{opacity:1;transform:none;}
+
+/* ── Tarjetas: hover más vivo, borde dorado y zoom de portada ── */
+.feat-card:hover{transform:translateY(-4px);border-color:rgba(201,168,76,.45);box-shadow:0 14px 40px rgba(26,0,8,.14);}
+.feat-icon{transition:transform .3s cubic-bezier(.34,1.56,.64,1);}
+.feat-card:hover .feat-icon{transform:scale(1.12);}
+.cpc-thumb{overflow:hidden;position:relative;}
+.cpc-thumb img{transition:transform .6s cubic-bezier(.16,1,.3,1);}
+.cpc:hover .cpc-thumb img{transform:scale(1.06);}
+.cpc:hover{box-shadow:0 16px 44px rgba(0,0,0,.3);}
+.course-card:hover,.ebook-card:hover{border-color:rgba(201,168,76,.5);}
+.cc:hover{border-color:rgba(201,168,76,.5);}
+
+/* ── Barras de progreso: brillo que recorre el dorado ── */
+@keyframes shine{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+.vpfill{background:linear-gradient(90deg,var(--c1l),var(--gold),var(--c1l));background-size:200% 100%;animation:shine 3.5s linear infinite;}
+
+/* ── Viewer: lección activa con acento dorado ── */
+.les-item{border-left:3px solid transparent;}
+.les-item:hover{border-left-color:rgba(201,168,76,.4);}
+.les-item.active{border-left-color:var(--gold);}
+
+/* ── Inputs: foco con halo suave ── */
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,.15);}
+
+/* ── Móvil: respiración y jerarquía ── */
+@media(max-width:768px){
+  .sec{padding:56px 5vw;}
+  .hero{padding:100px 6vw 56px;}
+  .stat-num{font-size:28px;}
+  .sec-tit{margin-bottom:28px;}
+}
+@media(max-width:480px){
+  .hero-acts{flex-direction:column;align-items:stretch;}
+  .hero-acts .btn-gold,.hero-acts .btn-g{width:100%;max-width:320px;margin:0 auto;text-align:center;}
+  .footer{flex-direction:column;text-align:center;gap:10px;}
+}
+
+/* ── Respeto por "reducir movimiento" del sistema ── */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;}
+  .rvl{opacity:1;transform:none;}
+}
