@@ -1,0 +1,57 @@
+rules_version = '2';
+
+// ═══════════════════════════════════════════════════════════════
+// Reglas de seguridad de Firestore — Mira Estudio
+//
+// CÓMO APLICARLAS (una sola vez, tarda 2 minutos):
+//   1. Entrá a https://console.firebase.google.com → proyecto "mira-estudio"
+//   2. Menú izquierdo: Firestore Database → pestaña "Reglas" (Rules)
+//   3. Borrá lo que haya, pegá TODO este archivo y tocá "Publicar" (Publish)
+//
+// IMPORTANTE: el email de abajo (isAdmin) debe ser el de TU cuenta.
+// Tenés que registrarte en la página con ese email y verificarlo,
+// y estar logueada con esa cuenta cuando uses el panel admin.
+// ═══════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // La dueña del estudio. Cambiá el email si usás otra cuenta.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'mg1705104@gmail.com'
+        && request.auth.token.email_verified;
+    }
+
+    // Contenido del sitio (cursos, ebooks, textos, config, estética...):
+    // cualquiera puede leerlo, solo la admin puede modificarlo.
+    match /site/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Horarios ocupados ({fecha: [horas]}, sin datos personales):
+    // se escribe desde el formulario de reservas, incluso sin cuenta.
+    match /site/taken {
+      allow read, write: if true;
+    }
+
+    // Datos de cada alumna (progreso, notas, ebooks comprados):
+    // solo ella y la admin. Nadie puede auto-asignarse rol de admin.
+    match /users/{uid} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+      allow create: if request.auth != null && request.auth.uid == uid
+                    && request.resource.data.get('role', 'student') != 'admin';
+      allow update: if isAdmin() || (request.auth != null && request.auth.uid == uid
+                    && request.resource.data.get('role', 'student') != 'admin');
+      allow delete: if isAdmin();
+    }
+
+    // Turnos: cualquiera puede solicitar uno (también visitas sin cuenta,
+    // desde la landing), pero solo la admin puede verlos, editarlos o borrarlos.
+    match /turnos/{id} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}
