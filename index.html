@@ -317,6 +317,7 @@ function checkKey(){
 function doLogout(){
   currentUser = null;
   localStorage.removeItem(KS);
+  clearUserLocalData();
   if(_fbReady && _auth) _auth.signOut().catch(()=>{});
 }
 

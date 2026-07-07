@@ -771,7 +771,7 @@ body.dark-mode .sb-item:hover{background:rgba(255,255,255,.07);}
 body.dark-mode .sb-item.active{background:var(--c1) !important;}
 body.dark-mode .mcard,.dark-mode .auth-card{background:#1A0009;border-color:#2A0818;}
 body.dark-mode .perfil-section{background:rgba(255,255,255,.04);border-color:#2A0818;}
-body.light-mode .topbar,body.light-mode .sidebar,body.light-mode .acard,body.light-mode .scard,body.light-mode .cc,body.light-mode .arow{background:rgba(255,255,255,.04);border-color:rgba(201,168,76,.15);}
+body.dark-mode .topbar,body.dark-mode .sidebar,body.dark-mode .scard,body.dark-mode .cc{background:rgba(255,255,255,.04);border-color:rgba(201,168,76,.15);}
 body.dark-mode .fg input,body.dark-mode .fg select,body.dark-mode .fg textarea{background:rgba(255,255,255,.06);border-color:rgba(201,168,76,.2);color:var(--cr);}
 body.dark-mode .les-card,body.dark-mode .mod-acc{background:rgba(255,255,255,.04);border-color:rgba(201,168,76,.15);}
 body.dark-mode .les-card-body{background:rgba(255,255,255,.03);}
@@ -1174,3 +1174,16 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 
 /* Dashboard: fila de servicio generada */
 .tsv-dur{margin-left:auto;font-size:11px;color:var(--muted);white-space:nowrap;}
+
+/* ═══ MODO CLARO: textos legibles en sidebar y topbar (fix jul 2026) ═══ */
+body.light-mode .sidebar{background:#FFF0E8;border-color:#E8D8CC;}
+body.light-mode .sb-brand{color:var(--c1d);}
+body.light-mode .sb-item{color:#6A464E;}
+body.light-mode .sb-item:hover{color:var(--c1);background:rgba(140,0,38,.06);}
+body.light-mode .sb-item.active{background:var(--c1) !important;color:#fff !important;}
+body.light-mode .sb-group{color:#A8848C;}
+body.light-mode .uname{color:var(--c1d);}
+body.light-mode .urole{color:#A8848C;}
+body.light-mode .topbar{background:#FFFFFF;border-color:#E8D8CC;}
+body.light-mode .tb-title{color:var(--c1d);}
+body.light-mode .dark-toggle{border-color:#E8D8CC;color:var(--c1d);}

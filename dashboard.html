@@ -70,7 +70,7 @@
           <h2>¡Bienvenida, <em id="wname">Alumna</em>!</h2>
           <p id="wsub">Continuá donde lo dejaste y seguí avanzando.</p>
         </div>
-        <div class="wb-emoji">👁✨</div>
+        <div class="wb-emoji" style="color:var(--goldl);opacity:.85;"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 13.5S6 7.5 12 7.5s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="13.5" r="2.6"/><path d="M12 4.8V2.6M7 5.8 5.8 3.9M17 5.8l1.2-1.9"/></svg></div>
       </div>
       <div class="stats-row">
         <div class="scard"><div class="scard-lbl">Cursos activos</div><div class="scard-val" id="stat-active">—</div><div class="scard-trend neutral" id="stat-active-sub">de los disponibles</div></div>
@@ -399,6 +399,7 @@ function loginOk(u){
 function doLogout(){
   currentUser = null;
   localStorage.removeItem(KS);
+  clearUserLocalData();
   if(_fbReady && _auth) _auth.signOut().catch(()=>{});
   _fbUid = null;
   window.location.href = 'index.html';

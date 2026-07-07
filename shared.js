@@ -315,6 +315,7 @@ function loginOk(u){
 }
 function doLogout(){
   currentUser=null;localStorage.removeItem(KS);
+  if(typeof clearUserLocalData==='function')clearUserLocalData();
   document.getElementById('fab-wrap').style.display='none';
   showView('landing');
 }
@@ -368,7 +369,7 @@ function renderLanding(){
       const isFree=!c.price||c.price===''||c.price==='Gratis'||c.price==='0';
       const priceLbl=isFree?'Gratis':c.price;
       const thumbInner=c.coverImg?`<img src="${c.coverImg}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:var(--r3) var(--r3) 0 0;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.6),transparent);"></div><span style="position:relative;z-index:1;font-size:46px;">${c.emoji}</span>`:c.emoji;
-      return`<div class="cpc" onclick="openAuth('r')"><div class="cpc-thumb" style="background:${c.coverImg?'transparent':c.color};">${thumbInner}<span style="position:absolute;top:8px;right:8px;background:${isFree?'linear-gradient(135deg,#1a7a3a,#25a85a)':'linear-gradient(135deg,#B8860B,#DAA520)'};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px;">${priceLbl}</span></div><div class="cpc-body"><span class="cpc-tag">${c.levelLabel}</span><div class="cpc-title">${c.title}</div><p class="cpc-desc">${c.description}</p><div class="cpc-meta">📹 ${tot} clases</div></div></div>`;
+      return`<div class="cpc" onclick="openAuth('r')"><div class="cpc-thumb" style="background:${c.coverImg?'transparent':c.color};">${thumbInner}${isFree?'':`<span style="position:absolute;top:8px;right:8px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px;">${priceLbl}</span>`}</div><div class="cpc-body"><span class="cpc-tag">${c.levelLabel}</span><div class="cpc-title">${c.title}</div><p class="cpc-desc">${c.description}</p><div class="cpc-meta">📹 ${tot} clases</div></div></div>`;
     }).join('');
   }
 }
@@ -427,7 +428,8 @@ function buildCourseThumb(c){
   return `<div class="cctbg" style="background:${c.color||'linear-gradient(135deg,#3D0015,#8C0026)'}"></div><span class="ccte">${c.emoji}</span>`;
 }
 function buildPriceBadge(c){
-  if(!c.price||c.price==='0'||c.price===''||c.price==='Gratis') return '<span class="cct-price-badge cct-free-badge">Gratis</span>';
+  // Los cursos gratuitos no llevan cartel; solo los pagos muestran su precio
+  if(!c.price||c.price==='0'||c.price===''||c.price==='Gratis') return '';
   return `<span class="cct-price-badge">${c.price}</span>`;
 }
 function buildBuyBtn(c){
@@ -528,7 +530,7 @@ function openViewer(id){
   (c.modules||[]).forEach((m,mi)=>m.lessons.forEach((l,li)=>lessonFlat.push({mi,li,mid:m.id,lid:l.id})));
   document.getElementById('vcname').textContent=c.title;
   document.getElementById('vsh-tit').textContent=c.title;
-  const tot=lessonFlat.length;const prog=getProgress(id);const done=(c.modules||[]).reduce((a,m)=>a+m.lessons.filter(l=>l.done||!!prog[l.id]).length,0);
+  const tot=lessonFlat.length;const prog=getProgress(id);const done=(c.modules||[]).reduce((a,m)=>a+m.lessons.filter(l=>!!prog[l.id]).length,0);
   const pct=tot>0?Math.round(done/tot*100):0;
   document.getElementById('vpf').style.width=pct+'%';document.getElementById('vpt').textContent=pct+'% completado';
   document.getElementById('vsh-meta').textContent=`${(c.modules||[]).length} módulos · ${tot} clases`;
@@ -540,8 +542,8 @@ function openViewer(id){
 }
 function renderVModules(c){
   document.getElementById('vmodules').innerHTML=(c.modules||[]).map((m,mi)=>{
-    const prog=getProgress(currentCourseId);const dc=m.lessons.filter(l=>l.done||!!prog[l.id]).length;
-    return`<div class="mod-sec"><div class="mod-hdr" onclick="toggleMod(this)"><div><div class="mod-num">Módulo ${mi+1} · ${dc}/${m.lessons.length}</div><div class="mod-name">${m.title}</div></div><span class="mod-chev">▾</span></div><div class="mod-lessons">${m.lessons.map((l,li)=>{const isDoneL=l.done||!!prog[l.id];const sc=isDoneL?'done':(li===0&&dc===0&&!isDoneL?'current':'locked');const si=isDoneL?'✓':(sc==='current'?'▶':li+1);return`<div class="les-item" id="li-${m.id}-${l.id}" onclick="selById('${m.id}','${l.id}')"><div class="les-st ${sc}">${si}</div><div><div class="les-name">${l.title}</div><div class="les-dur">⏱ ${l.duration}</div></div></div>`;}).join('')}</div></div>`;
+    const prog=getProgress(currentCourseId);const dc=m.lessons.filter(l=>!!prog[l.id]).length;
+    return`<div class="mod-sec"><div class="mod-hdr" onclick="toggleMod(this)"><div><div class="mod-num">Módulo ${mi+1} · ${dc}/${m.lessons.length}</div><div class="mod-name">${m.title}</div></div><span class="mod-chev">▾</span></div><div class="mod-lessons">${m.lessons.map((l,li)=>{const isDoneL=!!prog[l.id];const sc=isDoneL?'done':(li===0&&dc===0&&!isDoneL?'current':'locked');const si=isDoneL?'✓':(sc==='current'?'▶':li+1);return`<div class="les-item" id="li-${m.id}-${l.id}" onclick="selById('${m.id}','${l.id}')"><div class="les-st ${sc}">${si}</div><div><div class="les-name">${l.title}</div><div class="les-dur">⏱ ${l.duration}</div></div></div>`;}).join('')}</div></div>`;
   }).join('');
 }
 function toggleMod(h){const l=h.nextElementSibling,c=h.querySelector('.mod-chev'),o=l.classList.contains('open');if(o){l.classList.remove('open');c.classList.remove('open');h.classList.remove('open');}else openMod(h);}
@@ -631,7 +633,7 @@ function updateViewerProgress(){
   const total=lessonFlat.length;
   const done=lessonFlat.filter(f=>{
     const m=c.modules[f.mi];const l=m&&m.lessons[f.li];
-    return l&&(l.done||prog[l.id]);
+    return l&&!!prog[l.id];
   }).length;
   const pct=total>0?Math.round(done/total*100):0;
   const fill=document.getElementById('vs-prog-fill');const txt=document.getElementById('vs-prog-txt');
@@ -696,7 +698,7 @@ function selLesson(flat){
   document.getElementById('lcdesc').textContent=l.desc;
   // done state
   const prog=getProgress(currentCourseId);
-  const isDone=l.done||!!prog[l.id];
+  const isDone=!!prog[l.id];
   updateDoneUI(isDone);
   updateViewerProgress();
   const rl=document.getElementById('lcres-list');
@@ -1670,7 +1672,7 @@ function renderIcarousel(){
     const isFree=!c.price||c.price===''||c.price==='Gratis'||c.price==='0';
     const priceLbl=isFree?'Gratis':c.price;
     const thumbContent=c.coverImg?`<img src="${c.coverImg}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.5),transparent);"></div><span style="position:relative;z-index:1;font-size:38px;">${c.emoji}</span>`:c.emoji;
-    const priceTag=`<span style="position:absolute;top:7px;right:7px;background:${isFree?'linear-gradient(135deg,#1a7a3a,#25a85a)':'linear-gradient(135deg,#B8860B,#DAA520)'};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:50px;z-index:2;">${priceLbl}</span>`;
+    const priceTag=isFree?'':`<span style="position:absolute;top:7px;right:7px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:50px;z-index:2;">${priceLbl}</span>`;
     if(c.locked) return `<div class="icp-ccard" style="opacity:.55;cursor:default;"><div class="icp-thumb" style="background:${c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${c.levelLabel}</span><div class="icp-name">${c.title}</div><div class="icp-meta">🔒 Próximamente</div></div></div>`;
     return `<div class="icp-ccard" onclick="openAuth('r')"><div class="icp-thumb" style="background:${c.coverImg?'#0a0005':c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${c.levelLabel}</span><div class="icp-name">${c.title}</div><div class="icp-meta">📹 ${tot} clases · ${(c.modules||[]).length} módulos</div></div></div>`;
   }).join('');
@@ -1689,7 +1691,7 @@ function calcAllProgress(){
   courses.forEach(c => {
     const prog = getProgress(c.id);
     const lessons = (c.modules||[]).reduce((a,m) => a + m.lessons.length, 0);
-    const done = (c.modules||[]).reduce((a,m) => a + m.lessons.filter(l => l.done || !!prog[l.id]).length, 0);
+    const done = (c.modules||[]).reduce((a,m) => a + m.lessons.filter(l => !!prog[l.id]).length, 0);
     totalLessons += lessons;
     totalDone += done;
     const pct = lessons > 0 ? Math.round(done / lessons * 100) : 0;
@@ -1705,7 +1707,7 @@ function updateDashStats(){
   const activeCourses = courses.filter(c => {
     const prog = getProgress(c.id);
     const lessons = (c.modules||[]).reduce((a,m) => a + m.lessons.length, 0);
-    const done = (c.modules||[]).reduce((a,m) => a + m.lessons.filter(l => l.done || !!prog[l.id]).length, 0);
+    const done = (c.modules||[]).reduce((a,m) => a + m.lessons.filter(l => !!prog[l.id]).length, 0);
     return done > 0;
   }).length;
   const pct = totalLessons > 0 ? Math.round(totalDone / totalLessons * 100) : 0;
@@ -1757,7 +1759,7 @@ function findNextLesson(c){
   const prog = getProgress(c.id);
   for(const m of (c.modules||[])){
     for(const l of (m.lessons||[])){
-      if(!l.done && !prog[l.id]) return l;
+      if(!prog[l.id]) return l;
     }
   }
   return null;
@@ -1776,7 +1778,7 @@ function renderProgressPage(totalPct, totalDone, totalLessons){
   list.innerHTML = courses.map(c => {
     const prog = getProgress(c.id);
     const lessons = (c.modules||[]).reduce((a,m) => a + m.lessons.length, 0);
-    const done = (c.modules||[]).reduce((a,m) => a + m.lessons.filter(l => l.done || !!prog[l.id]).length, 0);
+    const done = (c.modules||[]).reduce((a,m) => a + m.lessons.filter(l => !!prog[l.id]).length, 0);
     const pct = lessons > 0 ? Math.round(done / lessons * 100) : 0;
     return `<div class="prog-course-row">
       <div class="pcr-emoji">${c.emoji}</div>
@@ -1960,7 +1962,7 @@ function renderAnalytics(){
   const courseStats = courses.map(c => {
     const total = (c.modules||[]).reduce((a,m) => a + m.lessons.length, 0);
     const prog = getProgress(c.id);
-    const done = (c.modules||[]).reduce((a,m) => a + m.lessons.filter(l => l.done || !!prog[l.id]).length, 0);
+    const done = (c.modules||[]).reduce((a,m) => a + m.lessons.filter(l => !!prog[l.id]).length, 0);
     const pct = total > 0 ? Math.round(done / total * 100) : 0;
     const started = done > 0 ? 1 : 0; // simplified (single user localStorage)
     return { c, total, done, pct, started };
@@ -2670,7 +2672,7 @@ markLessonDone = function(){
   if(c){
     const prog = getProgress(currentCourseId);
     const tot = lessonFlat.length;
-    const done = lessonFlat.filter(f=>{ const m=c.modules[f.mi];const l=m&&m.lessons[f.li];return l&&(l.done||!!prog[l.id]); }).length;
+    const done = lessonFlat.filter(f=>{ const m=c.modules[f.mi];const l=m&&m.lessons[f.li];return l&&(!!prog[l.id]); }).length;
     if(done===tot) pushNotif('🏆','¡Completaste el curso "'+c.title+'"! Ya podés descargar tu certificado.');
     else pushNotif('✅','Clase completada en "'+c.title+'"');
   }
@@ -2884,8 +2886,8 @@ function profileLoad() {
   // Stats
   const courses = gc();
   const allLessons = courses.reduce((a, c) => a + (c.modules || []).reduce((b, m) => b + m.lessons.length, 0), 0);
-  const doneLessons = courses.reduce((a, c) => a + (c.modules || []).reduce((b, m) => b + m.lessons.filter(l => l.done).length, 0), 0);
-  const completedCourses = courses.filter(c => !c.locked && (c.modules || []).every(m => m.lessons.every(l => l.done))).length;
+  const doneLessons = courses.reduce((a, c) => { const prog = getProgress(c.id); return a + (c.modules || []).reduce((b, m) => b + m.lessons.filter(l => !!prog[l.id]).length, 0); }, 0);
+  const completedCourses = courses.filter(c => { if (c.locked || !(c.modules || []).length) return false; const prog = getProgress(c.id); return c.modules.every(m => m.lessons.every(l => !!prog[l.id])); }).length;
 
   const statsEl = document.getElementById('profile-stats');
   if (statsEl) statsEl.innerHTML = `
@@ -3806,3 +3808,32 @@ function admDelServiceImg(idx,ui){
   const l=admCollectServicesInputs();
   if(l[idx]&&l[idx].imgs){l[idx].imgs.splice(ui,1);sServ(l);admRenderServicesList();}
 }
+
+
+// ═══ LIMPIEZA AL CERRAR SESIÓN ═══
+// Borra los datos por-usuaria del navegador (progreso, notas, compras) para
+// que no se mezclen entre cuentas distintas en la misma computadora.
+// Los datos reales viven en la nube y se recuperan al iniciar sesión.
+function clearUserLocalData(){
+  const borrar=[];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(k&&(k.indexOf('prog_')===0||k.indexOf('note_')===0||k.indexOf('ms_purchased_')===0))borrar.push(k);
+  }
+  borrar.forEach(k=>localStorage.removeItem(k));
+}
+
+// ═══ URL LIMPIA (estético: oculta el .html de la barra de direcciones) ═══
+// Solo en el sitio publicado (GitHub Pages sirve /dashboard igual que /dashboard.html).
+// En local (127.0.0.1 o archivo) no se toca, para no romper las pruebas.
+(function(){
+  try{
+    if(location.protocol.indexOf('http')!==0)return;
+    if(location.hostname==='127.0.0.1'||location.hostname==='localhost')return;
+    if(/\.html$/.test(location.pathname)){
+      let p=location.pathname.replace(/index\.html$/,'').replace(/\.html$/,'');
+      if(!p)p='/';
+      history.replaceState(null,'',p+location.search+location.hash);
+    }
+  }catch(e){}
+})();
