@@ -188,7 +188,15 @@ const gBG=()=>JSON.parse(localStorage.getItem(KBG)||'{}');
 const sBG=v=>localStorage.setItem(KBG,JSON.stringify(v));
 
 // ═══ TOAST ═══
-function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+function toast(m){
+  let t=document.getElementById('toast');
+  if(!t){ // algunas páginas no traen el elemento: se crea solo
+    t=document.createElement('div');t.id='toast';t.className='toast';
+    document.body.appendChild(t);
+  }
+  t.textContent=m;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
 
 // ═══ MODAL ═══
 function hovClick(e,id){if(e.target===document.getElementById(id))closeOv(id);}
@@ -450,8 +458,15 @@ function renderCarouselCourses(filt='todos', q=''){
     const buyBtn=buildBuyBtn(c);
     return`<div class="course-card" onclick="openViewer(${c.id})"><div class="cct">${thumb}${priceBadge}</div><div class="ccc"><div class="cch"><div class="ccn">${c.title}</div><span class="clvl ${lvlC[c.level]||'lvl-b'}">${c.levelLabel}</span></div><p class="ccd">${c.description}</p><div class="ccf"><div class="cmi">📹 ${tot} clases &nbsp;📋 ${(c.modules||[]).length} módulos</div>${buyBtn}</div></div></div>`;
   }).join('');
-  const el1=document.getElementById('carousel-courses-list');if(el1)el1.innerHTML=html;
-  const el2=document.getElementById('explorer-courses-list');if(el2)el2.innerHTML=html;
+  // Estado vacío amigable cuando la búsqueda o el filtro no encuentran nada
+  const vacio=`<div style="grid-column:1/-1;text-align:center;padding:44px 20px;color:var(--muted);">
+    <div style="font-family:var(--fd);font-size:22px;font-style:italic;color:var(--goldd);margin-bottom:8px;">Sin resultados</div>
+    <p style="font-size:13.5px;">${q?`No encontramos cursos para “${_escHtml(q)}”. Probá con otra palabra.`:'No hay cursos en este nivel todavía.'}</p>
+    ${q?'<button class="btn-g" style="margin-top:14px;padding:8px 20px;font-size:13px;" onclick="clearSearch()">Limpiar búsqueda</button>':''}
+  </div>`;
+  const final=html||vacio;
+  const el1=document.getElementById('carousel-courses-list');if(el1)el1.innerHTML=final;
+  const el2=document.getElementById('explorer-courses-list');if(el2)el2.innerHTML=final;
 }
 function filterCar(lv,btn){renderCarouselCourses(lv);}
 
@@ -527,7 +542,8 @@ function renderFAQModal(){const faqs=gF();document.getElementById('faq-modal-lis
 function openViewer(id){
   const courses=gc();const c=courses.find(x=>x.id===id);if(!c||c.locked)return;
   currentCourseId=id;lessonFlat=[];
-  (c.modules||[]).forEach((m,mi)=>m.lessons.forEach((l,li)=>lessonFlat.push({mi,li,mid:m.id,lid:l.id})));
+  (c.modules||[]).forEach((m,mi)=>(m.lessons||[]).forEach((l,li)=>lessonFlat.push({mi,li,mid:m.id,lid:l.id})));
+  if(!lessonFlat.length){toast('Este curso todavía no tiene clases cargadas');return;}
   document.getElementById('vcname').textContent=c.title;
   document.getElementById('vsh-tit').textContent=c.title;
   const tot=lessonFlat.length;const prog=getProgress(id);const done=(c.modules||[]).reduce((a,m)=>a+m.lessons.filter(l=>!!prog[l.id]).length,0);
@@ -537,7 +553,15 @@ function openViewer(id){
   renderVModules(c);showView('course-viewer');
   applyCourseThumbToViewer(c);
   const fm=document.querySelector('.mod-hdr');if(fm)openMod(fm);
-  if(lessonFlat.length)selLesson(lessonFlat[0]);
+  if(lessonFlat.length){
+    // Reanudar donde quedó: primera clase incompleta (o la primera si terminó todo)
+    let idx=lessonFlat.findIndex(f=>{const m=c.modules[f.mi];const l=m&&m.lessons[f.li];return l&&!prog[l.id];});
+    if(idx<0)idx=0;
+    selLesson(lessonFlat[idx]);
+    const li=document.getElementById('li-'+lessonFlat[idx].mid+'-'+lessonFlat[idx].lid);
+    const ml=li&&li.closest('.mod-lessons');
+    if(ml&&!ml.classList.contains('open')){const hdr=ml.previousElementSibling;if(hdr)openMod(hdr);}
+  }
   // vs-panel mobile handled by vsCheckMobile()
 }
 function renderVModules(c){
@@ -711,7 +735,33 @@ function selLesson(flat){
   document.getElementById('btn-prev').style.display=lessonIdx>0?'':'none';
   document.getElementById('btn-next').textContent=lessonIdx<lessonFlat.length-1?'Siguiente →':'✓ Completar curso';
 }
-function navL(d){const ni=lessonIdx+d;if(ni>=0&&ni<lessonFlat.length)selLesson(lessonFlat[ni]);}
+function navL(d){
+  const ni=lessonIdx+d;
+  if(ni>=0&&ni<lessonFlat.length){selLesson(lessonFlat[ni]);return;}
+  if(d>0)finishCourse(); // "✓ Completar curso" en la última clase
+}
+function finishCourse(){
+  const c=gc().find(x=>x.id===currentCourseId);if(!c)return;
+  // Marcar la clase actual como completada si no lo estaba
+  const flat=lessonFlat[lessonIdx];
+  if(flat){
+    const m=c.modules[flat.mi];const l=m&&m.lessons[flat.li];
+    if(l&&!getProgress(currentCourseId)[l.id]){
+      setProgress(currentCourseId,l.id,true);
+      updateDoneUI(true);renderVModules(c);
+    }
+  }
+  updateViewerProgress();
+  const prog=getProgress(currentCourseId);
+  const tot=lessonFlat.length;
+  const done=lessonFlat.filter(f=>{const m=c.modules[f.mi];const l=m&&m.lessons[f.li];return l&&!!prog[l.id];}).length;
+  if(tot>0&&done>=tot){
+    toast('🏆 ¡Felicitaciones! Completaste el curso');
+    if(typeof showCert==='function')setTimeout(()=>showCert(currentCourseId),700);
+  }else{
+    toast('Te falta'+(tot-done===1?'':'n')+' '+(tot-done)+' clase'+(tot-done===1?'':'s')+' para terminar el curso');
+  }
+}
 function backDash(){showView('dashboard');showPage('explorar');switchExplorer('cursos');updateDashStats();}
 
 // ═══ ESTETICS ═══
@@ -1748,7 +1798,7 @@ function renderContinueCards(inProgress){
         <div class="pb"><div class="pf" style="width:${pct}%"></div></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px;">
           <div class="pl">${pct}% completado</div>
-          ${pct===100 ? '<button class="cert-badge" onclick="event.stopPropagation();showCert('+c.id+')">🏆 Certificado</button>' : ''}
+          ${pct===100 ? '<button class="cert-badge" onclick="event.stopPropagation();showCert('+c.id+')">✦ Certificado</button>' : ''}
         </div>
       </div>
     </div>`;
@@ -1789,7 +1839,7 @@ function renderProgressPage(totalPct, totalDone, totalLessons){
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
         <div class="pcr-pct">${pct}%</div>
-        ${pct===100 ? '<button class="cert-badge" onclick="showCert('+c.id+')">🏆 Ver certificado</button>' : '<button class="btn-crimson" style="font-size:12px;padding:6px 14px;" onclick="openViewer('+c.id+')">Continuar →</button>'}
+        ${pct===100 ? '<button class="cert-badge" onclick="showCert('+c.id+')">✦ Ver certificado</button>' : '<button class="btn-crimson" style="font-size:12px;padding:6px 14px;" onclick="openViewer('+c.id+')">Continuar →</button>'}
       </div>
     </div>`;
   }).join('');
@@ -1925,6 +1975,7 @@ let noteSaveTimer = null;
 function getNoteKey(courseId, lessonId){ return 'note_' + courseId + '_' + lessonId; }
 
 function loadNote(courseId, lessonId){
+  if(typeof flushNote==='function')flushNote(); // no perder la nota anterior
   const ta = document.getElementById('notes-textarea');
   const sec = document.getElementById('notes-section');
   if(!ta || !sec) return;
@@ -1943,13 +1994,29 @@ function saveNote(){
   if(!l) return;
   const ta = document.getElementById('notes-textarea');
   if(!ta) return;
+  // Capturar clave y texto AHORA: si la alumna cambia de lección antes de que
+  // el timer dispare, igual se guarda el texto correcto bajo la lección correcta.
+  const cid = currentCourseId, lid = l.id, key = getNoteKey(cid, lid), val = ta.value;
   clearTimeout(noteSaveTimer);
+  window._pendingNote = { key, cid, lid, val };
   noteSaveTimer = setTimeout(() => {
-    localStorage.setItem(getNoteKey(currentCourseId, l.id), ta.value);
-    _saveNoteCloud(currentCourseId, l.id, ta.value);
+    window._pendingNote = null;
+    localStorage.setItem(key, val);
+    _saveNoteCloud(cid, lid, val);
     const saved = document.getElementById('notes-saved');
-    if(saved){ saved.classList.add('show'); setTimeout(()=>saved.classList.remove('show'), 2000); }
+    if(saved){
+      saved.textContent = (_fbReady && currentUser && currentUser.uid) ? '✓ Guardado en la nube' : '✓ Guardado en este dispositivo';
+      saved.classList.add('show'); setTimeout(()=>saved.classList.remove('show'), 2000);
+    }
   }, 600);
+}
+// Guarda al instante cualquier nota pendiente (se llama al cambiar de lección o salir)
+function flushNote(){
+  if(!window._pendingNote) return;
+  const p = window._pendingNote; window._pendingNote = null;
+  clearTimeout(noteSaveTimer);
+  localStorage.setItem(p.key, p.val);
+  _saveNoteCloud(p.cid, p.lid, p.val);
 }
 
 // ═══ ANALÍTICAS ═══
@@ -2619,17 +2686,19 @@ document.addEventListener('click', e=>{
 });
 
 // ═══ DARK MODE ═══
+const _ICON_SUN='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M4.9 19.1l1.7-1.7M17.4 6.6l1.7-1.7"/></svg>';
+const _ICON_MOON='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 13.2A8.2 8.2 0 1 1 10.8 3.5a6.4 6.4 0 0 0 9.7 9.7z"/></svg>';
 function toggleDarkMode(){
   const isDark = document.body.classList.toggle('dark-mode');
   localStorage.setItem('ms_darkmode', isDark?'1':'0');
   const btn = document.getElementById('dark-toggle');
-  if(btn) btn.textContent = isDark ? '☀️' : '🌙';
+  if(btn) btn.innerHTML = isDark ? _ICON_SUN : _ICON_MOON;
 }
 function loadDarkMode(){
   if(localStorage.getItem('ms_darkmode')==='1'){
     document.body.classList.add('dark-mode');
     const btn = document.getElementById('dark-toggle');
-    if(btn) btn.textContent='☀️';
+    if(btn) btn.innerHTML=_ICON_SUN;
   }
 }
 
@@ -2809,7 +2878,8 @@ function renderChatMessages(roomId) {
 }
 
 function chatSend() {
-  if (!activeChatRoom || !currentUser) return;
+  if (!activeChatRoom) { toast('Elegí una sala de la lista para escribir'); return; }
+  if (!currentUser) return;
   const inp = document.getElementById('chat-input');
   const text = (inp.value || '').trim();
   if (!text) return;

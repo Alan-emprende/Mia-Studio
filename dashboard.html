@@ -23,14 +23,14 @@
     </div>
     <nav class="sb-nav">
       <div class="sb-slbl">Principal</div>
-      <button class="sb-item active" id="nav-home" onclick="showPage('home')"><span class="sb-icon">🏠</span>Inicio</button>
-      <button class="sb-item" id="nav-explorar" onclick="showPage('explorar')"><span class="sb-icon">✨</span>Explorar<span class="sb-badge" id="sb-badge">8</span></button>
-      <button class="sb-item" id="nav-progreso" onclick="showPage('progreso')"><span class="sb-icon">📈</span>Mi Progreso</button>
+      <button class="sb-item active" id="nav-home" onclick="showPage('home')"><span class="sb-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg></span>Inicio</button>
+      <button class="sb-item" id="nav-explorar" onclick="showPage('explorar')"><span class="sb-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9l-2 5.2L8.8 16l2-5.2L15 9z"/></svg></span>Explorar<span class="sb-badge" id="sb-badge">8</span></button>
+      <button class="sb-item" id="nav-progreso" onclick="showPage('progreso')"><span class="sb-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20v-7M9.5 20V9M15 20v-5M20.5 20V5"/><path d="M2.5 20h19"/></svg></span>Mi Progreso</button>
       <div class="sb-slbl">Comunidad</div>
-      <button class="sb-item" id="nav-comunidad" onclick="showPage('comunidad')"><span class="sb-icon">💬</span>Comunidad</button>
-      <button class="sb-item" id="nav-recursos" onclick="showPage('recursos')"><span class="sb-icon">📎</span>Recursos</button>
+      <button class="sb-item" id="nav-comunidad" onclick="showPage('comunidad')"><span class="sb-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a7.5 7.5 0 0 1-7.5 7.5H4.5l1.8-3.2A7.5 7.5 0 1 1 21 11.5z"/></svg></span>Comunidad</button>
+      <button class="sb-item" id="nav-recursos" onclick="showPage('recursos')"><span class="sb-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h6l2 2h10v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7z"/><path d="M3 7V5a1 1 0 0 1 1-1h5"/></svg></span>Recursos</button>
       <div class="sb-slbl">Cuenta</div>
-      <button class="sb-item" id="nav-perfil" onclick="showPage('perfil')"><span class="sb-icon">👤</span>Mi Perfil</button>
+      <button class="sb-item" id="nav-perfil" onclick="showPage('perfil')"><span class="sb-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1.4-3.4 3.9-5 7-5s5.6 1.6 7 5"/></svg></span>Mi Perfil</button>
     </nav>
     <div class="sb-user">
       <div class="uav" id="uav">MS</div>
@@ -51,9 +51,9 @@
       </div>
       <div style="display:flex;gap:7px;">
         <div class="topbar-right">
-          <button class="dark-toggle" id="dark-toggle" onclick="toggleDarkMode()" title="Modo oscuro/claro">🌙</button>
+          <button class="dark-toggle" id="dark-toggle" onclick="toggleDarkMode()" title="Modo oscuro/claro"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 13.2A8.2 8.2 0 1 1 10.8 3.5a6.4 6.4 0 0 0 9.7 9.7z"/></svg></button>
           <div style="position:relative;">
-            <button class="notif-btn" id="notif-btn" onclick="toggleNotifPanel()">🔔<span class="notif-badge" id="notif-badge">0</span></button>
+            <button class="notif-btn" id="notif-btn" onclick="toggleNotifPanel()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8.5a6 6 0 0 0-12 0c0 6.5-2.5 8-2.5 8h17s-2.5-1.5-2.5-8"/><path d="M13.6 20a1.9 1.9 0 0 1-3.2 0"/></svg><span class="notif-badge" id="notif-badge">0</span></button>
             <div class="notif-panel" id="notif-panel">
               <div class="notif-hdr"><span class="notif-hdr-title">Notificaciones</span><button class="notif-clear" onclick="clearNotifs()">Limpiar todo</button></div>
               <div class="notif-list" id="notif-list"><div class="notif-empty">No hay notificaciones</div></div>
@@ -99,7 +99,7 @@
             <div class="cc-wrap" id="cc-wrap-dynamic"></div>
             <div class="sec-heading" style="margin-bottom:14px;">Todos los cursos</div>
             <div class="search-wrap">
-              <span class="search-icon">🔍</span>
+              <span class="search-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16 16"/></svg></span>
               <input class="search-inp" id="course-search" type="text" placeholder="Buscar curso por título o descripción..." oninput="filterCoursesSearch(this.value)">
               <button class="search-clear" id="search-clear" onclick="clearSearch()">×</button>
             </div>
@@ -254,7 +254,7 @@
       <div class="chat-layout">
         <!-- sidebar de salas -->
         <div class="chat-sidebar">
-          <div class="chat-sb-hdr">💬 Salas</div>
+          <div class="chat-sb-hdr">Salas</div>
           <div class="chat-rooms" id="chat-rooms-list"></div>
         </div>
         <!-- área de mensajes -->
@@ -381,6 +381,20 @@
         <div></div>
         <button class="btn-gold" id="btn-next" onclick="navL(1)">Siguiente →</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CERTIFICADO (recuperado del archivo original, jul 2026) ══ -->
+<div class="cert-wrap" id="cert-wrap">
+  <div>
+    <div class="cert-card">
+      <button class="cert-close" onclick="closeCert()">✕</button>
+      <canvas id="cert-canvas" width="700" height="495"></canvas>
+    </div>
+    <div class="cert-actions">
+      <button class="btn-gold" onclick="downloadCert()" style="font-size:14px;padding:10px 26px;">⬇ Descargar certificado</button>
+      <button class="btn-g" onclick="closeCert()" style="font-size:14px;padding:10px 20px;">Cerrar</button>
     </div>
   </div>
 </div>
