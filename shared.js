@@ -3696,34 +3696,61 @@ function _svcMainHtml(m){
   if(m.type==='mp4')return `<video src="${_escHtml(m.src)}" controls playsinline></video>`;
   return `<iframe src="${_escHtml(m.src)}" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
 }
+// Layout tipo YouTube: un servicio destacado grande + lista lateral para elegir.
+// El primero del panel admin arranca destacado (ordenalos ahí para elegir la "estrella").
 function renderServicesLanding(){
   const el=document.getElementById('icp-services-list');if(!el)return;
   const list=gServ();
-  el.innerHTML=list.map((s,idx)=>{
-    const media=_svcMedia(s);
-    const main=media.length?_svcMainHtml(media[0]):`<div class="svc-ph"><span>${_escHtml((s.name||'S').trim().charAt(0))}</span></div>`;
-    const thumbs=media.length>1?`<div class="svc-thumbs">${media.map((m,mi)=>{
-      const bg=m.type==='img'?`background-image:url('${_escHtml(m.src)}')`:(m.thumb?`background-image:url('${_escHtml(m.thumb)}')`:'');
-      return `<button class="svc-thumb${mi===0?' active':''}" id="svc-th-${idx}-${mi}" onclick="svcShowMedia(${idx},${mi})" style="${bg}" aria-label="Ver foto ${mi+1}">${m.type!=='img'?'<span class="svc-play">▶</span>':''}</button>`;
-    }).join('')}</div>`:'';
-    const precio=s.price?_escHtml(s.price):'Consultar';
-    return `<article class="svc-mag${idx%2?' rev':''}">
-      <div class="svc-media"><div class="svc-media-main" id="svc-main-${idx}">${main}</div>${thumbs}</div>
-      <div class="svc-info">
-        <span class="svc-num">${String(idx+1).padStart(2,'0')}</span>
-        <h3 class="svc-title">${_escHtml(s.name)}</h3>
-        <p class="svc-mag-desc">${_escHtml(s.desc||'')}</p>
-        <div class="svc-meta">${s.dur?`<span class="svc-dur2">${_escHtml(s.dur)}</span>`:''}<span class="svc-price2">${precio}</span></div>
-        <button class="btn-gold svc-book" onclick="icarChooseService(${idx})">Reservar turno</button>
-      </div>
-    </article>`;
-  }).join('');
+  if(!list.length){el.innerHTML='';return;}
+  el.innerHTML=`<div class="svc-yt">
+    <div class="svc-feat" id="svc-feat"></div>
+    <div class="svc-side" id="svc-side">${list.map((s,idx)=>{
+      const img=(s.imgs||[]).filter(Boolean)[0];
+      const bg=img?` style="background-image:url('${_escHtml(img)}')"`:'';
+      return `<button class="svc-row" id="svc-row-${idx}" onclick="svcFeature(${idx},true)">
+        <span class="svc-row-th"${bg}>${img?'':_escHtml((s.name||'S').trim().charAt(0))}</span>
+        <span class="svc-row-txt">
+          <span class="svc-row-name">${_escHtml(s.name)}</span>
+          <span class="svc-row-meta">${_escHtml(s.dur||'')}${s.dur&&s.price?' · ':''}${_escHtml(s.price||'')}</span>
+        </span>
+      </button>`;
+    }).join('')}</div>
+  </div>`;
+  svcFeature(0,false);
 }
-function svcShowMedia(idx,mi){
+function _svcFeatHtml(s,idx){
+  const media=_svcMedia(s);
+  const main=media.length?_svcMainHtml(media[0]):`<div class="svc-ph"><span>${_escHtml((s.name||'S').trim().charAt(0))}</span></div>`;
+  const thumbs=media.length>1?`<div class="svc-thumbs">${media.map((m,mi)=>{
+    const bg=m.type==='img'?`background-image:url('${_escHtml(m.src)}')`:(m.thumb?`background-image:url('${_escHtml(m.thumb)}')`:'');
+    return `<button class="svc-thumb${mi===0?' active':''}" id="svc-fth-${mi}" onclick="svcShowFeatMedia(${mi})" style="${bg}" aria-label="Ver foto ${mi+1}">${m.type!=='img'?'<span class="svc-play">▶</span>':''}</button>`;
+  }).join('')}</div>`:'';
+  const precio=s.price?_escHtml(s.price):'Consultar';
+  return `<div class="svc-feat-inner">
+    <div class="svc-media-main" id="svc-feat-main">${main}</div>
+    ${thumbs}
+    <div class="svc-feat-body">
+      <span class="svc-num">${String(idx+1).padStart(2,'0')}</span>
+      <h3 class="svc-title">${_escHtml(s.name)}</h3>
+      <p class="svc-mag-desc">${_escHtml(s.desc||'')}</p>
+      <div class="svc-meta">${s.dur?`<span class="svc-dur2">${_escHtml(s.dur)}</span>`:''}<span class="svc-price2">${precio}</span></div>
+      <button class="btn-gold svc-book" onclick="icarChooseService(${idx})">Reservar turno</button>
+    </div>
+  </div>`;
+}
+function svcFeature(idx,scrollTo){
   const s=gServ()[idx];if(!s)return;
+  window._featIdx=idx;
+  const el=document.getElementById('svc-feat');
+  if(el)el.innerHTML=_svcFeatHtml(s,idx); // .svc-feat-inner trae la animación de fundido
+  document.querySelectorAll('.svc-row').forEach((r,i)=>r.classList.toggle('active',i===idx));
+  if(scrollTo&&window.innerWidth<=760&&el)el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function svcShowFeatMedia(mi){
+  const s=gServ()[window._featIdx||0];if(!s)return;
   const media=_svcMedia(s);const m=media[mi];if(!m)return;
-  const main=document.getElementById('svc-main-'+idx);if(main)main.innerHTML=_svcMainHtml(m);
-  media.forEach((_,i)=>{const t=document.getElementById('svc-th-'+idx+'-'+i);if(t)t.classList.toggle('active',i===mi);});
+  const main=document.getElementById('svc-feat-main');if(main)main.innerHTML=_svcMainHtml(m);
+  media.forEach((_,i)=>{const t=document.getElementById('svc-fth-'+i);if(t)t.classList.toggle('active',i===mi);});
 }
 // Al reservar: abre el modal con el servicio ya elegido
 function icarChooseService(idx){
