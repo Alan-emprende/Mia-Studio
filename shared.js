@@ -565,7 +565,8 @@ function openViewer(id){
   // vs-panel mobile handled by vsCheckMobile()
 }
 function renderVModules(c){
-  document.getElementById('vmodules').innerHTML=(c.modules||[]).map((m,mi)=>{
+  // Los módulos sin clases no se muestran (quedan a medio crear en el panel)
+  document.getElementById('vmodules').innerHTML=(c.modules||[]).filter(m=>(m.lessons||[]).length).map((m,mi)=>{
     const prog=getProgress(currentCourseId);const dc=m.lessons.filter(l=>!!prog[l.id]).length;
     return`<div class="mod-sec"><div class="mod-hdr" onclick="toggleMod(this)"><div><div class="mod-num">Módulo ${mi+1} · ${dc}/${m.lessons.length}</div><div class="mod-name">${m.title}</div></div><span class="mod-chev">▾</span></div><div class="mod-lessons">${m.lessons.map((l,li)=>{const isDoneL=!!prog[l.id];const sc=isDoneL?'done':(li===0&&dc===0&&!isDoneL?'current':'locked');const si=isDoneL?'✓':(sc==='current'?'▶':li+1);return`<div class="les-item" id="li-${m.id}-${l.id}" onclick="selById('${m.id}','${l.id}')"><div class="les-st ${sc}">${si}</div><div><div class="les-name">${l.title}</div><div class="les-dur">⏱ ${l.duration}</div></div></div>`;}).join('')}</div></div>`;
   }).join('');
@@ -614,7 +615,7 @@ function renderVideoArea(l){
     // add "no url" overlay
     const noUrl=document.createElement('div');
     noUrl.className='vid-no-url';
-    noUrl.innerHTML=`<div class="vid-no-url-icon">🎬</div><div class="vid-no-url-txt">${l.title}</div><div class="vid-no-url-sub">El administrador aún no asignó un video a esta clase</div>`;
+    noUrl.innerHTML=`<div class="vid-no-url-icon" style="color:var(--gold);opacity:.7;"><svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg></div><div class="vid-no-url-txt">${l.title}</div><div class="vid-no-url-sub">Esta clase todavía no tiene video cargado</div>`;
     area.appendChild(noUrl);
     return;
   }
@@ -2688,18 +2689,23 @@ document.addEventListener('click', e=>{
 // ═══ DARK MODE ═══
 const _ICON_SUN='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M4.9 19.1l1.7-1.7M17.4 6.6l1.7-1.7"/></svg>';
 const _ICON_MOON='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 13.2A8.2 8.2 0 1 1 10.8 3.5a6.4 6.4 0 0 0 9.7 9.7z"/></svg>';
-function toggleDarkMode(){
-  const isDark = document.body.classList.toggle('dark-mode');
-  localStorage.setItem('ms_darkmode', isDark?'1':'0');
+// El tema SIEMPRE es una de las dos clases: dark-mode o light-mode.
+// (Antes al apagar "oscuro" el body quedaba sin clase = estado híbrido roto.)
+function _applyTheme(dark){
+  document.body.classList.toggle('dark-mode',dark);
+  document.body.classList.toggle('light-mode',!dark);
   const btn = document.getElementById('dark-toggle');
-  if(btn) btn.innerHTML = isDark ? _ICON_SUN : _ICON_MOON;
+  if(btn) btn.innerHTML = dark ? _ICON_SUN : _ICON_MOON;
+}
+function toggleDarkMode(){
+  const dark = !document.body.classList.contains('dark-mode');
+  localStorage.setItem('ms_darkmode', dark?'1':'0');
+  _applyTheme(dark);
 }
 function loadDarkMode(){
-  if(localStorage.getItem('ms_darkmode')==='1'){
-    document.body.classList.add('dark-mode');
-    const btn = document.getElementById('dark-toggle');
-    if(btn) btn.innerHTML=_ICON_SUN;
-  }
+  // Solo en páginas con botón de tema (la landing tiene su propio diseño fijo)
+  if(!document.getElementById('dark-toggle')) return;
+  _applyTheme(localStorage.getItem('ms_darkmode')!=='0'); // oscuro por defecto
 }
 
 // ═══ ONBOARDING ═══
@@ -2773,6 +2779,33 @@ const saveChat = v => localStorage.setItem(KC_CHAT, JSON.stringify(v));
 
 let activeChatRoom = null;
 
+// ── COMUNIDAD EN LA NUBE ─────────────────────────────
+// Los mensajes viven en Firestore (chat/{sala}/msgs) y llegan en tiempo real
+// a todas las alumnas. localStorage queda como espejo/respaldo sin conexión.
+let _chatUnsub = null;
+function _chatCloudOk(){ return _fbReady && _db && currentUser && currentUser.uid; }
+function _chatListen(roomId){
+  if(_chatUnsub){ try{_chatUnsub();}catch(e){} _chatUnsub=null; }
+  if(!_chatCloudOk()) return; // sin nube: modo local
+  _chatUnsub = _db.collection('chat').doc(roomId).collection('msgs')
+    .orderBy('ts').limitToLast(80)
+    .onSnapshot(snap => {
+      const msgs = snap.docs.map(d => {
+        const m = d.data(); const dt = new Date(m.ts || 0);
+        return { id: d.id, uid: m.uid || '', user: m.user || 'Alumna', text: String(m.text || ''),
+          time: dt.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
+          date: dt.toLocaleDateString('es-AR',{day:'2-digit',month:'short'}), read: true };
+      });
+      const chat = getChat(); chat[roomId] = msgs; saveChat(chat);
+      if(activeChatRoom === roomId){
+        renderChatMessages(roomId);
+        const metaEl = document.getElementById('chat-room-meta');
+        if(metaEl) metaEl.textContent = msgs.length + ' mensaje' + (msgs.length !== 1 ? 's' : '');
+      }
+      renderChatRooms();
+    }, err => { console.warn('chat:', err.message); });
+}
+
 // Genera las salas: una general + una por cada curso desbloqueado
 function getChatRooms() {
   const courses = gc();
@@ -2834,6 +2867,7 @@ function openChatRoom(roomId) {
   // Render messages
   renderChatMessages(roomId);
   renderChatRooms(); // refresh unread badges
+  _chatListen(roomId); // escuchar la sala en la nube (tiempo real)
 }
 
 function renderChatMessages(roomId) {
@@ -2861,7 +2895,7 @@ function renderChatMessages(roomId) {
       html += `<div style="text-align:center;font-size:11px;color:var(--muted);margin:8px 0;">${d}</div>`;
       lastDate = d;
     }
-    const isMine = m.user === myName;
+    const isMine = (m.uid && currentUser && currentUser.uid) ? m.uid === currentUser.uid : m.user === myName;
     const initials = m.user.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     html += `<div class="chat-msg${isMine ? ' mine' : ''}">
       <div class="chat-msg-av${isMine ? ' mine-av' : ''}">${initials}</div>
@@ -2884,6 +2918,16 @@ function chatSend() {
   const text = (inp.value || '').trim();
   if (!text) return;
 
+  // Con nube: el mensaje va a Firestore y vuelve solo por el listener en tiempo real
+  if (_chatCloudOk()) {
+    _db.collection('chat').doc(activeChatRoom).collection('msgs').add({
+      uid: currentUser.uid, user: currentUser.name || 'Alumna', text: text.slice(0, 500), ts: Date.now()
+    }).catch(() => toast('⚠️ No se pudo enviar el mensaje. Probá de nuevo.'));
+    inp.value = ''; inp.style.height = 'auto';
+    return;
+  }
+
+  // Sin nube: modo local de respaldo
   const now = new Date();
   const time = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
   const date = now.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });

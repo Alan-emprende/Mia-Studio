@@ -1208,3 +1208,23 @@ body.light-mode .dark-toggle{border-color:#E8D8CC;color:var(--c1d);}
   .svc-side{max-height:none;overflow:visible;padding-right:0;}
   .svc-feat{padding:13px;}
 }
+/* ═══ VIEWER: barra superior legible en ambos temas (fix jul 2026) ═══ */
+.vtop{background:#160008;border-bottom:1px solid rgba(201,168,76,.25);}
+.vtop .vcname{color:var(--goldl);}
+body.light-mode .vtop{background:#FFF0E8;border-color:#E8D8CC;}
+body.light-mode .vtop .vcname{color:var(--c1d);}
+body.light-mode .vback{color:#6A464E;}
+body.light-mode .vback:hover{color:var(--c1);}
+body.light-mode .vpt{color:#8A6A72;}
+body.light-mode .vpbar{background:rgba(140,0,38,.12);}
+body.light-mode .vs{background:#FFF7F0;border-color:#E8D8CC;}
+body.light-mode .vmain{background:#FFF8F0;}
+/* ═══ MODO CLARO: refuerzo de textos del sidebar (prioridad máxima) ═══ */
+body.light-mode .sb-item{color:#6A464E !important;}
+body.light-mode .sb-item:hover{color:var(--c1) !important;}
+body.light-mode .sb-item.active{background:var(--c1) !important;color:#fff !important;}
+body.light-mode .sb-slbl{color:#A8848C !important;}
+body.light-mode .sb-brand{color:var(--c1d) !important;}
+body.light-mode .uname{color:var(--c1d) !important;}
+body.light-mode .urole{color:#A8848C !important;}
+body.light-mode .btn-logout{color:#8A6A72 !important;}
