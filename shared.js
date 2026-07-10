@@ -797,15 +797,26 @@ function loadAdminData(){
     admPage('estetica');
   }
 }
-// Avisa si el panel se abrió sin sesión de Firebase: con las reglas de seguridad
-// activas, los cambios no se guardan en la nube si no iniciaste sesión con tu cuenta.
+// Avisa si el panel se abrió sin la sesión correcta de Firebase: con las reglas
+// activas, la nube RECHAZA los cambios si no estás logueada con la cuenta admin.
+// (debe coincidir con el email de firestore.rules)
+const ADMIN_CLOUD_EMAIL='estudiosmira@gmail.com';
 function _admCheckCloudAuth(){
   if(!_fbReady||!_auth)return;
-  setTimeout(()=>{
-    if(!_auth.currentUser){
-      toast('⚠️ No iniciaste sesión con tu cuenta de administradora — los cambios podrían quedar solo en este dispositivo');
-    }
-  },3500);
+  const chequear=()=>{
+    const u=_auth.currentUser;
+    const ok=u&&u.email===ADMIN_CLOUD_EMAIL&&u.emailVerified;
+    let banner=document.getElementById('adm-nocloud-banner');
+    if(ok){if(banner)banner.remove();return;}
+    if(banner)return;
+    banner=document.createElement('div');
+    banner.id='adm-nocloud-banner';banner.className='adm-nocloud';
+    const motivo=!u?'No iniciaste sesión con tu cuenta.':(u.email!==ADMIN_CLOUD_EMAIL?('Estás logueada como '+u.email+', que no es la cuenta de administradora.'):'Tu email todavía no está verificado.');
+    banner.innerHTML='⚠️ <div><strong>Tus cambios NO se están guardando en la nube</strong> (quedan solo en esta computadora y las alumnas no los ven). '+motivo+' Cerrá el panel, iniciá sesión en la página con '+ADMIN_CLOUD_EMAIL+' y volvé a entrar.</div>';
+    document.body.prepend(banner);
+  };
+  setTimeout(chequear,3000);   // dar tiempo a que Firebase restaure la sesión
+  setTimeout(chequear,8000);   // segundo chequeo por si tardó
 }
 
 function admLogout(){
@@ -3978,3 +3989,20 @@ function clearUserLocalData(){
     }
   }catch(e){}
 })();
+
+
+// ═══ OJITO DE CONTRASEÑA ═══
+const _ICON_EYE='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/></svg>';
+const _ICON_EYE_OFF='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 6.5 12 6.5c1.8 0 3.4.5 4.7 1.2M21.5 12S18 17.5 12 17.5c-1.8 0-3.4-.5-4.7-1.2"/><path d="M4 20 20 4"/></svg>';
+function togglePw(btn){
+  const inp=btn.parentElement.querySelector('input');
+  if(!inp)return;
+  const mostrar=inp.type==='password';
+  inp.type=mostrar?'text':'password';
+  btn.innerHTML=mostrar?_ICON_EYE_OFF:_ICON_EYE;
+  btn.setAttribute('aria-label',mostrar?'Ocultar contraseña':'Mostrar contraseña');
+}
+// Pintar el ícono inicial en todos los ojitos presentes
+document.addEventListener('DOMContentLoaded',function(){
+  document.querySelectorAll('.pw-eye').forEach(function(b){if(!b.innerHTML.trim())b.innerHTML=_ICON_EYE;});
+});

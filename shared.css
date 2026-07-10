@@ -1228,3 +1228,12 @@ body.light-mode .sb-brand{color:var(--c1d) !important;}
 body.light-mode .uname{color:var(--c1d) !important;}
 body.light-mode .urole{color:#A8848C !important;}
 body.light-mode .btn-logout{color:#8A6A72 !important;}
+/* ═══ OJITO DE CONTRASEÑA ═══ */
+.pw-wrap{position:relative;}
+.pw-wrap input{padding-right:42px !important;width:100%;}
+.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);padding:6px;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:.2s;}
+.pw-eye:hover{color:var(--gold);}
+
+/* ═══ BANNER PERSISTENTE DEL ADMIN SIN SESIÓN ═══ */
+.adm-nocloud{position:sticky;top:0;z-index:200;background:linear-gradient(135deg,#8C0026,#B0003A);color:#fff;padding:11px 18px;font-size:13.5px;line-height:1.5;display:flex;align-items:center;gap:12px;box-shadow:0 4px 16px rgba(0,0,0,.35);}
+.adm-nocloud a{color:#FFD98A;font-weight:600;text-decoration:underline;cursor:pointer;}

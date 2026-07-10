@@ -185,7 +185,7 @@
     <div id="auth-err" class="auth-error"></div>
     <div id="form-l">
       <div class="fg" id="fg-li-email"><label>Email</label><input type="email" id="li-email" placeholder="tu@email.com" oninput="clearFieldErr('fg-li-email')"><span class="field-err-msg"></span></div>
-      <div class="fg" id="fg-li-pass"><label>Contraseña</label><input type="password" id="li-pass" placeholder="••••••••" oninput="clearFieldErr('fg-li-pass')" onkeydown="if(event.key==='Enter')doLogin()"><span class="field-err-msg"></span></div>
+      <div class="fg" id="fg-li-pass"><label>Contraseña</label><div class="pw-wrap"><input type="password" id="li-pass" placeholder="••••••••" oninput="clearFieldErr('fg-li-pass')" onkeydown="if(event.key==='Enter')doLogin()"><button type="button" class="pw-eye" onclick="togglePw(this)" aria-label="Mostrar contraseña"></button></div><span class="field-err-msg"></span></div>
       <button class="btn-auth" onclick="doLogin()">Iniciar sesión</button>
       <div style="text-align:center;margin-top:10px;"><button onclick="showResetPass()" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;font-family:var(--fb);text-decoration:underline;">¿Olvidaste tu contraseña?</button></div>
       <div class="auth-divider">— acceso rápido —</div>
@@ -200,7 +200,7 @@
     <div id="form-r" style="display:none;">
       <div class="fg" id="fg-rg-name"><label>Nombre completo</label><input type="text" id="rg-name" placeholder="Tu nombre" oninput="clearFieldErr('fg-rg-name')"><span class="field-err-msg"></span></div>
       <div class="fg" id="fg-rg-email"><label>Email</label><input type="email" id="rg-email" placeholder="tu@email.com" oninput="clearFieldErr('fg-rg-email')"><span class="field-err-msg"></span></div>
-      <div class="fg" id="fg-rg-pass"><label>Contraseña</label><input type="password" id="rg-pass" placeholder="Mínimo 6 caracteres" oninput="clearFieldErr('fg-rg-pass')" onkeydown="if(event.key==='Enter')doRegister()"><span class="field-err-msg"></span></div>
+      <div class="fg" id="fg-rg-pass"><label>Contraseña</label><div class="pw-wrap"><input type="password" id="rg-pass" placeholder="Mínimo 6 caracteres" oninput="clearFieldErr('fg-rg-pass')" onkeydown="if(event.key==='Enter')doRegister()"><button type="button" class="pw-eye" onclick="togglePw(this)" aria-label="Mostrar contraseña"></button></div><span class="field-err-msg"></span></div>
       <button class="btn-auth" onclick="doRegister()">Crear cuenta gratis</button>
     </div>
   </div>
