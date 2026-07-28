@@ -456,7 +456,7 @@ body{font-family:var(--fb);background:var(--cr);color:var(--dark);min-height:100
 .icp-ebooks{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:14px;}
 .icp-ebook{background:rgba(255,255,255,.05);border:1px solid rgba(201,168,76,.14);border-radius:18px;padding:18px 14px;text-align:center;cursor:pointer;transition:.25s;}
 .icp-ebook:hover{background:rgba(201,168,76,.09);transform:translateY(-2px);}
-.icp-ecov{width:58px;height:82px;border-radius:8px;margin:0 auto 11px;display:flex;align-items:center;justify-content:center;font-size:28px;}
+.icp-ecov{width:58px;height:82px;border-radius:8px;margin:0 auto 11px;display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden;}
 .icp-etit{font-family:var(--fd);font-size:15px;font-weight:500;color:var(--cr);margin-bottom:4px;}
 .icp-eprice{font-family:var(--fd);font-size:15px;font-weight:500;color:var(--gold);}
 .icp-efree{color:#4ade80;}

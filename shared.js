@@ -380,7 +380,7 @@ function renderLanding(){
       const tot=(c.modules||[]).reduce((a,m)=>a+m.lessons.length,0);
       const isFree=!c.price||c.price===''||c.price==='Gratis'||c.price==='0';
       const priceLbl=isFree?'Gratis':c.price;
-      const thumbInner=c.coverImg?`<img src="${c.coverImg}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:var(--r3) var(--r3) 0 0;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.6),transparent);"></div><span style="position:relative;z-index:1;font-size:46px;">${c.emoji}</span>`:c.emoji;
+      const thumbInner=c.coverImg?`<img src="${_cldOpt(c.coverImg,640)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:var(--r3) var(--r3) 0 0;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.6),transparent);"></div><span style="position:relative;z-index:1;font-size:46px;">${c.emoji}</span>`:c.emoji;
       return`<div class="cpc" onclick="openAuth('r')"><div class="cpc-thumb" style="background:${c.coverImg?'transparent':c.color};">${thumbInner}${isFree?'':`<span style="position:absolute;top:8px;right:8px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px;">${priceLbl}</span>`}</div><div class="cpc-body"><span class="cpc-tag">${c.levelLabel}</span><div class="cpc-title">${c.title}</div><p class="cpc-desc">${c.description}</p><div class="cpc-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot} clases</div></div></div>`;
     }).join('');
   }
@@ -436,7 +436,7 @@ function switchExplorer(tab){
 
 // ═══ COURSE RENDERS ═══
 function buildCourseThumb(c){
-  if(c.coverImg) return `<img class="cct-img" src="${c.coverImg}" alt="${c.title}"><div class="cct-overlay"></div><span class="cct-emoji-over">${c.emoji}</span>`;
+  if(c.coverImg) return `<img class="cct-img" loading="lazy" src="${_cldOpt(c.coverImg,640)}" alt="${c.title}"><div class="cct-overlay"></div><span class="cct-emoji-over">${c.emoji}</span>`;
   return `<div class="cctbg" style="background:${c.color||'linear-gradient(135deg,#3D0015,#8C0026)'}"></div><span class="ccte">${c.emoji}</span>`;
 }
 function buildPriceBadge(c){
@@ -478,7 +478,7 @@ function filterCar(lv,btn){renderCarouselCourses(lv);}
 function renderEbooks(){
   const ebs=gEB();
   const cards=ebs.map(e=>{
-    const cover=e.cover?`<img src="${e.cover}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`:`<span>${e.emoji||'📕'}</span>`;
+    const cover=e.cover?`<img src="${_cldOpt(e.cover,480)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`:`<span>${e.emoji||'📕'}</span>`;
     const price=e.paid?(e.price||'De pago'):'Gratis';
     const isPurchased=!e.paid||hasEbook(e.id);
     let btn;
@@ -1772,7 +1772,7 @@ function renderIcarousel(){
     const tot = (c.modules||[]).reduce((a,m)=>a+m.lessons.length, 0);
     const isFree=!c.price||c.price===''||c.price==='Gratis'||c.price==='0';
     const priceLbl=isFree?'Gratis':c.price;
-    const thumbContent=c.coverImg?`<img src="${c.coverImg}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.5),transparent);"></div><span style="position:relative;z-index:1;font-size:38px;">${c.emoji}</span>`:c.emoji;
+    const thumbContent=c.coverImg?`<img src="${_cldOpt(c.coverImg,400)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.5),transparent);"></div><span style="position:relative;z-index:1;font-size:38px;">${c.emoji}</span>`:c.emoji;
     const priceTag=isFree?'':`<span style="position:absolute;top:7px;right:7px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:50px;z-index:2;">${priceLbl}</span>`;
     if(c.locked) return `<div class="icp-ccard" style="opacity:.55;cursor:default;"><div class="icp-thumb" style="background:${c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${c.levelLabel}</span><div class="icp-name">${c.title}</div><div class="icp-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Próximamente</div></div></div>`;
     return `<div class="icp-ccard" onclick="openAuth('r')"><div class="icp-thumb" style="background:${c.coverImg?'#0a0005':c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${c.levelLabel}</span><div class="icp-name">${c.title}</div><div class="icp-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot} clases · ${(c.modules||[]).length} módulos</div></div></div>`;
@@ -1780,7 +1780,11 @@ function renderIcarousel(){
   // ebooks
   const ebs = gEB();
   const eg = document.getElementById('icp-ebooks-grid');
-  if(eg) eg.innerHTML = ebs.map(e=>`<div class="icp-ebook" onclick="openAuth('r')"><div class="icp-ecov" style="background:${e.color||'#8C0026'};">${e.emoji}</div><div class="icp-etit">${e.title}</div><div class="icp-eprice ${e.paid?'':'icp-efree'}">${e.price}</div><button class="icp-ebtn">${e.paid?'Comprar':'Descargar gratis'}</button></div>`).join('');
+  if(eg) eg.innerHTML = ebs.map(e=>{
+    // Usar la portada subida desde el panel; el emoji queda como respaldo
+    const cov=e.cover?`<img src="${_escHtml(_cldOpt(e.cover,240))}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;">`:(e.emoji||'📕');
+    return `<div class="icp-ebook" onclick="openAuth('r')"><div class="icp-ecov" style="background:${e.color||'#8C0026'};">${cov}</div><div class="icp-etit">${e.title}</div><div class="icp-eprice ${e.paid?'':'icp-efree'}">${e.price}</div><button class="icp-ebtn">${e.paid?'Comprar':'Descargar gratis'}</button></div>`;
+  }).join('');
 }
 
 
@@ -1873,7 +1877,7 @@ function renderContinueCards(inProgress){
     const nextLesson = findNextLesson(c);
     const nextTxt = nextLesson ? ('Sigue: ' + nextLesson.title + (nextLesson.duration ? ' · ' + nextLesson.duration : '')) : 'Curso completo';
     const th = c.coverImg
-      ? `<img src="${_escHtml(c.coverImg)}" alt="" loading="lazy">`
+      ? `<img src="${_escHtml(_cldOpt(c.coverImg,160))}" alt="" loading="lazy">`
       : `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg>`;
     const cierre = pct === 100
       ? '<button class="cert-badge" onclick="event.stopPropagation();showCert('+c.id+')">✦ Certificado</button>'
@@ -3890,7 +3894,7 @@ function _svcMedia(s){
 }
 function _svcMainHtml(m){
   if(!m)return '';
-  if(m.type==='img')return `<img src="${_escHtml(m.src)}" alt="" loading="lazy">`;
+  if(m.type==='img')return `<img src="${_escHtml(_cldOpt(m.src,900))}" alt="" loading="lazy">`;
   if(m.type==='mp4')return `<video src="${_escHtml(m.src)}" controls playsinline></video>`;
   return `<iframe src="${_escHtml(m.src)}" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
 }
@@ -4079,3 +4083,13 @@ function togglePw(btn){
 document.addEventListener('DOMContentLoaded',function(){
   document.querySelectorAll('.pw-eye').forEach(function(b){if(!b.innerHTML.trim())b.innerHTML=_ICON_EYE;});
 });
+
+
+// ═══ OPTIMIZACIÓN DE IMÁGENES CLOUDINARY ═══
+// Pide a Cloudinary la imagen ya comprimida y del ancho justo (WebP/AVIF).
+// Las portadas originales pesan hasta 2.5MB; así llegan en ~30-100KB.
+function _cldOpt(url,w){
+  if(!url||url.indexOf('res.cloudinary.com')<0||url.indexOf('/upload/')<0)return url;
+  if(url.indexOf('/upload/f_auto')>=0)return url; // ya optimizada
+  return url.replace('/upload/','/upload/f_auto,q_auto,w_'+(w||600)+'/');
+}
