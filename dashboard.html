@@ -65,18 +65,19 @@
 
     <!-- HOME -->
     <div class="pc" id="page-home">
-      <div class="welcome-banner">
-        <div class="welcome-banner wb-text">
+      <div class="welcome-banner wb2">
+        <div class="wb-ring" id="wb-ring"><div class="wb-ring-in" id="wb-ring-pct">0%</div></div>
+        <div class="wb-text2">
           <h2>¡Bienvenida, <em id="wname">Alumna</em>!</h2>
           <p id="wsub">Continuá donde lo dejaste y seguí avanzando.</p>
         </div>
-        <div class="wb-emoji" style="color:var(--goldl);opacity:.85;"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 13.5S6 7.5 12 7.5s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="13.5" r="2.6"/><path d="M12 4.8V2.6M7 5.8 5.8 3.9M17 5.8l1.2-1.9"/></svg></div>
+        <button class="wb-continue" id="wb-continue" onclick="wbContinue()" style="display:none;">Continuar ▸</button>
       </div>
       <div class="stats-row">
-        <div class="scard"><div class="scard-lbl">Cursos activos</div><div class="scard-val" id="stat-active">—</div><div class="scard-trend neutral" id="stat-active-sub">de los disponibles</div></div>
-        <div class="scard"><div class="scard-lbl">Clases completadas</div><div class="scard-val" id="stat-done">—</div><div class="scard-trend neutral" id="stat-done-sub">calculando...</div></div>
-        <div class="scard"><div class="scard-lbl">Progreso total</div><div class="scard-val" id="stat-pct">—</div><div class="scard-trend neutral" id="stat-pct-sub">en todos los cursos</div></div>
-        <div class="scard"><div class="scard-lbl">Certificados</div><div class="scard-val" id="stat-certs">—</div><div class="scard-trend neutral" id="stat-certs-sub">cursos completados</div></div>
+        <div class="scard"><span class="scard-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.2 12 4.4l9.5 4.8L12 14 2.5 9.2z"/><path d="M6.5 11.2v4.6c0 1.5 2.5 2.8 5.5 2.8s5.5-1.3 5.5-2.8v-4.6"/></svg></span><div class="scard-lbl">Cursos activos</div><div class="scard-val" id="stat-active">—</div><div class="scard-trend neutral" id="stat-active-sub">de los disponibles</div></div>
+        <div class="scard"><span class="scard-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6.5 9.5 17 4 11.5"/></svg></span><div class="scard-lbl">Clases completadas</div><div class="scard-val" id="stat-done">—</div><div class="scard-trend neutral" id="stat-done-sub">calculando...</div></div>
+        <div class="scard"><span class="scard-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 20v-7M9.5 20V9M15 20v-5M20.5 20V5"/><path d="M2.5 20h19"/></svg></span><div class="scard-lbl">Progreso total</div><div class="scard-val" id="stat-pct">—</div><div class="scard-trend neutral" id="stat-pct-sub">en todos los cursos</div></div>
+        <div class="scard"><span class="scard-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5.5"/><path d="M8.8 13.5 7.5 21l4.5-2.4L16.5 21l-1.3-7.5"/></svg></span><div class="scard-lbl">Certificados</div><div class="scard-val" id="stat-certs">—</div><div class="scard-trend neutral" id="stat-certs-sub">cursos completados</div></div>
       </div>
 
       <!-- ══ CAROUSEL ══ -->

@@ -125,9 +125,12 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
               <div style="font-size:28px;">🖼</div><p>Click para subir imagen (JPG/PNG/WEBP)</p>
               <input type="file" id="hero-img-inp" accept="image/*" style="display:none;" onchange="admUploadHeroBg(this,'image')">
             </div>
-            <div class="file-drop" style="margin-top:9px;" onclick="document.getElementById('hero-vid-inp').click()">
-              <div style="font-size:28px;">🎬</div><p>Click para subir video (MP4/WEBM)</p>
-              <input type="file" id="hero-vid-inp" accept="video/*" style="display:none;" onchange="admUploadHeroBg(this,'video')">
+            <div class="fg" style="margin-top:10px;margin-bottom:0;">
+              <label>Video de fondo (link directo a un .mp4 — por ej. de Cloudinary)</label>
+              <div style="display:flex;gap:7px;">
+                <input type="text" id="adm-hero-video-url" placeholder="https://.../video.mp4" style="flex:1;">
+                <button class="abtn" onclick="admSetHeroVideo()">Usar video</button>
+              </div>
             </div>
             <button class="abtn-g" style="margin-top:9px;width:100%;" onclick="admClearHeroBg()">🗑 Quitar fondo personalizado</button>
           </div>

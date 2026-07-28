@@ -341,18 +341,22 @@ function showView(n){document.querySelectorAll('.view').forEach(v=>v.classList.r
 
 // ═══ HERO BG ═══
 function applyHeroBg(){
-  const bg=gBG();const media=document.getElementById('hero-media');
+  const media=document.getElementById('hero-media');
   if(!media)return;
   const def=document.getElementById('hero-default-bg');
   // remove old dynamic media
   media.querySelectorAll('img.dyn,video.dyn').forEach(el=>el.remove());
+  // Prioridad: fondo guardado en la nube (config) > fondo local legado
+  const cfg=gCfg();
+  const bg=(cfg.heroBg&&cfg.heroBg.url)?{type:cfg.heroBg.type,data:cfg.heroBg.url}:gBG();
   if(bg.type==='image'&&bg.data){
     if(def)def.style.display='none';
-    const img=document.createElement('img');img.src=bg.data;img.className='dyn';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;';
+    const img=document.createElement('img');img.src=bg.data;img.className='dyn hero-kb';img.alt='';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;';
     media.insertBefore(img,media.firstChild);
   }else if(bg.type==='video'&&bg.data){
     if(def)def.style.display='none';
     const vid=document.createElement('video');vid.src=bg.data;vid.className='dyn';vid.autoplay=true;vid.loop=true;vid.muted=true;vid.playsInline=true;
+    vid.setAttribute('aria-hidden','true');
     vid.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;';
     media.insertBefore(vid,media.firstChild);
   }else{if(def)def.style.display='';}
@@ -377,7 +381,7 @@ function renderLanding(){
       const isFree=!c.price||c.price===''||c.price==='Gratis'||c.price==='0';
       const priceLbl=isFree?'Gratis':c.price;
       const thumbInner=c.coverImg?`<img src="${c.coverImg}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:var(--r3) var(--r3) 0 0;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.6),transparent);"></div><span style="position:relative;z-index:1;font-size:46px;">${c.emoji}</span>`:c.emoji;
-      return`<div class="cpc" onclick="openAuth('r')"><div class="cpc-thumb" style="background:${c.coverImg?'transparent':c.color};">${thumbInner}${isFree?'':`<span style="position:absolute;top:8px;right:8px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px;">${priceLbl}</span>`}</div><div class="cpc-body"><span class="cpc-tag">${c.levelLabel}</span><div class="cpc-title">${c.title}</div><p class="cpc-desc">${c.description}</p><div class="cpc-meta">📹 ${tot} clases</div></div></div>`;
+      return`<div class="cpc" onclick="openAuth('r')"><div class="cpc-thumb" style="background:${c.coverImg?'transparent':c.color};">${thumbInner}${isFree?'':`<span style="position:absolute;top:8px;right:8px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px;">${priceLbl}</span>`}</div><div class="cpc-body"><span class="cpc-tag">${c.levelLabel}</span><div class="cpc-title">${c.title}</div><p class="cpc-desc">${c.description}</p><div class="cpc-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot} clases</div></div></div>`;
     }).join('');
   }
 }
@@ -443,8 +447,8 @@ function buildPriceBadge(c){
 function buildBuyBtn(c){
   const isFree=!c.price||c.price==='0'||c.price===''||c.price==='Gratis';
   if(isFree) return `<button class="btn-buy btn-buy-free" onclick="event.stopPropagation();openViewer(${c.id})">▶ Entrar al curso</button>`;
-  if(c.payLink) return `<button class="btn-buy" onclick="event.stopPropagation();buyCourse(${c.id})">🛒 Comprar ${c.price}</button>`;
-  return `<button class="btn-buy" onclick="event.stopPropagation();openViewer(${c.id})">🛒 Comprar ${c.price}</button>`;
+  if(c.payLink) return `<button class="btn-buy" onclick="event.stopPropagation();buyCourse(${c.id})">Comprar ${c.price}</button>`;
+  return `<button class="btn-buy" onclick="event.stopPropagation();openViewer(${c.id})">Comprar ${c.price}</button>`;
 }
 function renderCarouselCourses(filt='todos', q=''){
   const all=gc();let list=filt==='todos'?all:all.filter(c=>c.level===filt);
@@ -454,9 +458,9 @@ function renderCarouselCourses(filt='todos', q=''){
     const tot=(c.modules||[]).reduce((a,m)=>a+m.lessons.length,0);
     const thumb=buildCourseThumb(c);
     const priceBadge=buildPriceBadge(c);
-    if(c.locked)return`<div class="course-card clocked"><div class="cct">${thumb}${priceBadge}</div><div class="ccc"><div class="cch"><div class="ccn">${c.title}</div><span class="clvl ${lvlC[c.level]||'lvl-b'}">${c.levelLabel}</span></div><p class="ccd">${c.description}</p><div class="ccf"><div class="cmi">📹 ${tot||'?'} clases</div><div class="lckbdg">🔒 Próximamente</div></div></div></div>`;
+    if(c.locked)return`<div class="course-card clocked"><div class="cct">${thumb}${priceBadge}</div><div class="ccc"><div class="cch"><div class="ccn">${c.title}</div><span class="clvl ${lvlC[c.level]||'lvl-b'}">${c.levelLabel}</span></div><p class="ccd">${c.description}</p><div class="ccf"><div class="cmi"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot||'?'} clases</div><div class="lckbdg"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Próximamente</div></div></div></div>`;
     const buyBtn=buildBuyBtn(c);
-    return`<div class="course-card" onclick="openViewer(${c.id})"><div class="cct">${thumb}${priceBadge}</div><div class="ccc"><div class="cch"><div class="ccn">${c.title}</div><span class="clvl ${lvlC[c.level]||'lvl-b'}">${c.levelLabel}</span></div><p class="ccd">${c.description}</p><div class="ccf"><div class="cmi">📹 ${tot} clases &nbsp;📋 ${(c.modules||[]).length} módulos</div>${buyBtn}</div></div></div>`;
+    return`<div class="course-card" onclick="openViewer(${c.id})"><div class="cct">${thumb}${priceBadge}</div><div class="ccc"><div class="cch"><div class="ccn">${c.title}</div><span class="clvl ${lvlC[c.level]||'lvl-b'}">${c.levelLabel}</span></div><p class="ccd">${c.description}</p><div class="ccf"><div class="cmi"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot} clases &nbsp;<svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 5h16M4 12h16M4 19h10"/></svg> ${(c.modules||[]).length} módulos</div>${buyBtn}</div></div></div>`;
   }).join('');
   // Estado vacío amigable cuando la búsqueda o el filtro no encuentran nada
   const vacio=`<div style="grid-column:1/-1;text-align:center;padding:44px 20px;color:var(--muted);">
@@ -493,10 +497,10 @@ function renderEbooks(){
     } else {
       // Paid + not yet purchased → show payment link
       btn=pyLink
-        ?`<button onclick="buyEbook('${e.id}')" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;border:none;border-radius:50px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;cursor:pointer;font-family:var(--fb);">🛒 Comprar ${price}</button>`
+        ?`<button onclick="buyEbook('${e.id}')" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;border:none;border-radius:50px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;cursor:pointer;font-family:var(--fb);">Comprar ${price}</button>`
         :`<button class="btn-g" style="margin-top:10px;width:100%;padding:9px;font-size:13px;opacity:.5;cursor:default;" disabled>Próximamente</button>`;
     }
-    const lockBadge=e.paid&&!isPurchased?`<div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);border-radius:50px;padding:3px 8px;font-size:11px;color:#fff;">🔒 Pago</div>`:'';
+    const lockBadge=e.paid&&!isPurchased?`<div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);border-radius:50px;padding:3px 9px;font-size:11px;color:#fff;display:flex;align-items:center;gap:4px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Pago</div>`:'';
     return`<div class="ebook-card" style="position:relative;"><div class="ebook-cover" style="background:${e.color||'#8C0026'};">${cover}</div>${lockBadge}<div class="ebook-title">${e.title}</div><p class="ebook-desc">${e.desc}</p><div class="ebook-price ${e.paid&&!isPurchased?'':'ebook-free'}">${price}</div>${btn}</div>`;
   }).join('');
   const el1=document.getElementById('ebook-grid');if(el1)el1.innerHTML=cards;
@@ -523,8 +527,12 @@ function saveTurnoForm(nameId,telId,servId,dateId,msgId){
   [nameId,telId,dateId,msgId].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   toast('✅ Solicitud enviada. Te contactamos pronto!');return true;
 }
-function saveTurno(){saveTurnoForm('t-name','t-tel','t-serv','t-date','t-msg');}
-function saveTurno2(){saveTurnoForm('t2-name','t2-tel','t2-serv','t2-date','t2-msg');}
+function saveTurno(){
+  try{const _b=window.event&&window.event.target;if(_b&&_b.tagName==='BUTTON'){_b.disabled=true;setTimeout(()=>{_b.disabled=false;},1600);}}catch(e){}
+saveTurnoForm('t-name','t-tel','t-serv','t-date','t-msg');}
+function saveTurno2(){
+  try{const _b=window.event&&window.event.target;if(_b&&_b.tagName==='BUTTON'){_b.disabled=true;setTimeout(()=>{_b.disabled=false;},1600);}}catch(e){}
+saveTurnoForm('t2-name','t2-tel','t2-serv','t2-date','t2-msg');}
 
 // ═══ FAB ═══
 function toggleFab(){fabOpen=!fabOpen;document.getElementById('fab-menu').classList.toggle('open',fabOpen);}
@@ -568,7 +576,7 @@ function renderVModules(c){
   // Los módulos sin clases no se muestran (quedan a medio crear en el panel)
   document.getElementById('vmodules').innerHTML=(c.modules||[]).filter(m=>(m.lessons||[]).length).map((m,mi)=>{
     const prog=getProgress(currentCourseId);const dc=m.lessons.filter(l=>!!prog[l.id]).length;
-    return`<div class="mod-sec"><div class="mod-hdr" onclick="toggleMod(this)"><div><div class="mod-num">Módulo ${mi+1} · ${dc}/${m.lessons.length}</div><div class="mod-name">${m.title}</div></div><span class="mod-chev">▾</span></div><div class="mod-lessons">${m.lessons.map((l,li)=>{const isDoneL=!!prog[l.id];const sc=isDoneL?'done':(li===0&&dc===0&&!isDoneL?'current':'locked');const si=isDoneL?'✓':(sc==='current'?'▶':li+1);return`<div class="les-item" id="li-${m.id}-${l.id}" onclick="selById('${m.id}','${l.id}')"><div class="les-st ${sc}">${si}</div><div><div class="les-name">${l.title}</div><div class="les-dur">⏱ ${l.duration}</div></div></div>`;}).join('')}</div></div>`;
+    return`<div class="mod-sec"><div class="mod-hdr" onclick="toggleMod(this)"><div><div class="mod-num">Módulo ${mi+1} · ${dc}/${m.lessons.length}</div><div class="mod-name">${m.title}</div></div><span class="mod-chev">▾</span></div><div class="mod-lessons">${m.lessons.map((l,li)=>{const isDoneL=!!prog[l.id];const sc=isDoneL?'done':(li===0&&dc===0&&!isDoneL?'current':'locked');const si=isDoneL?'✓':(sc==='current'?'▶':li+1);return`<div class="les-item" id="li-${m.id}-${l.id}" onclick="selById('${m.id}','${l.id}')"><div class="les-st ${sc}">${si}</div><div><div class="les-name">${l.title}</div><div class="les-dur"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg> ${l.duration}</div></div></div>`;}).join('')}</div></div>`;
   }).join('');
 }
 function toggleMod(h){const l=h.nextElementSibling,c=h.querySelector('.mod-chev'),o=l.classList.contains('open');if(o){l.classList.remove('open');c.classList.remove('open');h.classList.remove('open');}else openMod(h);}
@@ -719,7 +727,9 @@ function selLesson(flat){
   renderVideoArea(l);
   loadNote(currentCourseId, l.id);
   document.getElementById('vlt').textContent=l.title;document.getElementById('vls').textContent=`${m.title} · ${l.duration}`;
-  document.getElementById('lctit').textContent=l.title;document.getElementById('lcmod').textContent=`📹 ${m.title}`;document.getElementById('lcdur').textContent=`⏱ ${l.duration}`;
+  document.getElementById('lctit').textContent=l.title;
+  document.getElementById('lcmod').innerHTML='<svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> '+_escHtml(m.title);
+  document.getElementById('lcdur').innerHTML='<svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg> '+_escHtml(l.duration||'');
   document.getElementById('lcdesc').textContent=l.desc;
   // done state
   const prog=getProgress(currentCourseId);
@@ -884,21 +894,48 @@ function admResetColors(){
   admRenderEstetica();toast('✅ Colores reseteados');
 }
 
-function admUploadHeroBg(input,type){
+// El fondo del hero ahora sube a Cloudinary y se guarda en la config (NUBE):
+// antes se guardaba solo en localStorage y las visitas nunca lo veían.
+async function admUploadHeroBg(input,type){
   const file=input.files[0];if(!file)return;
-  if(file.size>4*1024*1024){toast('⚠️ Archivo muy grande (máx 4MB). Comprimilo primero.');input.value='';return;}
-  const reader=new FileReader();
-  reader.onload=function(e){
-    try{sBG({type,data:e.target.result});applyHeroBg();admUpdateBgPreview();toast('✅ Fondo actualizado');}
-    catch(err){toast('⚠️ Error al guardar. El archivo puede ser muy grande.');}
-  };
-  reader.readAsDataURL(file);input.value='';
+  input.value='';
+  if(type==='video'){
+    toast('Para video usá el campo "Link de video" de abajo (subilo a Cloudinary o usá un MP4 online)');
+    return;
+  }
+  try{
+    toast('☁ Subiendo imagen de fondo...');
+    const url=await uploadToCloudinary(file,'hero');
+    const cfg=gCfg();cfg.heroBg={type:'image',url};sCfg(cfg);
+    sBG({}); // limpiar el legado local
+    applyHeroBg();admUpdateBgPreview();
+    toast('✅ Fondo actualizado (visible para todas las visitas)');
+  }catch(err){toast('⚠️ '+err.message);}
+}
+// Video de fondo por link directo (MP4/WebM). Se guarda en la config (nube).
+function admSetHeroVideo(){
+  const inp=document.getElementById('adm-hero-video-url');if(!inp)return;
+  const url=inp.value.trim();
+  const cfg=gCfg();
+  if(!url){delete cfg.heroBg;}
+  else{
+    if(!/^https?:\/\/.+\.(mp4|webm|ogv)(\?.*)?$/i.test(url)){toast('⚠️ Tiene que ser un link directo a un archivo .mp4 o .webm');return;}
+    cfg.heroBg={type:'video',url};
+  }
+  sCfg(cfg);sBG({});applyHeroBg();admUpdateBgPreview();
+  toast(url?'✅ Video de fondo guardado (visible para todas las visitas)':'Fondo de video quitado');
 }
 
-function admClearHeroBg(){sBG({});applyHeroBg();admUpdateBgPreview();toast('✅ Fondo removido');}
+function admClearHeroBg(){
+  const cfg=gCfg();delete cfg.heroBg;sCfg(cfg);
+  sBG({});
+  const inp=document.getElementById('adm-hero-video-url');if(inp)inp.value='';
+  applyHeroBg();admUpdateBgPreview();toast('✅ Fondo removido');
+}
 
 function admUpdateBgPreview(){
-  const bg=gBG();const prev=document.getElementById('adm-bg-prev');if(!prev)return;
+  const cfg=gCfg();const bg=(cfg.heroBg&&cfg.heroBg.url)?{type:cfg.heroBg.type,data:cfg.heroBg.url}:gBG();const prev=document.getElementById('adm-bg-prev');if(!prev)return;
+  const vi=document.getElementById('adm-hero-video-url');if(vi&&cfg.heroBg&&cfg.heroBg.type==='video')vi.value=cfg.heroBg.url;
   prev.innerHTML='';
   if(bg.type==='image'&&bg.data){
     const img=document.createElement('img');img.src=bg.data;img.style.cssText='width:100%;height:100%;object-fit:cover;';prev.appendChild(img);
@@ -1703,6 +1740,8 @@ function getTakenSlots(dateStr){
   };
 
   window.icarSaveTurno=function(){
+  try{const _b=window.event&&window.event.target;if(_b&&_b.tagName==='BUTTON'){_b.disabled=true;setTimeout(()=>{_b.disabled=false;},1600);}}catch(e){}
+
     const name=document.getElementById('ict-name').value.trim();
     const tel=document.getElementById('ict-tel').value.trim();
     const date=document.getElementById('ict-date').value;
@@ -1735,8 +1774,8 @@ function renderIcarousel(){
     const priceLbl=isFree?'Gratis':c.price;
     const thumbContent=c.coverImg?`<img src="${c.coverImg}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.5),transparent);"></div><span style="position:relative;z-index:1;font-size:38px;">${c.emoji}</span>`:c.emoji;
     const priceTag=isFree?'':`<span style="position:absolute;top:7px;right:7px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:50px;z-index:2;">${priceLbl}</span>`;
-    if(c.locked) return `<div class="icp-ccard" style="opacity:.55;cursor:default;"><div class="icp-thumb" style="background:${c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${c.levelLabel}</span><div class="icp-name">${c.title}</div><div class="icp-meta">🔒 Próximamente</div></div></div>`;
-    return `<div class="icp-ccard" onclick="openAuth('r')"><div class="icp-thumb" style="background:${c.coverImg?'#0a0005':c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${c.levelLabel}</span><div class="icp-name">${c.title}</div><div class="icp-meta">📹 ${tot} clases · ${(c.modules||[]).length} módulos</div></div></div>`;
+    if(c.locked) return `<div class="icp-ccard" style="opacity:.55;cursor:default;"><div class="icp-thumb" style="background:${c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${c.levelLabel}</span><div class="icp-name">${c.title}</div><div class="icp-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Próximamente</div></div></div>`;
+    return `<div class="icp-ccard" onclick="openAuth('r')"><div class="icp-thumb" style="background:${c.coverImg?'#0a0005':c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${c.levelLabel}</span><div class="icp-name">${c.title}</div><div class="icp-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot} clases · ${(c.modules||[]).length} módulos</div></div></div>`;
   }).join('');
   // ebooks
   const ebs = gEB();
@@ -1779,13 +1818,44 @@ function updateDashStats(){
   sv('stat-done', totalDone);
   sv('stat-done-sub', `de ${totalLessons} clases`);
   sv('stat-pct', pct + '%');
-  sv('stat-pct-sub', 'en todos los cursos');
+  sv('stat-pct-sub', _weeklyTrend(pct) || 'en todos los cursos');
   sv('stat-certs', completedCourses);
   sv('stat-certs-sub', completedCourses === 1 ? 'curso completado' : 'cursos completados');
+  // Banner v2: anillo de progreso + próxima clase + botón continuar
+  const ring = document.getElementById('wb-ring');
+  if(ring){
+    ring.style.background = `conic-gradient(var(--gold) 0 ${pct}%, rgba(255,255,255,.12) ${pct}% 100%)`;
+    const rp = document.getElementById('wb-ring-pct'); if(rp) rp.textContent = pct + '%';
+    const btn = document.getElementById('wb-continue');
+    const ws = document.getElementById('wsub');
+    const target = inProgress.filter(x => x.pct > 0 && x.pct < 100).sort((a,b) => b.pct - a.pct)[0] || null;
+    if(target){
+      const nl = findNextLesson(target.c);
+      if(ws && nl) ws.innerHTML = 'Vas por <strong>' + _escHtml(nl.title) + '</strong> · clase ' + Math.min(target.done + 1, target.lessons) + ' de ' + target.lessons;
+      window._wbCourseId = target.c.id;
+      if(btn) btn.style.display = '';
+    } else {
+      window._wbCourseId = undefined;
+      if(btn) btn.style.display = 'none';
+      if(ws) ws.textContent = 'Continuá donde lo dejaste y seguí avanzando.';
+    }
+  }
   // continue cards
   renderContinueCards(inProgress);
   // progress page
   renderProgressPage(pct, totalDone, totalLessons);
+}
+function wbContinue(){ if(window._wbCourseId !== undefined) openViewer(window._wbCourseId); }
+// Tendencia semanal: compara el progreso con una foto guardada hace ≤7 días
+function _weeklyTrend(pct){
+  let s = null; try{ s = JSON.parse(localStorage.getItem('ms_prog_week')); }catch(e){}
+  const now = Date.now();
+  if(!s || typeof s.pct !== 'number' || now - s.ts > 7*24*60*60*1000){
+    localStorage.setItem('ms_prog_week', JSON.stringify({ts: now, pct}));
+    return '';
+  }
+  const d = pct - s.pct;
+  return d > 0 ? ('↑ subiste ' + d + '% esta semana') : '';
 }
 
 function renderContinueCards(inProgress){
@@ -1801,18 +1871,21 @@ function renderContinueCards(inProgress){
   if(hdg) hdg.style.display = '';
   wrap.innerHTML = showing.map(({c, done, lessons, pct}) => {
     const nextLesson = findNextLesson(c);
-    const nextTxt = nextLesson ? nextLesson.title : 'Continuar';
-    return `<div class="cc" onclick="openViewer(${c.id})">
-      <div class="cc-thumb">${c.emoji}</div>
-      <div style="flex:1;min-width:0;">
-        <div class="cc-title">${c.title}</div>
-        <div class="cc-meta">${nextTxt}</div>
-        <div class="pb"><div class="pf" style="width:${pct}%"></div></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px;">
-          <div class="pl">${pct}% completado</div>
-          ${pct===100 ? '<button class="cert-badge" onclick="event.stopPropagation();showCert('+c.id+')">✦ Certificado</button>' : ''}
-        </div>
+    const nextTxt = nextLesson ? ('Sigue: ' + nextLesson.title + (nextLesson.duration ? ' · ' + nextLesson.duration : '')) : 'Curso completo';
+    const th = c.coverImg
+      ? `<img src="${_escHtml(c.coverImg)}" alt="" loading="lazy">`
+      : `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg>`;
+    const cierre = pct === 100
+      ? '<button class="cert-badge" onclick="event.stopPropagation();showCert('+c.id+')">✦ Certificado</button>'
+      : `<div class="cc2-pct">${pct}%</div><div class="cc2-go">▸</div>`;
+    return `<div class="cc2" onclick="openViewer(${c.id})">
+      <div class="cc2-th" style="${c.coverImg ? '' : 'background:' + (c.color || 'linear-gradient(135deg,#3D2B1F,#8B5E3C)')};">${th}</div>
+      <div class="cc2-body">
+        <div class="cc2-t">${_escHtml(c.title)}</div>
+        <div class="cc2-m">${_escHtml(nextTxt)}</div>
+        <div class="cc2-bar"><i style="width:${pct}%"></i></div>
       </div>
+      ${cierre}
     </div>`;
   }).join('');
 }
