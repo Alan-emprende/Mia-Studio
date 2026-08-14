@@ -772,7 +772,7 @@ body.dark-mode .sb-item.active{background:var(--c1) !important;}
 body.dark-mode .mcard,.dark-mode .auth-card{background:#1A0009;border-color:#2A0818;}
 body.dark-mode .perfil-section{background:rgba(255,255,255,.04);border-color:#2A0818;}
 body.dark-mode .topbar,body.dark-mode .sidebar,body.dark-mode .scard,body.dark-mode .cc{background:rgba(255,255,255,.04);border-color:rgba(201,168,76,.15);}
-body.dark-mode .fg input,body.dark-mode .fg select,body.dark-mode .fg textarea{background:rgba(255,255,255,.06);border-color:rgba(201,168,76,.2);color:var(--cr);}
+body.dark-mode .fg input,body.dark-mode .fg select,body.dark-mode .fg textarea{background:rgba(255,255,255,.06);border-color:rgba(201,168,76,.2);color:var(--dark);}
 body.dark-mode .les-card,body.dark-mode .mod-acc{background:rgba(255,255,255,.04);border-color:rgba(201,168,76,.15);}
 body.dark-mode .les-card-body{background:rgba(255,255,255,.03);}
 body.dark-mode .search-inp{background:rgba(255,255,255,.06);border-color:rgba(201,168,76,.2);color:var(--goldl);}

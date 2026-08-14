@@ -68,7 +68,24 @@ async function _updateTakenSlot(date,time,taken){
     await _db.collection('site').doc('taken').set({v:{[date]:taken?FV.arrayUnion(time):FV.arrayRemove(time)}},{merge:true});
   }catch(e){}
 }
+// Aviso por email a la dueña con cada turno nuevo (servicio FormSubmit, sin backend).
+// La PRIMERA vez FormSubmit manda un mail de activación a esa casilla: hay que aceptarlo una única vez.
+function _notifyTurnoEmail(t){
+  try{
+    fetch('https://formsubmit.co/ajax/'+ADMIN_CLOUD_EMAIL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({
+        _subject:'📅 Nuevo turno: '+(t.serv||'Consulta')+' — '+(t.date||'sin fecha'),
+        _template:'table',
+        Nombre:t.name||'', Telefono:t.tel||'', Servicio:t.serv||'',
+        Fecha:t.date||'', Hora:t.time||'', Mensaje:t.msg||''
+      })
+    }).catch(()=>{});
+  }catch(e){}
+}
 async function _turnoCloudSave(t){
+  _notifyTurnoEmail(t);
   if(!_fbReady||!_db)return;
   try{
     const data={...t};
@@ -803,6 +820,11 @@ function loadAdminData(){
       admPage('estetica');
       toast('✅ Datos actualizados');
       _admCheckCloudAuth();
+      // Avisar cuántos turnos pendientes hay al entrar al panel
+      loadTurnosCloud().then(ok=>{
+        const p=gT().filter(t=>(t.status||'pending')==='pending').length;
+        if(p)setTimeout(()=>toast('📅 Tenés '+p+' turno'+(p!==1?'s':'')+' pendiente'+(p!==1?'s':'')+' por confirmar'),1500);
+      });
     }).catch(()=>admPage('estetica'));
   } else {
     admPage('estetica');
