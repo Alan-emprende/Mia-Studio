@@ -1719,7 +1719,7 @@ function getTakenSlots(dateStr){
     window._selSlot='';
     const selDiv=document.getElementById('ict-slot-selected');if(selDiv)selDiv.style.display='none';
   };
-  window._selSlot='';window._selServ='';window._ictStep=0;
+  window._selSlot='';window._selServ='';window._selServs=[];if(typeof renderTurnoServChips==='function')renderTurnoServChips([]);window._ictStep=0;
 
   window.icarSelSlot=function(el,time){
     document.querySelectorAll('.ict-slot').forEach(e=>e.classList.remove('sel'));
@@ -1742,7 +1742,7 @@ function getTakenSlots(dateStr){
       if(!window._selSlot){toast('⚠️ Elegí un horario disponible');return;}
       const resumen=document.getElementById('ict-resumen');
       if(resumen){
-        const serv=window._selServ||'Sin especificar';
+        const serv=(window._selServs&&window._selServs.length)?window._selServs.join(' + '):(window._selServ||'Sin especificar');
         resumen.innerHTML='<strong>📋 Resumen de tu reserva:</strong><br>📌 Servicio: '+serv+'<br>📅 Fecha: '+date+'<br>⏰ Horario: '+window._selSlot;
       }
     }
@@ -1754,7 +1754,7 @@ function getTakenSlots(dateStr){
   };
 
   window.icarResetForm=function(){
-    window._selSlot='';window._selServ='';window._ictStep=0;
+    window._selSlot='';window._selServ='';window._selServs=[];if(typeof renderTurnoServChips==='function')renderTurnoServChips([]);window._ictStep=0;
     ['ict-name','ict-tel','ict-date','ict-msg'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.querySelectorAll('.icp-tserv,.service-card').forEach(e=>e.classList.remove('sel'));
     const grid=document.getElementById('ict-slots-grid');
@@ -1770,7 +1770,7 @@ function getTakenSlots(dateStr){
     const date=document.getElementById('ict-date').value;
     if(!name||!tel){toast('⚠️ Nombre y teléfono son requeridos');return;}
     if(!date||!window._selSlot){toast('⚠️ Falta fecha u horario');return;}
-    const serv=window._selServ||'Consulta';
+    const serv=(window._selServs&&window._selServs.length)?window._selServs.join(' + '):(window._selServ||'Consulta');
     const turno={id:Date.now(),name,tel,serv,date,time:window._selSlot,msg:document.getElementById('ict-msg').value.trim(),status:'pending',ts:new Date().toLocaleDateString('es-AR')};
     const t=gT();t.push(turno);sT(t);
     _turnoCloudSave(turno);_updateTakenSlot(turno.date,turno.time,true);
@@ -3597,7 +3597,7 @@ function dashNextStep(prefix,step){
 }
 
 function dashResetForm(prefix){
-  _dashSlot[prefix]='';_dashServ[prefix]='';_dashStep[prefix]=0;
+  _dashSlot[prefix]='';_dashServ[prefix]='';if(typeof _dashServs!=='undefined')_dashServs[prefix]=[];_dashStep[prefix]=0;
   const dateEl=document.getElementById(prefix+'-date');if(dateEl)dateEl.value='';
   const nameEl=document.getElementById(prefix+'-name');if(nameEl)nameEl.value='';
   const telEl=document.getElementById(prefix+'-tel');if(telEl)telEl.value='';
@@ -3611,16 +3611,15 @@ function dashResetForm(prefix){
 
 // Override setTurnoService to also store in _dashServ
 const _origSetServ=typeof setTurnoService==='function'?setTurnoService:null;
-function setTurnoService(serv){
-  _dashServ.t=serv;
-  document.querySelectorAll('#cpanel-turnos .tsv').forEach(e=>e.classList.remove('sel'));
-  event.currentTarget.classList.add('sel');
+const _dashServs={t:[],t2:[]};
+function _dashToggleServ(prefix,serv,el){
+  const a=_dashServs[prefix];const i=a.indexOf(serv);
+  if(i>=0){a.splice(i,1);el.classList.remove('sel');}
+  else{a.push(serv);el.classList.add('sel');}
+  _dashServ[prefix]=a.join(' + '); // los guardados existentes siguen funcionando
 }
-function setTurnoService2(serv){
-  _dashServ.t2=serv;
-  document.querySelectorAll('#explorer-turnos .tsv').forEach(e=>e.classList.remove('sel'));
-  event.currentTarget.classList.add('sel');
-}
+function setTurnoService(serv){_dashToggleServ('t',serv,event.currentTarget);}
+function setTurnoService2(serv){_dashToggleServ('t2',serv,event.currentTarget);}
 
 // Override saveTurno to use slot
 const _origSaveTurno=typeof saveTurno==='function'?saveTurno:null;
@@ -3940,6 +3939,9 @@ function renderServicesLanding(){
         </span>
       </button>`;
     }).join('')}</div>
+  </div>
+  <div style="text-align:center;margin-top:20px;">
+    <a class="btn-g" href="servicios.html" style="text-decoration:none;padding:11px 28px;">Ver catálogo completo de servicios →</a>
   </div>`;
   svcFeature(0,false);
 }
@@ -3980,11 +3982,30 @@ function svcShowFeatMedia(mi){
 // Al reservar: abre el modal con el servicio ya elegido
 function icarChooseService(idx){
   const s=gServ()[idx];if(!s)return;
-  window._selServ=s.name;
-  const chosen=document.getElementById('ict-serv-chosen');
-  if(chosen){chosen.textContent='Servicio elegido: '+s.name;chosen.style.display='';}
-  openOv('turno-modal');
+  turnoOpenModal(s.name);
+}
+// Abre el modal de reserva (desde la landing o desde servicios.html),
+// con un servicio preseleccionado si corresponde.
+function turnoOpenModal(pre){
+  renderTurnoServChips(pre?[pre]:[]);
   if(typeof icarNextStep==='function')icarNextStep(0);
+  openOv('turno-modal');
+}
+// Chips de servicios (se pueden marcar varios: pestañas + cejas, etc.)
+window._selServs=[];
+function renderTurnoServChips(presel){
+  const box=document.getElementById('ict-serv-chips');if(!box)return;
+  window._selServs=Array.isArray(presel)?presel.slice():(presel?[presel]:[]);
+  let nombres=[];
+  try{nombres=gServ().map(s=>s.name);}catch(e){return;} // aún cargando el script
+  window._selServs.forEach(p=>{if(nombres.indexOf(p)<0)nombres.unshift(p);});
+  box.innerHTML=nombres.map(n=>`<button type="button" class="turno-chip${window._selServs.indexOf(n)>=0?' sel':''}" data-serv="${_escHtml(n)}" onclick="turnoToggleServ(this)">${_escHtml(n)}</button>`).join('');
+}
+function turnoToggleServ(btn){
+  const n=btn.dataset.serv;
+  const i=window._selServs.indexOf(n);
+  if(i>=0){window._selServs.splice(i,1);btn.classList.remove('sel');}
+  else{window._selServs.push(n);btn.classList.add('sel');}
 }
 
 // Botones de servicio del dashboard, generados desde los mismos datos
@@ -4200,6 +4221,17 @@ const gSvcPage = () => {
 const sSvcPage = v => { localStorage.setItem('ms_services_page', JSON.stringify(v)); _fsSet('services_page', v); };
 
 // ── Render de servicios.html ──
+// Si una sección del catálogo no tiene foto propia, usa la del servicio
+// del inicio cuyo nombre se parezca (comparten imágenes entre las dos vistas).
+function _svcImgForCat(nombre){
+  const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const palabras=norm(nombre).split(/\s+/).filter(w=>w.length>=5);
+  for(const s of gServ()){
+    const sn=norm(s.name);
+    if(palabras.some(w=>sn.includes(w))&&(s.imgs||[]).length)return s.imgs[0];
+  }
+  return '';
+}
 function renderServicesPage(){
   const d = gSvcPage();
   const set=(id,txt)=>{const el=document.getElementById(id);if(el)el.textContent=txt;};
@@ -4219,14 +4251,14 @@ function renderServicesPage(){
   if(wrap) wrap.innerHTML=d.cats.map((c,ci)=>`
     <section class="sp-cat" id="cat-${_escHtml(c.id)}">
       <div class="sp-cat-head${ci%2?' rev':''}">
-        <div class="sp-cat-media">${c.img?`<img src="${_escHtml(_cldOpt(c.img,700))}" alt="" loading="lazy">`:`<div class="sp-cat-ph"><span>${_escHtml((c.name||'S').charAt(0))}</span></div>`}</div>
+        <div class="sp-cat-media">${(c.img||_svcImgForCat(c.name))?`<img src="${_escHtml(_cldOpt(c.img||_svcImgForCat(c.name),700))}" alt="" loading="lazy">`:`<div class="sp-cat-ph"><span>${_escHtml((c.name||'S').charAt(0))}</span></div>`}</div>
         <div class="sp-cat-info">
           <h2>${_escHtml(c.name)}</h2>
           <p>${_escHtml(c.desc||'')}</p>
           <div class="sp-items">
             ${(c.items||[]).map(it=>`<div class="sp-item"><div class="sp-item-n">${_escHtml(it.n)}${it.note?`<span class="sp-item-note">${_escHtml(it.note)}</span>`:''}</div><div class="sp-item-p">${_escHtml(it.p)}</div></div>`).join('')}
           </div>
-          <a class="btn-gold sp-book" href="index.html?abrir=turnos">Reservar turno</a>
+          <button class="btn-gold sp-book" data-cat="${_escHtml(c.name)}" onclick="turnoOpenModal(this.dataset.cat)">Reservar turno</button>
         </div>
       </div>
     </section>`).join('');

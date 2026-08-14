@@ -1318,3 +1318,11 @@ body.light-mode .cc2-bar{background:rgba(140,0,38,.1);}
 .hero h1{text-shadow:0 2px 24px rgba(13,0,5,.55);}
 .hero p{text-shadow:0 1px 12px rgba(13,0,5,.6);color:rgba(255,248,240,.82);}
 @media(prefers-reduced-motion:reduce){.hero-kb{animation:none;}}
+
+/* ═══ CHIPS DE SERVICIOS EN EL MODAL DE RESERVA (multi-selección) ═══ */
+.turno-chips-lbl{font-size:11.5px;color:var(--muted);margin-bottom:8px;letter-spacing:.05em;text-transform:uppercase;}
+.turno-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;}
+.turno-chip{background:rgba(255,255,255,.05);border:1px solid rgba(201,168,76,.3);color:rgba(255,248,240,.75);padding:8px 15px;border-radius:50px;font-size:12.5px;cursor:pointer;font-family:var(--fb);transition:.2s;}
+.turno-chip:hover{border-color:var(--gold);}
+.turno-chip.sel{background:var(--gold);color:#1A0008;border-color:var(--gold);font-weight:600;}
+.turno-chips{max-height:150px;overflow-y:auto;padding-right:4px;}
