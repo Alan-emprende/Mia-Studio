@@ -43,7 +43,7 @@ async function _fsGet(key){if(!_fbReady||!_db)return null;try{const d=await _db.
 async function _fsSet(key,value){if(!_fbReady||!_db)return;try{const s=JSON.stringify(value);if(s.length>900000)return;await _db.collection('site').doc(key).set({v:value,t:Date.now()});}catch(e){}}
 async function _syncSiteFromCloud(){
   if(!_fbReady||!_db)return;
-  const KEYS=[{ls:KC,fs:'courses'},{ls:KF,fs:'faq'},{ls:KI,fs:'info'},{ls:KFT,fs:'features'},{ls:KR,fs:'recursos'},{ls:KEB,fs:'ebooks'},{ls:KCF,fs:'config'},{ls:KES,fs:'estetics'},{ls:'ms_banner',fs:'banner'},{ls:'ms_social',fs:'social'},{ls:KSL,fs:'slots'},{ls:'ms_reviews',fs:'reviews_list'},{ls:'ms_taken',fs:'taken'},{ls:'ms_services',fs:'services'}];
+  const KEYS=[{ls:KC,fs:'courses'},{ls:KF,fs:'faq'},{ls:KI,fs:'info'},{ls:KFT,fs:'features'},{ls:KR,fs:'recursos'},{ls:KEB,fs:'ebooks'},{ls:KCF,fs:'config'},{ls:KES,fs:'estetics'},{ls:'ms_banner',fs:'banner'},{ls:'ms_social',fs:'social'},{ls:KSL,fs:'slots'},{ls:'ms_reviews',fs:'reviews_list'},{ls:'ms_taken',fs:'taken'},{ls:'ms_services',fs:'services'},{ls:'ms_services_page',fs:'services_page'}];
   for(const {ls,fs} of KEYS){try{const v=await _fsGet(fs);if(v!==null){const lc=localStorage.getItem(ls);if(lc!==JSON.stringify(v)){localStorage.setItem(ls,JSON.stringify(v));}}}catch(e){}}
 }
 async function _saveUserProfile(uid,data){if(!_fbReady||!_db)return;try{await _db.collection('users').doc(uid).set(data,{merge:true});}catch(e){}}
@@ -368,6 +368,7 @@ function renderLanding(){
   if(typeof renderReviewsLanding==='function')renderReviewsLanding();
   if(typeof renderFaqLanding==='function')renderFaqLanding();
   if(typeof renderServicesLanding==='function')renderServicesLanding();
+  if(typeof _abrirTurnosSiCorresponde==='function')_abrirTurnosSiCorresponde();
   // features
   const feats=gFt();
   const fg=document.getElementById('feat-grid');
@@ -846,7 +847,7 @@ function admPage(name){
     info:admRenderInfoPage,recursos:admRenderRecsList,
     analytics:function(){renderAnalytics();loadTurnosCloud().then(ok=>{if(ok)renderAnalytics();});},
     turnos:function(){admRenderTurnosList();admRenderSlots();loadTurnosCloud().then(ok=>{if(ok)admRenderTurnosList();});},
-    usuarios:admRenderUsersList,config:admRenderConfig};
+    usuarios:admRenderUsersList,config:admRenderConfig,svcpage:admRenderSvcPage};
   if(renders[name])renders[name]();
 }
 
@@ -4092,4 +4093,211 @@ function _cldOpt(url,w){
   if(!url||url.indexOf('res.cloudinary.com')<0||url.indexOf('/upload/')<0)return url;
   if(url.indexOf('/upload/f_auto')>=0)return url; // ya optimizada
   return url.replace('/upload/','/upload/f_auto,q_auto,w_'+(w||600)+'/');
+}
+
+
+// ═══════════════════════════════════════════════════════
+// PÁGINA DE SERVICIOS (servicios.html) — Catálogo 2026
+// Datos en localStorage 'ms_services_page' ↔ Firestore site/services_page.
+// Editable desde el panel admin ("🗂 Página Servicios").
+// ═══════════════════════════════════════════════════════
+const DEF_SERVICES_PAGE = {
+  heroTag: 'Catálogo 2026',
+  heroTitle: 'Nuestro trabajo es que te sientas hermosa',
+  heroSub: 'Conocé todos los servicios de Mira Estudio: pestañas, cejas, cosmetología, masajes y mucho más. Elegí el tuyo y reservá tu turno.',
+  heroImg: '',
+  promoTitle: 'Combo Miradas',
+  promoText: 'Lifting de pestañas + diseño, epilación, depilación y laminado de cejas. Todo en una sola sesión.',
+  promoPrice: '$30.000',
+  cats: [
+    { id:'pestanas', name:'Extensiones de pestañas', desc:'Técnica pelo a pelo: elegí el volumen ideal para tu mirada. El "service" es el retoque de mantenimiento.', img:'', items:[
+      {n:'Técnica clásica', p:'$20.000', note:'service $18.000'},
+      {n:'Volumen bajo', p:'$22.000', note:'service $20.000'},
+      {n:'Volumen medio', p:'$26.000', note:'service $23.000'},
+      {n:'Volumen alto', p:'$29.000', note:'service $26.000'},
+      {n:'Mega volumen', p:'$32.000', note:'service $27.000'},
+    ]},
+    { id:'efectos', name:'Efectos de pestañas', desc:'Estilos con personalidad para llevar tu mirada a otro nivel.', img:'', items:[
+      {n:'Híbridas', p:'$21.000', note:'service $18.000'},
+      {n:'Humedad / rímel', p:'$23.000', note:'service $21.000'},
+      {n:'Wispy', p:'$26.000', note:'service $23.000'},
+      {n:'Kim "K"', p:'$27.000', note:'sin retoques'},
+      {n:'Anime', p:'$28.500', note:'sin retoques'},
+      {n:'Half lash', p:'$35.000', note:'service $28.000'},
+      {n:'Delineado', p:'$30.000', note:'sin retoques'},
+      {n:'Foxy', p:'$35.000', note:'service $28.000'},
+    ]},
+    { id:'tech', name:'Pestañas tecnológicas', desc:'Fibras tech de última generación: más livianas, más duraderas, efectos increíbles.', img:'', items:[
+      {n:'Tech "Y"', p:'$23.000', note:'service $20.000'},
+      {n:'Tech "UU"', p:'$26.000', note:'service $23.000'},
+      {n:'Tech "W"', p:'$28.000', note:'service $26.000'},
+      {n:'Pestañas Borgoña', p:'$30.000', note:'service $25.000'},
+      {n:'Tech 4D', p:'$29.500', note:'service $27.000'},
+      {n:'Tech 5D', p:'$33.000', note:'service $29.500'},
+      {n:'Tech 6D', p:'$35.000', note:'service $33.000'},
+    ]},
+    { id:'miradas', name:'Lifting y cejas', desc:'Realzá tu mirada natural: lifting de pestañas y el diseño de cejas perfecto para tu rostro.', img:'', items:[
+      {n:'Lifting de pestañas', p:'$22.000', note:''},
+      {n:'Diseño, epilación y depilación de cejas', p:'$10.000', note:''},
+      {n:'Laminado de cejas', p:'$16.000', note:''},
+      {n:'Cejas completas (diseño + laminado)', p:'$23.000', note:''},
+      {n:'Combo Miradas (lifting + cejas completas)', p:'$30.000', note:''},
+    ]},
+    { id:'labios', name:'Servicio de labios', desc:'Hidratación profunda, color y definición para tus labios.', img:'', items:[
+      {n:'Hidralips', p:'$25.000', note:'ideal como preparación para micropigmentación'},
+      {n:'Henna Lips', p:'$27.000', note:'color semipermanente con tintes naturales'},
+      {n:'Micropigmentación de labios', p:'Consultar', note:'maquillaje semipermanente'},
+    ]},
+    { id:'cosmetologia', name:'Cosmetología y cosmiatría', desc:'GLOW: tratamientos faciales profesionales para renovar y cuidar tu piel.', img:'', items:[
+      {n:'Limpieza profesional', p:'$30.000', note:'rostro, axila y espalda · alta frecuencia incluida'},
+      {n:'Hidratación facial Baby Glow', p:'Consultar', note:'luminosidad natural y fresca'},
+      {n:'Hidratación doble mascarilla', p:'Consultar', note:''},
+      {n:'Peeling químico', p:'Consultar', note:'una vez por semana'},
+      {n:'Tratamiento capilar', p:'Consultar', note:'alta frecuencia con ozono'},
+    ]},
+    { id:'pedicuria', name:'Pedicuría profesional', desc:'Salud, higiene y buena apariencia para tus pies: mucho más que un esmaltado.', img:'', items:[
+      {n:'Pedicuría completa', p:'Desde $20.000', note:'limpieza, durezas, callos, uñas encarnadas, exfoliación, masaje y semipermanente'},
+    ]},
+    { id:'masajes', name:'Masajes', desc:'Aliviá tensiones y regalale a tu cuerpo un momento de bienestar.', img:'', items:[
+      {n:'Descontracturante', p:'Consultar', note:'alivia contracturas y tensión muscular'},
+      {n:'Piedras calientes', p:'Consultar', note:''},
+      {n:'Relajante', p:'Consultar', note:''},
+      {n:'Linfático', p:'Consultar', note:'moviliza líquidos y mejora la circulación'},
+      {n:'Reflexología', p:'Consultar', note:''},
+      {n:'Vendas taping', p:'Consultar', note:'lumbalgia, cervicalgia y más'},
+    ]},
+  ]
+};
+const gSvcPage = () => {
+  try {
+    const d = localStorage.getItem('ms_services_page');
+    const v = d ? JSON.parse(d) : null;
+    return (v && v.cats && v.cats.length) ? v : JSON.parse(JSON.stringify(DEF_SERVICES_PAGE));
+  } catch(e) { return JSON.parse(JSON.stringify(DEF_SERVICES_PAGE)); }
+};
+const sSvcPage = v => { localStorage.setItem('ms_services_page', JSON.stringify(v)); _fsSet('services_page', v); };
+
+// ── Render de servicios.html ──
+function renderServicesPage(){
+  const d = gSvcPage();
+  const set=(id,txt)=>{const el=document.getElementById(id);if(el)el.textContent=txt;};
+  set('sp-tag', d.heroTag); set('sp-title', d.heroTitle); set('sp-sub', d.heroSub);
+  const hi=document.getElementById('sp-hero-img');
+  if(hi){
+    const url=d.heroImg||'https://res.cloudinary.com/da0xdmu7k/image/upload/f_auto,q_auto,w_900/v1785279328/mira-estudio/hero/azfgqziwsctsdeckszab.png';
+    hi.src=_cldOpt(url,900);
+  }
+  // chips de navegación
+  const chips=document.getElementById('sp-chips');
+  if(chips) chips.innerHTML=d.cats.map(c=>`<a class="sp-chip" href="#cat-${_escHtml(c.id)}">${_escHtml(c.name)}</a>`).join('');
+  // promo
+  set('sp-promo-title', d.promoTitle); set('sp-promo-text', d.promoText); set('sp-promo-price', d.promoPrice);
+  // categorías
+  const wrap=document.getElementById('sp-cats');
+  if(wrap) wrap.innerHTML=d.cats.map((c,ci)=>`
+    <section class="sp-cat" id="cat-${_escHtml(c.id)}">
+      <div class="sp-cat-head${ci%2?' rev':''}">
+        <div class="sp-cat-media">${c.img?`<img src="${_escHtml(_cldOpt(c.img,700))}" alt="" loading="lazy">`:`<div class="sp-cat-ph"><span>${_escHtml((c.name||'S').charAt(0))}</span></div>`}</div>
+        <div class="sp-cat-info">
+          <h2>${_escHtml(c.name)}</h2>
+          <p>${_escHtml(c.desc||'')}</p>
+          <div class="sp-items">
+            ${(c.items||[]).map(it=>`<div class="sp-item"><div class="sp-item-n">${_escHtml(it.n)}${it.note?`<span class="sp-item-note">${_escHtml(it.note)}</span>`:''}</div><div class="sp-item-p">${_escHtml(it.p)}</div></div>`).join('')}
+          </div>
+          <a class="btn-gold sp-book" href="index.html?abrir=turnos">Reservar turno</a>
+        </div>
+      </div>
+    </section>`).join('');
+}
+
+// En la landing: abrir directo el panel de turnos si venimos de servicios.html
+function _abrirTurnosSiCorresponde(){
+  try{
+    const p=new URLSearchParams(location.search);
+    if(p.get('abrir')!=='turnos')return;
+    history.replaceState(null,'',location.pathname);
+    setTimeout(()=>{
+      document.querySelectorAll('.icar-panel').forEach(x=>x.classList.remove('open'));
+      const t=document.getElementById('icp-turnos');if(t)t.classList.add('open');
+      document.querySelectorAll('.icar-dot').forEach(dd=>dd.classList.toggle('active',dd.dataset.id==='turnos'));
+      const sec=document.querySelector('.icar-section');if(sec)sec.scrollIntoView({behavior:'smooth'});
+    },400);
+  }catch(e){}
+}
+
+// ── Admin: editor de la página de servicios ──
+function admRenderSvcPage(){
+  const d=gSvcPage();
+  const g=id=>document.getElementById(id);
+  if(g('svp-tag'))g('svp-tag').value=d.heroTag||'';
+  if(g('svp-title'))g('svp-title').value=d.heroTitle||'';
+  if(g('svp-sub'))g('svp-sub').value=d.heroSub||'';
+  if(g('svp-promo-title'))g('svp-promo-title').value=d.promoTitle||'';
+  if(g('svp-promo-text'))g('svp-promo-text').value=d.promoText||'';
+  if(g('svp-promo-price'))g('svp-promo-price').value=d.promoPrice||'';
+  const el=g('adm-svcpage-cats');if(!el)return;
+  el.innerHTML=d.cats.map((c,idx)=>`
+    <div class="arow">
+      <div class="arow-main">
+        <div class="adm-grid2" style="gap:8px;margin-bottom:7px;">
+          <div class="fg" style="margin:0;"><label>Nombre de la sección</label><input type="text" id="svp-cat-name-${idx}" value="${_escHtml(c.name)}"></div>
+          <div class="fg" style="margin:0;"><label>Foto de la sección</label>
+            <div class="svc-adm-imgs">
+              ${c.img?`<div class="svc-adm-img" style="background-image:url('${_escHtml(_cldOpt(c.img,160))}')"><button class="svc-adm-img-del" onclick="admSvcPageDelImg(${idx})">✕</button></div>`:''}
+              <label class="svc-adm-add">+<input type="file" accept="image/*" style="display:none;" onchange="admSvcPageAddImg(${idx},event)"></label>
+            </div>
+          </div>
+        </div>
+        <div class="fg" style="margin-bottom:7px;"><label>Descripción corta</label><textarea id="svp-cat-desc-${idx}" rows="2">${_escHtml(c.desc)}</textarea></div>
+        <div class="fg" style="margin:0;"><label>Servicios y precios (uno por línea: Nombre | Precio | Nota opcional)</label>
+          <textarea id="svp-cat-items-${idx}" rows="${Math.max(3,(c.items||[]).length+1)}">${(c.items||[]).map(it=>[it.n,it.p,it.note].filter((x,i)=>i<2||x).join(' | ')).map(_escHtml).join('\n')}</textarea>
+        </div>
+      </div>
+      <div class="arow-acts"><button class="abtn-del" onclick="admSvcPageDelCat(${idx})">✕</button></div>
+    </div>`).join('');
+}
+function _admSvcPageCollect(){
+  const d=gSvcPage();
+  const g=id=>document.getElementById(id);
+  if(g('svp-tag'))d.heroTag=g('svp-tag').value.trim();
+  if(g('svp-title'))d.heroTitle=g('svp-title').value.trim();
+  if(g('svp-sub'))d.heroSub=g('svp-sub').value.trim();
+  if(g('svp-promo-title'))d.promoTitle=g('svp-promo-title').value.trim();
+  if(g('svp-promo-text'))d.promoText=g('svp-promo-text').value.trim();
+  if(g('svp-promo-price'))d.promoPrice=g('svp-promo-price').value.trim();
+  d.cats.forEach((c,idx)=>{
+    if(g('svp-cat-name-'+idx))c.name=g('svp-cat-name-'+idx).value.trim();
+    if(g('svp-cat-desc-'+idx))c.desc=g('svp-cat-desc-'+idx).value.trim();
+    const ta=g('svp-cat-items-'+idx);
+    if(ta)c.items=ta.value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
+      const parts=l.split('|').map(x=>x.trim());
+      return {n:parts[0]||'', p:parts[1]||'', note:parts[2]||''};
+    }).filter(it=>it.n);
+  });
+  return d;
+}
+function admSvcPageSave(){
+  const d=_admSvcPageCollect();
+  sSvcPage(d);toast('✅ Página de servicios guardada');admRenderSvcPage();
+}
+function admSvcPageNewCat(){
+  const d=_admSvcPageCollect();
+  d.cats.push({id:'cat'+Date.now(),name:'Nueva sección',desc:'',img:'',items:[]});
+  sSvcPage(d);admRenderSvcPage();
+}
+function admSvcPageDelCat(idx){
+  if(!confirm('¿Eliminar esta sección completa?'))return;
+  const d=_admSvcPageCollect();d.cats.splice(idx,1);sSvcPage(d);admRenderSvcPage();
+}
+async function admSvcPageAddImg(idx,ev){
+  const file=ev.target.files[0];if(!file)return;
+  const d=_admSvcPageCollect();
+  try{
+    toast('☁ Subiendo foto...');
+    d.cats[idx].img=await uploadToCloudinary(file,'servicios-pagina');
+    sSvcPage(d);admRenderSvcPage();toast('✅ Foto de la sección actualizada');
+  }catch(e){toast('⚠️ '+e.message);}
+}
+function admSvcPageDelImg(idx){
+  const d=_admSvcPageCollect();d.cats[idx].img='';sSvcPage(d);admRenderSvcPage();
 }

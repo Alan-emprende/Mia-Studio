@@ -78,6 +78,7 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
       <button class="adm-ni" data-adm="faq" onclick="admPage('faq')">❓ FAQ</button>
       <button class="adm-ni" data-adm="reviews" onclick="admPage('reviews')">⭐ Testimonios</button>
       <button class="adm-ni" data-adm="servicios" onclick="admPage('servicios')">💅 Servicios</button>
+      <button class="adm-ni" data-adm="svcpage" onclick="admPage('svcpage')">🗂 Página Servicios</button>
       <button class="adm-ni" data-adm="info" onclick="admPage('info')">ℹ️ Info General</button>
       <button class="adm-ni" data-adm="recursos" onclick="admPage('recursos')">📎 Recursos</button>
       <div class="adm-group">Analíticas</div>
@@ -303,6 +304,33 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
       </div>
       <div id="adm-services-list"></div>
       <div style="margin-top:14px;"><button class="abtn" onclick="admSaveServicesAll()">Guardar servicios</button></div>
+    </div>
+
+    <!-- PÁGINA DE SERVICIOS (servicios.html) -->
+    <div class="adm-pg" id="adm-svcpage">
+      <div class="adm-pghdr"><h2>🗂 Página de Servicios</h2><p>El catálogo completo que se ve en <strong>servicios.html</strong> (link "Servicios" de la portada). Cada sección tiene su foto, descripción y lista de precios.</p></div>
+      <div class="acard">
+        <h3>Encabezado</h3>
+        <div class="adm-grid2" style="gap:8px;">
+          <div class="fg"><label>Etiqueta chica</label><input type="text" id="svp-tag"></div>
+          <div class="fg"><label>Título</label><input type="text" id="svp-title"></div>
+        </div>
+        <div class="fg" style="margin-bottom:0;"><label>Subtítulo</label><textarea id="svp-sub" rows="2"></textarea></div>
+      </div>
+      <div class="acard">
+        <h3>Banda de promoción</h3>
+        <div class="adm-grid2" style="gap:8px;">
+          <div class="fg"><label>Título de la promo</label><input type="text" id="svp-promo-title"></div>
+          <div class="fg"><label>Precio</label><input type="text" id="svp-promo-price"></div>
+        </div>
+        <div class="fg" style="margin-bottom:0;"><label>Texto</label><textarea id="svp-promo-text" rows="2"></textarea></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0;">
+        <h3 style="font-family:var(--fd);">Secciones del catálogo</h3>
+        <button class="abtn-add" onclick="admSvcPageNewCat()">+ Nueva sección</button>
+      </div>
+      <div id="adm-svcpage-cats"></div>
+      <div style="margin-top:14px;"><button class="abtn" onclick="admSvcPageSave()">Guardar página de servicios</button></div>
     </div>
 
     <!-- INFO -->
