@@ -127,11 +127,26 @@ body{background:#FFF8F0;color:#1A0008;}
 
 <footer class="sp-footer">© 2026 Mira Estudio · <a href="index.html">mirastudiotb.com</a></footer>
 
+<div class="modal-ov" id="svc-info-modal" onclick="hovClick(event,'svc-info-modal')">
+  <div class="mcard"><button class="mclose" onclick="closeOv('svc-info-modal')">✕</button>
+    <div class="svci-cat" id="svci-cat"></div>
+    <div class="svci-title" id="svci-title"></div>
+    <div class="svci-precio-row">
+      <span class="svci-precio" id="svci-price"></span>
+      <span class="svci-nota" id="svci-note"></span>
+    </div>
+    <div id="svci-gal"></div>
+    <p class="svci-text" id="svci-text"></p>
+    <button class="btn-gold" style="width:100%;padding:13px;" onclick="svcInfoReservar()">Reservar este servicio</button>
+  </div>
+</div>
+
 <div class="modal-ov" id="turno-modal" onclick="hovClick(event,'turno-modal')">
   <div class="mcard mcard-sm"><button class="mclose" onclick="closeOv('turno-modal')">✕</button>
           <div class="icp-tform">
             <div class="icp-tform-title">Reservá tu turno</div>
             <div class="turno-chips-lbl">Elegí tus servicios (podés marcar varios)</div>
+            <div id="ict-serv-resumen" class="turno-resumen" style="display:none;"></div>
             <div class="turno-chips" id="ict-serv-chips"></div>
             <div class="ict-steps-nav">
               <div class="ict-step-dot active" id="sdot-0"></div>

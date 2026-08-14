@@ -1326,3 +1326,41 @@ body.light-mode .cc2-bar{background:rgba(140,0,38,.1);}
 .turno-chip:hover{border-color:var(--gold);}
 .turno-chip.sel{background:var(--gold);color:#1A0008;border-color:var(--gold);font-weight:600;}
 .turno-chips{max-height:150px;overflow-y:auto;padding-right:4px;}
+
+/* ═══ BOTÓN "MÁS INFO" Y FICHA DE SERVICIO (servicios.html) ═══ */
+.sp-item-right{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.sp-info-btn{display:inline-flex;align-items:center;gap:5px;background:none;border:1px solid #E4CDB9;color:#8C0026;padding:6px 12px;border-radius:50px;font-family:var(--fb);font-size:11.5px;cursor:pointer;transition:.2s;white-space:nowrap;min-height:32px;}
+.sp-info-btn:hover{background:#FDF5DC;border-color:#C9A84C;}
+.sp-info-btn svg{flex-shrink:0;}
+@media(max-width:520px){
+  .sp-item{flex-wrap:wrap;}
+  .sp-item-right{width:100%;justify-content:space-between;margin-top:6px;}
+}
+/* Ficha */
+#svc-info-modal .mcard{max-width:600px;background:#FFF8F0;color:#1A0008;}
+.svci-cat{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A7A2A;margin-bottom:4px;}
+.svci-title{font-family:var(--fd);font-size:clamp(23px,3.4vw,31px);font-weight:500;color:#2A0818;line-height:1.15;margin-bottom:10px;}
+.svci-precio-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #F0E2D4;}
+.svci-precio{font-family:var(--fd);font-size:26px;font-weight:600;color:#8C0026;}
+.svci-nota{font-size:12.5px;color:#A08088;}
+.svci-main{border-radius:14px;overflow:hidden;aspect-ratio:4/3;background:#F3E4D6;margin-bottom:9px;}
+.svci-main img{width:100%;height:100%;object-fit:cover;display:block;animation:svcFade .3s ease both;}
+.svci-thumbs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px;}
+.svci-th{width:62px;height:46px;border-radius:8px;background-size:cover;background-position:center;border:1px solid #E4CDB9;cursor:pointer;padding:0;transition:.2s;}
+.svci-th:hover{border-color:#C9A84C;}
+.svci-th.active{border-color:#8C0026;box-shadow:0 0 0 1px #8C0026;}
+.svci-text{font-size:14.5px;line-height:1.75;color:#4A3038;margin-bottom:20px;}
+#svc-info-modal .mclose{color:#8C0026;}
+/* Editor admin: fichas por servicio */
+.svp-det{margin-top:8px;border:1px solid var(--adm-border,#2A0818);border-radius:10px;padding:8px 12px;}
+.svp-det summary{cursor:pointer;font-size:12.5px;color:var(--gold);padding:4px 0;}
+.svp-item-info{margin:10px 0;}
+.svp-item-info label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+.svp-item-info textarea{width:100%;font-size:13px;}
+.turno-resumen{background:rgba(201,168,76,.16);border:1px solid rgba(201,168,76,.35);color:var(--goldl);border-radius:12px;padding:8px 13px;font-size:12.5px;margin-bottom:9px;line-height:1.45;}
+/* Contraste corregido en la ficha (antes #A08088 quedaba por debajo del mínimo) */
+.svci-nota{color:#8A6A72;}
+.sp-item-note{color:#8A6A72;}
+.svci-cat{color:#8A6A2A;}
+/* Cerrar la ficha siempre accesible aunque el texto sea largo */
+#svc-info-modal .mclose{position:sticky;top:0;float:right;background:rgba(255,248,240,.95);border-radius:50%;z-index:3;}

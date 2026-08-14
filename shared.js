@@ -3,6 +3,10 @@
 // ════════════════════════════════════════════════════════
 
 
+// Escapa texto para insertarlo en HTML sin riesgo de inyección.
+// Declarada arriba de todo a propósito: la usan funciones de todo el archivo.
+function _escHtml(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
 // ═══ STORAGE KEYS ═══
 const KU='ms_users',KS='ms_session',KC='ms_courses',KT='ms_turnos',KF='ms_faq',KI='ms_info',KFT='ms_features',KR='ms_recursos',KEB='ms_ebooks',KCF='ms_config',KES='ms_estetics',KBG='ms_herobg',KSL='ms_slots';
 
@@ -1776,7 +1780,7 @@ function getTakenSlots(dateStr){
     _turnoCloudSave(turno);_updateTakenSlot(turno.date,turno.time,true);
     if(typeof pushNotif==='function')pushNotif('📅','Turno solicitado correctamente');
     const confirmTxt=document.getElementById('ict-confirm-txt');
-    if(confirmTxt)confirmTxt.innerHTML='<strong>'+serv+'</strong><br>📅 '+date+' a las <strong>'+window._selSlot+'</strong><br>📱 Te contactamos al '+tel;
+    if(confirmTxt)confirmTxt.innerHTML='<strong>'+_escHtml(serv)+'</strong><br>'+_escHtml(date)+' a las <strong>'+_escHtml(window._selSlot)+'</strong><br>Te contactamos al '+_escHtml(tel);
     icarNextStep(2);
   };
 
@@ -2248,17 +2252,17 @@ function admRenderTurnosList(){
       <tbody>${turnos.map(t => {
         const st = t.status || 'pending';
         return `<tr id="trow-${t.id}">
-          <td><strong>${t.name}</strong><br><span style="font-size:11px;color:var(--muted);">${t.ts||''}</span></td>
+          <td><strong>${_escHtml(t.name)}</strong><br><span style="font-size:11px;color:var(--muted);">${_escHtml(t.ts||'')}</span></td>
           <td>
-            <div style="font-size:13px;">${t.tel}</div>
-            <button class="wa-btn" style="margin-top:4px;" onclick="openWhatsApp('${t.tel}','${(t.name||'').replace(/'/g,'')}','${(t.serv||'').replace(/'/g,'')}','${t.date||''}')">
+            <div style="font-size:13px;">${_escHtml(t.tel)}</div>
+            <button class="wa-btn" style="margin-top:4px;" data-tel="${_escHtml(t.tel||'')}" data-nom="${_escHtml(t.name||'')}" data-serv="${_escHtml(t.serv||'')}" data-fecha="${_escHtml(t.date||'')}" onclick="openWhatsApp(this.dataset.tel,this.dataset.nom,this.dataset.serv,this.dataset.fecha)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.09.537 4.054 1.474 5.762L0 24l6.39-1.446A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.6c-1.969 0-3.81-.528-5.39-1.443l-.386-.228-4.002.906.924-3.893-.253-.4A9.56 9.56 0 012.4 12C2.4 6.698 6.698 2.4 12 2.4S21.6 6.698 21.6 12 17.302 21.6 12 21.6z"/></svg>
               WhatsApp
             </button>
           </td>
-          <td><span class="adm-badge">${t.serv}</span></td>
-          <td style="font-size:13px;">${t.date||'—'}</td>
-          <td style="max-width:160px;font-size:12px;color:var(--muted);">${t.msg||'—'}</td>
+          <td><span class="adm-badge">${_escHtml(t.serv)}</span></td>
+          <td style="font-size:13px;">${_escHtml(t.date||'—')}</td>
+          <td style="max-width:160px;font-size:12px;color:var(--muted);">${_escHtml(t.msg||'—')}</td>
           <td>
             <select class="turno-status ${statusClass[st]}" onchange="changeTurnoStatus(${t.id},this.value,this)" style="border:none;outline:none;cursor:pointer;font-size:11px;font-weight:600;padding:4px 8px;border-radius:50px;font-family:var(--fb);">
               <option value="pending" ${st==='pending'?'selected':''}>⏳ Pendiente</option>
@@ -3634,7 +3638,7 @@ function saveTurno(){
   const arr=gT();arr.push(turno);sT(arr);
   _turnoCloudSave(turno);_updateTakenSlot(turno.date,turno.time,true);
   const txt=document.getElementById('t-confirm-txt');
-  if(txt)txt.innerHTML='<strong>'+serv+'</strong><br>📅 '+date+' a las <strong>'+_dashSlot.t+'</strong><br>📱 Te contactamos al '+tel;
+  if(txt)txt.innerHTML='<strong>'+_escHtml(serv)+'</strong><br>'+_escHtml(date)+' a las <strong>'+_escHtml(_dashSlot.t)+'</strong><br>Te contactamos al '+_escHtml(tel);
   dashNextStep('t',2);
   if(typeof pushNotif==='function')pushNotif('📅','Turno solicitado correctamente');
 }
@@ -3649,7 +3653,7 @@ function saveTurno2(){
   const arr=gT();arr.push(turno);sT(arr);
   _turnoCloudSave(turno);_updateTakenSlot(turno.date,turno.time,true);
   const txt=document.getElementById('t2-confirm-txt');
-  if(txt)txt.innerHTML='<strong>'+serv+'</strong><br>📅 '+date+' a las <strong>'+_dashSlot.t2+'</strong><br>📱 Te contactamos al '+tel;
+  if(txt)txt.innerHTML='<strong>'+_escHtml(serv)+'</strong><br>'+_escHtml(date)+' a las <strong>'+_escHtml(_dashSlot.t2)+'</strong><br>Te contactamos al '+_escHtml(tel);
   dashNextStep('t2',2);
   if(typeof pushNotif==='function')pushNotif('📅','Turno solicitado correctamente');
 }
@@ -3797,7 +3801,6 @@ function switchCarousel(tab){
 // Estructura: [{name, role, stars(1-5), text}]
 const gRev=()=>{try{return JSON.parse(localStorage.getItem('ms_reviews')||'[]');}catch(e){return[];}};
 const sRev=v=>{localStorage.setItem('ms_reviews',JSON.stringify(v));_fsSet('reviews_list',v);};
-function _escHtml(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 function renderReviewsLanding(){
   const sec=document.getElementById('reviews-sec');
@@ -3997,15 +4000,36 @@ function renderTurnoServChips(presel){
   const box=document.getElementById('ict-serv-chips');if(!box)return;
   window._selServs=Array.isArray(presel)?presel.slice():(presel?[presel]:[]);
   let nombres=[];
-  try{nombres=gServ().map(s=>s.name);}catch(e){return;} // aún cargando el script
+  try{
+    // Unir el catálogo del inicio con el catálogo completo de la página de servicios
+    nombres=gServ().map(s=>s.name);
+    if(typeof gSvcPage==='function'){
+      (gSvcPage().cats||[]).forEach(c=>(c.items||[]).forEach(it=>{ if(it.n&&nombres.indexOf(it.n)<0)nombres.push(it.n); }));
+    }
+  }catch(e){return;} // aún cargando el script
   window._selServs.forEach(p=>{if(nombres.indexOf(p)<0)nombres.unshift(p);});
-  box.innerHTML=nombres.map(n=>`<button type="button" class="turno-chip${window._selServs.indexOf(n)>=0?' sel':''}" data-serv="${_escHtml(n)}" onclick="turnoToggleServ(this)">${_escHtml(n)}</button>`).join('');
+  // Los servicios ya elegidos van primero, para que se vean sin scrollear
+  nombres.sort((a,b)=>(window._selServs.indexOf(b)>=0?1:0)-(window._selServs.indexOf(a)>=0?1:0));
+  box.innerHTML=nombres.map(n=>{
+    const sel=window._selServs.indexOf(n)>=0;
+    return `<button type="button" class="turno-chip${sel?' sel':''}" data-serv="${_escHtml(n)}" aria-pressed="${sel}" onclick="turnoToggleServ(this)">${sel?'✓ ':''}${_escHtml(n)}</button>`;
+  }).join('');
+  _turnoUpdResumen();
 }
 function turnoToggleServ(btn){
   const n=btn.dataset.serv;
   const i=window._selServs.indexOf(n);
-  if(i>=0){window._selServs.splice(i,1);btn.classList.remove('sel');}
-  else{window._selServs.push(n);btn.classList.add('sel');}
+  if(i>=0){window._selServs.splice(i,1);btn.classList.remove('sel');btn.setAttribute('aria-pressed','false');btn.textContent=n;}
+  else{window._selServs.push(n);btn.classList.add('sel');btn.setAttribute('aria-pressed','true');btn.textContent='✓ '+n;}
+  _turnoUpdResumen();
+}
+// Resumen fijo arriba de los chips: la clienta siempre ve qué eligió
+function _turnoUpdResumen(){
+  const r=document.getElementById('ict-serv-resumen');if(!r)return;
+  const s=window._selServs||[];
+  if(!s.length){r.style.display='none';r.textContent='';return;}
+  r.style.display='';
+  r.textContent='Elegiste: '+s.join(' + ');
 }
 
 // Botones de servicio del dashboard, generados desde los mismos datos
@@ -4147,75 +4171,456 @@ function _cldOpt(url,w){
 const DEF_SERVICES_PAGE = {
   heroTag: 'Catálogo 2026',
   heroTitle: 'Nuestro trabajo es que te sientas hermosa',
-  heroSub: 'Conocé todos los servicios de Mira Estudio: pestañas, cejas, cosmetología, masajes y mucho más. Elegí el tuyo y reservá tu turno.',
+  heroSub: 'Conocé todos los servicios de Mira Estudio: pestañas, cejas, labios, cosmetología, pedicuría y masajes. Tocá «Más info» en cada servicio para ver fotos y todos los detalles.',
   heroImg: '',
   promoTitle: 'Combo Miradas',
-  promoText: 'Lifting de pestañas + diseño, epilación, depilación y laminado de cejas. Todo en una sola sesión.',
+  promoText: 'Lifting de pestañas + diseño, epilación, depilación y laminado de cejas. Toda la mirada resuelta en una sola sesión.',
   promoPrice: '$30.000',
   cats: [
-    { id:'pestanas', name:'Extensiones de pestañas', desc:'Técnica pelo a pelo: elegí el volumen ideal para tu mirada. El "service" es el retoque de mantenimiento.', img:'', items:[
-      {n:'Técnica clásica', p:'$20.000', note:'service $18.000'},
-      {n:'Volumen bajo', p:'$22.000', note:'service $20.000'},
-      {n:'Volumen medio', p:'$26.000', note:'service $23.000'},
-      {n:'Volumen alto', p:'$29.000', note:'service $26.000'},
-      {n:'Mega volumen', p:'$32.000', note:'service $27.000'},
-    ]},
-    { id:'efectos', name:'Efectos de pestañas', desc:'Estilos con personalidad para llevar tu mirada a otro nivel.', img:'', items:[
-      {n:'Híbridas', p:'$21.000', note:'service $18.000'},
-      {n:'Humedad / rímel', p:'$23.000', note:'service $21.000'},
-      {n:'Wispy', p:'$26.000', note:'service $23.000'},
-      {n:'Kim "K"', p:'$27.000', note:'sin retoques'},
-      {n:'Anime', p:'$28.500', note:'sin retoques'},
-      {n:'Half lash', p:'$35.000', note:'service $28.000'},
-      {n:'Delineado', p:'$30.000', note:'sin retoques'},
-      {n:'Foxy', p:'$35.000', note:'service $28.000'},
-    ]},
-    { id:'tech', name:'Pestañas tecnológicas', desc:'Fibras tech de última generación: más livianas, más duraderas, efectos increíbles.', img:'', items:[
-      {n:'Tech "Y"', p:'$23.000', note:'service $20.000'},
-      {n:'Tech "UU"', p:'$26.000', note:'service $23.000'},
-      {n:'Tech "W"', p:'$28.000', note:'service $26.000'},
-      {n:'Pestañas Borgoña', p:'$30.000', note:'service $25.000'},
-      {n:'Tech 4D', p:'$29.500', note:'service $27.000'},
-      {n:'Tech 5D', p:'$33.000', note:'service $29.500'},
-      {n:'Tech 6D', p:'$35.000', note:'service $33.000'},
-    ]},
-    { id:'miradas', name:'Lifting y cejas', desc:'Realzá tu mirada natural: lifting de pestañas y el diseño de cejas perfecto para tu rostro.', img:'', items:[
-      {n:'Lifting de pestañas', p:'$22.000', note:''},
-      {n:'Diseño, epilación y depilación de cejas', p:'$10.000', note:''},
-      {n:'Laminado de cejas', p:'$16.000', note:''},
-      {n:'Cejas completas (diseño + laminado)', p:'$23.000', note:''},
-      {n:'Combo Miradas (lifting + cejas completas)', p:'$30.000', note:''},
-    ]},
-    { id:'labios', name:'Servicio de labios', desc:'Hidratación profunda, color y definición para tus labios.', img:'', items:[
-      {n:'Hidralips', p:'$25.000', note:'ideal como preparación para micropigmentación'},
-      {n:'Henna Lips', p:'$27.000', note:'color semipermanente con tintes naturales'},
-      {n:'Micropigmentación de labios', p:'Consultar', note:'maquillaje semipermanente'},
-    ]},
-    { id:'cosmetologia', name:'Cosmetología y cosmiatría', desc:'GLOW: tratamientos faciales profesionales para renovar y cuidar tu piel.', img:'', items:[
-      {n:'Limpieza profesional', p:'$30.000', note:'rostro, axila y espalda · alta frecuencia incluida'},
-      {n:'Hidratación facial Baby Glow', p:'Consultar', note:'luminosidad natural y fresca'},
-      {n:'Hidratación doble mascarilla', p:'Consultar', note:''},
-      {n:'Peeling químico', p:'Consultar', note:'una vez por semana'},
-      {n:'Tratamiento capilar', p:'Consultar', note:'alta frecuencia con ozono'},
-    ]},
-    { id:'pedicuria', name:'Pedicuría profesional', desc:'Salud, higiene y buena apariencia para tus pies: mucho más que un esmaltado.', img:'', items:[
-      {n:'Pedicuría completa', p:'Desde $20.000', note:'limpieza, durezas, callos, uñas encarnadas, exfoliación, masaje y semipermanente'},
-    ]},
-    { id:'masajes', name:'Masajes', desc:'Aliviá tensiones y regalale a tu cuerpo un momento de bienestar.', img:'', items:[
-      {n:'Descontracturante', p:'Consultar', note:'alivia contracturas y tensión muscular'},
-      {n:'Piedras calientes', p:'Consultar', note:''},
-      {n:'Relajante', p:'Consultar', note:''},
-      {n:'Linfático', p:'Consultar', note:'moviliza líquidos y mejora la circulación'},
-      {n:'Reflexología', p:'Consultar', note:''},
-      {n:'Vendas taping', p:'Consultar', note:'lumbalgia, cervicalgia y más'},
-    ]},
+    {
+      "id": "pestanas",
+      "name": "Extensiones de pestañas",
+      "img": "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725354/mira-estudio/catalogo/jqupmfxjsfduxxto328y.jpg",
+      "imgs": [
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725354/mira-estudio/catalogo/jqupmfxjsfduxxto328y.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725355/mira-estudio/catalogo/at6a0nceus4nseu3wljj.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725356/mira-estudio/catalogo/hfsdmxzrrit2sw6zstzk.jpg"
+      ],
+      "desc": "Técnica pelo a pelo: elegí el volumen ideal para tu mirada. El \"service\" es el retoque de mantenimiento.",
+      "info": "Las extensiones pelo a pelo se colocan una por una sobre cada pestaña natural. La técnica clásica es 1:1, o sea una extensión por cada pestaña natural, y de ahí suben los volúmenes hasta el mega volumen. Donde dice \"service\", ese es el valor del retoque de mantenimiento.",
+      "items": [
+        {
+          "n": "Técnica clásica",
+          "p": "$20.000",
+          "note": "service $18.000",
+          "info": ""
+        },
+        {
+          "n": "Volumen bajo",
+          "p": "$22.000",
+          "note": "service $20.000",
+          "info": ""
+        },
+        {
+          "n": "Volumen medio",
+          "p": "$26.000",
+          "note": "service $23.000",
+          "info": ""
+        },
+        {
+          "n": "Volumen alto",
+          "p": "$29.000",
+          "note": "service $26.000",
+          "info": ""
+        },
+        {
+          "n": "Mega volumen",
+          "p": "$32.000",
+          "note": "service $27.000",
+          "info": ""
+        }
+      ]
+    },
+    {
+      "id": "efectos",
+      "name": "Efectos de pestañas",
+      "img": "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725357/mira-estudio/catalogo/ntqroh3xya4827yhcu0q.jpg",
+      "imgs": [
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725357/mira-estudio/catalogo/ntqroh3xya4827yhcu0q.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725355/mira-estudio/catalogo/at6a0nceus4nseu3wljj.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725356/mira-estudio/catalogo/hfsdmxzrrit2sw6zstzk.jpg"
+      ],
+      "desc": "Cada efecto es un diseño distinto: elegí la mirada que más te guste.",
+      "info": "Los efectos son las distintas formas de armar las extensiones: cada nombre es un diseño diferente. Se dividen en efectos de pestañas (híbridas, humedad o rímel, wispy y Kim \"K\") y efectos estilizantes (anime, half lash, delineado y foxy). Donde dice \"service\" ese es el valor del mantenimiento; los que figuran como \"sin retoques\" no tienen precio de service.",
+      "items": [
+        {
+          "n": "Híbridas",
+          "p": "$21.000",
+          "note": "service $18.000",
+          "info": ""
+        },
+        {
+          "n": "Humedad / rímel",
+          "p": "$23.000",
+          "note": "service $21.000",
+          "info": ""
+        },
+        {
+          "n": "Wispy",
+          "p": "$26.000",
+          "note": "service $23.000",
+          "info": ""
+        },
+        {
+          "n": "Kim \"K\"",
+          "p": "$27.000",
+          "note": "sin retoques",
+          "info": ""
+        },
+        {
+          "n": "Anime",
+          "p": "$28.500",
+          "note": "sin retoques",
+          "info": ""
+        },
+        {
+          "n": "Half lash",
+          "p": "$35.000",
+          "note": "service $28.000",
+          "info": ""
+        },
+        {
+          "n": "Delineado",
+          "p": "$30.000",
+          "note": "sin retoques",
+          "info": ""
+        },
+        {
+          "n": "Foxy",
+          "p": "$35.000",
+          "note": "service $28.000",
+          "info": ""
+        }
+      ]
+    },
+    {
+      "id": "tech",
+      "name": "Pestañas tecnológicas",
+      "img": "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725356/mira-estudio/catalogo/hfsdmxzrrit2sw6zstzk.jpg",
+      "imgs": [
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725356/mira-estudio/catalogo/hfsdmxzrrit2sw6zstzk.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725354/mira-estudio/catalogo/jqupmfxjsfduxxto328y.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725357/mira-estudio/catalogo/ntqroh3xya4827yhcu0q.jpg"
+      ],
+      "desc": "La línea tech, con sus armados y efectos propios.",
+      "info": "Las pestañas tecnológicas son una línea de diseños con distintas formas y armados: las \"Y\", las \"UU\", las \"W\", las versiones 4D, 5D y 6D, y las pestañas Borgoña. Aparte están los efectos tech (híbridas, wispy, Kim \"K\" y half lash), que son variantes dentro del mismo estilo. Mirá la nota al lado de cada nombre: algunas opciones tienen su valor de service y otras se hacen sin retoque.",
+      "items": [
+        {
+          "n": "Pestañas tech \"Y\"",
+          "p": "$23.000",
+          "note": "service $20.000",
+          "info": ""
+        },
+        {
+          "n": "Pestañas tech \"UU\"",
+          "p": "$26.000",
+          "note": "service $23.000",
+          "info": ""
+        },
+        {
+          "n": "Pestañas tech \"W\"",
+          "p": "$28.000",
+          "note": "service $26.000",
+          "info": ""
+        },
+        {
+          "n": "Pestañas Borgoña",
+          "p": "$30.000",
+          "note": "service $25.000",
+          "info": ""
+        },
+        {
+          "n": "Tech 4D",
+          "p": "$29.500",
+          "note": "service $27.000",
+          "info": ""
+        },
+        {
+          "n": "Tech 5D",
+          "p": "$33.000",
+          "note": "service $29.500",
+          "info": ""
+        },
+        {
+          "n": "Tech 6D",
+          "p": "$35.000",
+          "note": "service $33.000",
+          "info": ""
+        },
+        {
+          "n": "Efecto híbridas tech",
+          "p": "$23.000",
+          "note": "service $20.000",
+          "info": ""
+        },
+        {
+          "n": "Efecto wispy tech",
+          "p": "$26.000",
+          "note": "sin retoque",
+          "info": ""
+        },
+        {
+          "n": "Efecto Kim \"K\" tech",
+          "p": "$27.000",
+          "note": "sin retoque",
+          "info": ""
+        },
+        {
+          "n": "Efecto half lash tech",
+          "p": "$29.000",
+          "note": "sin retoque",
+          "info": ""
+        }
+      ]
+    },
+    {
+      "id": "miradas",
+      "name": "Cejas perfectas y lifting",
+      "img": "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725359/mira-estudio/catalogo/jndwbodb5cjgbcodcakr.jpg",
+      "imgs": [
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725359/mira-estudio/catalogo/jndwbodb5cjgbcodcakr.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725358/mira-estudio/catalogo/vin8fa8vbb680noaubcr.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725355/mira-estudio/catalogo/at6a0nceus4nseu3wljj.jpg"
+      ],
+      "desc": "El marco de tu mirada: diseño y laminado de cejas, y lifting de pestañas naturales.",
+      "info": "Esta sección trabaja sobre el marco de la mirada: cejas y pestañas. El diseño de cejas evalúa las facciones, la forma del rostro, la estructura ósea y las expresiones para crear el marco más favorecedor y armónico para tu cara. El laminado es un tratamiento semipermanente que alisa, peina y fija el vello en una dirección específica. Podés tomar cada servicio por separado o sumar el lifting de pestañas con el Combo Miradas.",
+      "items": [
+        {
+          "n": "Diseño, epilación y depilación de cejas",
+          "p": "$10.000",
+          "note": "",
+          "info": "El diseño de cejas es una técnica estética en la que se evalúan tus facciones, la forma del rostro, la estructura ósea y las expresiones para crear el marco de cejas más favorecedor y armónico para tu cara. En este servicio el diseño viene acompañado de la epilación y la depilación, así las cejas quedan definidas siguiendo ese trazado."
+        },
+        {
+          "n": "Laminado de cejas",
+          "p": "$16.000",
+          "note": "semipermanente",
+          "info": "El laminado de cejas es un tratamiento estético semipermanente pensado para alisar, peinar y fijar el vello de las cejas en una dirección específica. Es la opción indicada si tenés el vello desordenado o rebelde y buscás una ceja prolija y con la forma definida."
+        },
+        {
+          "n": "Cejas completas: diseño, epilación, depilación y laminado",
+          "p": "$23.000",
+          "note": "todo junto",
+          "info": "Reúne en una sola sesión el diseño de cejas con su epilación y depilación, más el laminado que alisa, peina y fija el vello. Es la opción para dejar la ceja completamente terminada de una sola vez."
+        },
+        {
+          "n": "Lifting de pestañas",
+          "p": "$22.000",
+          "note": "sobre tu pestaña natural",
+          "info": "El lifting trabaja sobre tus propias pestañas, sin extensiones. Es la alternativa si querés realzar tu mirada manteniendo tu pestaña natural."
+        },
+        {
+          "n": "Combo Miradas",
+          "p": "$30.000",
+          "note": "lifting + cejas completas",
+          "info": "El Combo Miradas reúne en una misma sesión el lifting de pestañas y el trabajo de cejas: diseño, depilación y laminado. Es la opción para resolver toda la mirada junta, en lugar de tomar cada servicio por separado."
+        }
+      ]
+    },
+    {
+      "id": "labios",
+      "name": "Servicios de labios",
+      "img": "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725360/mira-estudio/catalogo/sz3amwdydyes6mhwb9ih.jpg",
+      "imgs": [
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725360/mira-estudio/catalogo/sz3amwdydyes6mhwb9ih.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725360/mira-estudio/catalogo/s4kzb1stdnfgqs8pk7om.jpg"
+      ],
+      "desc": "Hidratación profunda, color y definición para tus labios.",
+      "info": "Tratamientos estéticos pensados para el color, la hidratación y la definición de los labios. Hay desde hidratación profunda de la piel labial hasta color semipermanente, con distintas duraciones: algunas opciones se mantienen una semana y otras, varios años.",
+      "items": [
+        {
+          "n": "Hidralips",
+          "p": "$25.000",
+          "note": "ideal antes de micropigmentación",
+          "info": "Hidralips es un tratamiento que hidrata en profundidad, regenera y rejuvenece la piel de los labios. A diferencia de un relleno de ácido hialurónico, su objetivo no es aumentar el volumen. Es ideal como preparación previa a la micropigmentación."
+        },
+        {
+          "n": "Henna Lips",
+          "p": "$27.000",
+          "note": "dura una semana",
+          "info": "Henna Lips, también conocido como lip blush temporal o tatuaje de henna en labios, es un tratamiento estético que le da color semipermanente y definición a los labios. Se realiza con tintes naturales a base de henna, formulados específicamente para la mucosa labial. La duración del resultado es de una semana."
+        },
+        {
+          "n": "Micropigmentación",
+          "p": "$100.000",
+          "note": "3 sesiones, 1 por mes · dura 1 a 3 años",
+          "info": "La micropigmentación es una técnica de maquillaje semipermanente: se implantan pigmentos hipoalergénicos en la capa epidérmica de la piel mediante microagujas. A diferencia del tatuaje tradicional, que es definitivo y penetra más profundo, el pigmento se va degradando de forma progresiva y el acabado es mucho más suave, natural y pulido. El tratamiento consta de tres sesiones, una por mes, y el resultado dura entre 1 y 3 años."
+        }
+      ]
+    },
+    {
+      "id": "cosmetologia",
+      "name": "Cosmetología y cosmiatría · GLOW",
+      "img": "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725361/mira-estudio/catalogo/ctvgqpzszgx89tlgfjij.jpg",
+      "imgs": [
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725361/mira-estudio/catalogo/ctvgqpzszgx89tlgfjij.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725362/mira-estudio/catalogo/cpdx51ozjxakzxkk58el.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725363/mira-estudio/catalogo/ngkov5fd3lge96kdhcu9.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725363/mira-estudio/catalogo/tynvwjxnxn74hadra8pu.jpg"
+      ],
+      "desc": "GLOW: tratamientos faciales profesionales para limpiar, hidratar y renovar tu piel.",
+      "info": "GLOW es el área de cosmetología y cosmiatría de Mira Estudio: tratamientos para limpiar, hidratar y renovar la piel. Vas a encontrar desde la limpieza profunda de cutis hasta peelings químicos, hidratación facial, tratamiento capilar y despigmentación. Algunos requieren varias sesiones para ver el resultado completo.",
+      "items": [
+        {
+          "n": "Limpieza profesional",
+          "p": "$30.000",
+          "note": "rostro, axila y espalda · alta frecuencia incluida",
+          "info": "Es una limpieza de cutis profunda pensada para destapar los poros, retirar células muertas, reequilibrar la piel y mejorar su textura y apariencia general. Se puede realizar en rostro, axila y espalda. Incluye higienización, diagnóstico cutáneo, tonificación, exfoliación, apertura de poros, extracción, desinfección, mascarillas, masajes faciales y protector solar, con alta frecuencia incluida."
+        },
+        {
+          "n": "Tratamiento capilar",
+          "p": "$26.000",
+          "note": "semanal",
+          "info": "Es un tratamiento de electroterapia: al pasar el electrodo en forma de peine sobre la piel, la corriente interactúa con el aire y produce ozono, lo que le da propiedades antisépticas, vasodilatadoras y purificantes. Mejora la absorción de nutrientes, regula la producción de sebo, estimula la circulación sanguínea, regula la caída y acelera el crecimiento. Se realiza en formato semanal."
+        },
+        {
+          "n": "Baby Glow",
+          "p": "$25.000",
+          "note": "con nano agujas",
+          "info": "Es un tratamiento de estética facial no invasivo diseñado para renovar la piel, emparejar el tono y devolverle una luminosidad natural y fresca. Se realiza con nano agujas."
+        },
+        {
+          "n": "Doble mascarilla",
+          "p": "$25.000",
+          "note": "hidratación profunda",
+          "info": "Combina suero de dextrosa (glucosa) y ácido hialurónico aplicados en formato de doble mascarilla. Es un protocolo enfocado en la recuperación, la hidratación profunda y la recarga energética de la piel."
+        },
+        {
+          "n": "Peeling químico",
+          "p": "$30.000",
+          "note": "por sesión · 1 vez por semana, como mucho cada dos",
+          "info": "Es un procedimiento dermoestético que consiste en aplicar una solución ácida sobre la piel para provocar una exfoliación controlada y acelerada. Al eliminar las capas de células muertas o dañadas, se fuerza a la piel a regenerarse y aparece una capa nueva más lisa, luminosa y uniforme. Se realiza una vez por semana, como mucho cada dos."
+        },
+        {
+          "n": "Despigmentación",
+          "p": "Consultar",
+          "note": "mínimo 6 sesiones · axilas, rodillas y codos",
+          "info": "Es un tratamiento de 6 sesiones como mínimo, pensado principalmente para axilas. También se puede realizar en rodillas y codos. Al necesitar varias sesiones, conviene planificarlo con tiempo para completar el protocolo."
+        }
+      ]
+    },
+    {
+      "id": "pedicuria",
+      "name": "Pedicuría profesional",
+      "img": "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725364/mira-estudio/catalogo/vbgga6ulzfrtgtw0uotz.jpg",
+      "imgs": [
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725364/mira-estudio/catalogo/vbgga6ulzfrtgtw0uotz.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725365/mira-estudio/catalogo/j3faci9wohjid86vtary.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725366/mira-estudio/catalogo/rgblxbr3bqoawkhrzj5q.jpg"
+      ],
+      "desc": "Salud, higiene y buena apariencia para tus pies: mucho más que un esmaltado.",
+      "info": "La pedicuría profesional es un tratamiento estético y de cuidado especializado que se realiza en los pies y las uñas, y va mucho más allá de un simple esmaltado. Busca mantener la salud, la higiene y la buena apariencia de los pies.",
+      "items": [
+        {
+          "n": "Pedicuría completa",
+          "p": "Desde $20.000",
+          "note": "",
+          "info": "La sesión incluye limpieza y desinfección, tratamiento de durezas y de callos, extracción de uñas encarnadas, exfoliación e hidratación, masajes relajantes y esmaltado semipermanente. Es un trabajo completo sobre el pie, no solo sobre la uña."
+        }
+      ]
+    },
+    {
+      "id": "masajes",
+      "name": "Masajes y tratamientos corporales",
+      "img": "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725363/mira-estudio/catalogo/tynvwjxnxn74hadra8pu.jpg",
+      "imgs": [
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725363/mira-estudio/catalogo/tynvwjxnxn74hadra8pu.jpg",
+        "https://res.cloudinary.com/da0xdmu7k/image/upload/v1786725363/mira-estudio/catalogo/ngkov5fd3lge96kdhcu9.jpg"
+      ],
+      "desc": "Aliviá tensiones y regalale a tu cuerpo un momento de bienestar.",
+      "info": "Sesiones de masaje y tratamientos corporales para aliviar dolores y tensiones, bajar el estrés o acompañar un objetivo estético. Los masajes y tratamientos corporales se toman en cuerpo completo ($25.000) o por zona ($20.000). También hay técnicas terapéuticas puntuales para molestias específicas como cuello, espalda baja, rodilla u hombro.",
+      "items": [
+        {
+          "n": "Descontracturante",
+          "p": "$25.000",
+          "note": "cuerpo completo · por zona $20.000",
+          "info": "Está enfocado en aliviar contracturas, tensión muscular y dolor. Se trabaja con una presión más firme sobre los músculos afectados, para liberar los nudos y mejorar la movilidad. Durante la sesión puede resultar un poco molesto, pero suele dejar una sensación de alivio."
+        },
+        {
+          "n": "Relajante",
+          "p": "$25.000",
+          "note": "cuerpo completo · por zona $20.000",
+          "info": "Busca reducir el estrés y la ansiedad y favorecer el bienestar general. Se realiza con movimientos suaves, lentos y continuos que promueven la relajación física y mental. Por lo general no causa dolor y suele ser una experiencia muy placentera."
+        },
+        {
+          "n": "Piedras calientes",
+          "p": "$25.000",
+          "note": "cuerpo completo · por zona $20.000",
+          "info": "Es una técnica de relajación que utiliza piedras lisas de origen volcánico, calentadas a una temperatura segura. Las piedras se colocan sobre puntos específicos del cuerpo y también se usan para masajear."
+        },
+        {
+          "n": "Cañas de bambú",
+          "p": "$25.000",
+          "note": "cuerpo completo · por zona $20.000",
+          "info": "También conocida como bambuterapia, es una técnica que utiliza cañas de distintos tamaños para realizar movimientos de deslizamiento, presión y rodamiento sobre el cuerpo."
+        },
+        {
+          "n": "Drenaje linfático",
+          "p": "$25.000",
+          "note": "cuerpo completo · por zona $20.000",
+          "info": "El drenaje linfático manual es una técnica de masaje suave y lenta que ayuda a estimular el sistema linfático, encargado de eliminar el exceso de líquidos, desechos y toxinas del organismo."
+        },
+        {
+          "n": "Tratamientos reductores",
+          "p": "$25.000",
+          "note": "cuerpo completo · por zona $20.000",
+          "info": "Están orientados a ayudar a moldear la figura y a disminuir medidas de forma temporal, favoreciendo la movilización de líquidos y mejorando la circulación. No eliminan la grasa localizada por sí solos, pero pueden ser un buen complemento de una alimentación saludable y del ejercicio."
+        },
+        {
+          "n": "Tratamientos para celulitis",
+          "p": "$25.000",
+          "note": "cuerpo completo · por zona $20.000 · planes de 10 o 20 sesiones",
+          "info": "Los masajes para la celulitis pueden ayudar a mejorar temporalmente el aspecto de la piel y a favorecer la circulación y el drenaje de líquidos, aunque por sí solos no eliminan la celulitis. Se trabajan en planes de 10 o 20 sesiones."
+        },
+        {
+          "n": "Reflexología",
+          "p": "Consultar",
+          "note": "pies, manos u orejas",
+          "info": "Es una terapia manual que consiste en aplicar presión sobre puntos específicos de los pies, las manos o las orejas, conocidos como puntos reflejos. Según esta práctica, cada uno de esos puntos se relaciona con diferentes órganos, glándulas y partes del cuerpo."
+        },
+        {
+          "n": "Masaje para estreñimiento",
+          "p": "Consultar",
+          "note": "",
+          "info": "Es una técnica manual enfocada en estimular el movimiento natural del intestino, lo que se conoce como peristaltismo. Favorece el tránsito intestinal y ayuda a aliviar la sensación de hinchazón y el malestar abdominal."
+        },
+        {
+          "n": "Vendas taping",
+          "p": "Consultar",
+          "note": "kinesiotape",
+          "info": "Son cintas elásticas adhesivas que se colocan sobre la piel para brindar soporte a músculos y articulaciones. Lo bueno es que dan ese sostén sin limitar completamente el movimiento."
+        },
+        {
+          "n": "Masaje para lumbalgia",
+          "p": "Consultar",
+          "note": "zona lumbar",
+          "info": "Masaje terapéutico enfocado en aliviar el dolor y la tensión en la zona lumbar, es decir la parte baja de la espalda. Está indicado para personas con molestias causadas por contracturas musculares, malas posturas, esfuerzo físico o estrés."
+        },
+        {
+          "n": "Masaje para ciatalgia",
+          "p": "Consultar",
+          "note": "nervio ciático",
+          "info": "Técnica terapéutica destinada a aliviar el dolor causado por la irritación o compresión del nervio ciático. Ese dolor puede extenderse desde la zona lumbar hacia los glúteos y descender por la parte posterior de la pierna."
+        },
+        {
+          "n": "Masaje para cervicalgia",
+          "p": "Consultar",
+          "note": "cuello",
+          "info": "Es un masaje terapéutico enfocado en la zona del cuello. Tiene como objetivo aliviar la tensión muscular, disminuir el dolor y mejorar la movilidad."
+        },
+        {
+          "n": "Masaje para gonalgia",
+          "p": "Consultar",
+          "note": "rodilla",
+          "info": "Gonalgia es el término médico que se utiliza para describir el dolor en la rodilla. El masaje busca aliviar la tensión muscular que rodea la articulación, disminuir el dolor y favorecer la movilidad."
+        },
+        {
+          "n": "Masaje para omalgia",
+          "p": "Consultar",
+          "note": "hombro",
+          "info": "Omalgia es el dolor localizado en el hombro. La sesión busca aliviar la tensión muscular, disminuir el dolor y mejorar la movilidad de la articulación."
+        }
+      ]
+    }
   ]
 };
 const gSvcPage = () => {
   try {
     const d = localStorage.getItem('ms_services_page');
     const v = d ? JSON.parse(d) : null;
-    return (v && v.cats && v.cats.length) ? v : JSON.parse(JSON.stringify(DEF_SERVICES_PAGE));
+    // Si existe el objeto guardado se respeta aunque tenga 0 secciones
+    // (antes, borrar todo hacía reaparecer el catálogo de fábrica).
+    return (v && Array.isArray(v.cats)) ? v : JSON.parse(JSON.stringify(DEF_SERVICES_PAGE));
   } catch(e) { return JSON.parse(JSON.stringify(DEF_SERVICES_PAGE)); }
 };
 const sSvcPage = v => { localStorage.setItem('ms_services_page', JSON.stringify(v)); _fsSet('services_page', v); };
@@ -4256,7 +4661,16 @@ function renderServicesPage(){
           <h2>${_escHtml(c.name)}</h2>
           <p>${_escHtml(c.desc||'')}</p>
           <div class="sp-items">
-            ${(c.items||[]).map(it=>`<div class="sp-item"><div class="sp-item-n">${_escHtml(it.n)}${it.note?`<span class="sp-item-note">${_escHtml(it.note)}</span>`:''}</div><div class="sp-item-p">${_escHtml(it.p)}</div></div>`).join('')}
+            ${(c.items||[]).map((it,ii)=>{
+              const hayInfo=(it.info||c.info);
+              return `<div class="sp-item">
+                <div class="sp-item-n">${_escHtml(it.n)}${it.note?`<span class="sp-item-note">${_escHtml(it.note)}</span>`:''}</div>
+                <div class="sp-item-right">
+                  <span class="sp-item-p">${_escHtml(it.p)}</span>
+                  ${hayInfo?`<button class="sp-info-btn" onclick="svcInfoOpen(${ci},${ii},this.dataset.n)" data-n="${_escHtml(it.n)}" aria-label="Más información sobre ${_escHtml(it.n)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.6"/></svg> Más info</button>`:''}
+                </div>
+              </div>`;
+            }).join('')}
           </div>
           <button class="btn-gold sp-book" data-cat="${_escHtml(c.name)}" onclick="turnoOpenModal(this.dataset.cat)">Reservar turno</button>
         </div>
@@ -4302,10 +4716,20 @@ function admRenderSvcPage(){
             </div>
           </div>
         </div>
-        <div class="fg" style="margin-bottom:7px;"><label>Descripción corta</label><textarea id="svp-cat-desc-${idx}" rows="2">${_escHtml(c.desc)}</textarea></div>
-        <div class="fg" style="margin:0;"><label>Servicios y precios (uno por línea: Nombre | Precio | Nota opcional)</label>
-          <textarea id="svp-cat-items-${idx}" rows="${Math.max(3,(c.items||[]).length+1)}">${(c.items||[]).map(it=>[it.n,it.p,it.note].filter((x,i)=>i<2||x).join(' | ')).map(_escHtml).join('\n')}</textarea>
+        <div class="fg" style="margin-bottom:7px;"><label>Descripción corta (se ve en la lista)</label><textarea id="svp-cat-desc-${idx}" rows="2">${_escHtml(c.desc)}</textarea></div>
+        <div class="fg" style="margin-bottom:7px;"><label>Ficha "Más info" de toda la sección (la usan los servicios que no tienen texto propio)</label><textarea id="svp-cat-info-${idx}" rows="3">${_escHtml(c.info||'')}</textarea></div>
+        <div class="fg" style="margin-bottom:7px;"><label>Fotos de la ficha (se muestran en "Más info")</label>
+          <div class="svc-adm-imgs">
+            ${(c.imgs||[]).map((u,ui)=>`<div class="svc-adm-img" style="background-image:url('${_escHtml(_cldOpt(u,160))}')"><button class="svc-adm-img-del" onclick="admSvcPageDelGal(${idx},${ui})" title="Quitar">✕</button></div>`).join('')}
+            <label class="svc-adm-add" title="Agregar fotos">+<input type="file" accept="image/*" multiple style="display:none;" onchange="admSvcPageAddGal(${idx},event)"></label>
+          </div>
         </div>
+        <div class="fg" style="margin-bottom:7px;"><label>Servicios y precios (uno por línea: Nombre | Precio | Nota opcional)</label>
+          <textarea id="svp-cat-items-${idx}" rows="${Math.max(3,(c.items||[]).length+1)}" oninput="admSvcPageSyncItems(${idx})">${(c.items||[]).map(it=>[it.n,it.p,it.note].filter((x,i)=>i<2||x).join(' | ')).map(_escHtml).join('\n')}</textarea>
+        </div>
+        <details class="svp-det"><summary>Ficha propia de cada servicio (opcional) — ${(c.items||[]).length} servicios</summary>
+          <div id="svp-cat-infos-${idx}">${_admSvcItemInfos(c,idx)}</div>
+        </details>
       </div>
       <div class="arow-acts"><button class="abtn-del" onclick="admSvcPageDelCat(${idx})">✕</button></div>
     </div>`).join('');
@@ -4322,11 +4746,36 @@ function _admSvcPageCollect(){
   d.cats.forEach((c,idx)=>{
     if(g('svp-cat-name-'+idx))c.name=g('svp-cat-name-'+idx).value.trim();
     if(g('svp-cat-desc-'+idx))c.desc=g('svp-cat-desc-'+idx).value.trim();
+    if(g('svp-cat-info-'+idx))c.info=g('svp-cat-info-'+idx).value.trim();
+    // Las fichas y fotos por servicio se recuperan por NOMBRE (data-n del textarea),
+    // nunca por índice: así no se corren si se agrega, borra o reordena una línea.
+    const prev={};
+    (c.items||[]).forEach(it=>{ prev[it.n]={info:it.info||'', imgs:it.imgs||null}; });
+    const cont=g('svp-cat-infos-'+idx);
+    if(cont)cont.querySelectorAll('textarea[data-n]').forEach(ta2=>{
+      const n=ta2.getAttribute('data-n');
+      prev[n]=prev[n]||{info:'',imgs:null};
+      prev[n].info=ta2.value.trim();
+    });
     const ta=g('svp-cat-items-'+idx);
-    if(ta)c.items=ta.value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
-      const parts=l.split('|').map(x=>x.trim());
-      return {n:parts[0]||'', p:parts[1]||'', note:parts[2]||''};
-    }).filter(it=>it.n);
+    if(ta){
+      const lineas=ta.value.split('\n').map(l=>l.trim()).filter(Boolean);
+      // El respaldo por posición SOLO aplica si no se agregaron ni borraron líneas:
+      // ahí un nombre que no coincide es un renombrado, y la ficha debe seguirlo.
+      const mismaCantidad=lineas.length===(c.items||[]).length;
+      c.items=lineas.map((l,li)=>{
+        const parts=l.split('|').map(x=>x.trim());
+        const n=parts[0]||'';
+        const guardado=prev[n]||{};
+        const item={n, p:parts[1]||'', note:parts[2]||'', info:guardado.info||''};
+        if(guardado.imgs)item.imgs=guardado.imgs; // no perder las fotos propias
+        if(!item.info && mismaCantidad && !prev[n] && (c.items||[])[li]){
+          item.info=c.items[li].info||'';
+          if(!item.imgs && c.items[li].imgs)item.imgs=c.items[li].imgs;
+        }
+        return item;
+      }).filter(it=>it.n);
+    }
   });
   return d;
 }
@@ -4354,4 +4803,86 @@ async function admSvcPageAddImg(idx,ev){
 }
 function admSvcPageDelImg(idx){
   const d=_admSvcPageCollect();d.cats[idx].img='';sSvcPage(d);admRenderSvcPage();
+}
+
+
+// ═══ FICHA "MÁS INFO" DE CADA SERVICIO (servicios.html) ═══
+// Abre una ficha con las fotos del servicio + la información del catálogo.
+let _svcInfoMedia = [], _svcInfoNombre = '';
+function svcInfoOpen(ci, ii, nombre){
+  const d = gSvcPage();
+  const c = d.cats[ci]; if(!c){ toast('Ese servicio ya no está disponible'); return; }
+  let it = (c.items||[])[ii];
+  // Si los datos cambiaron entre el dibujado y el clic, buscar por nombre
+  if(nombre && (!it || it.n !== nombre)) it = (c.items||[]).find(x => x.n === nombre) ||
+    (d.cats.map(cc => (cc.items||[]).find(x => x.n === nombre)).filter(Boolean)[0]);
+  if(!it){ toast('Ese servicio ya no está disponible'); return; }
+  _svcInfoNombre = it.n;
+  _svcInfoMedia = ((it.imgs && it.imgs.length) ? it.imgs : (c.imgs && c.imgs.length ? c.imgs : [c.img])).filter(Boolean);
+  const texto = it.info || c.info || '';
+  const g = id => document.getElementById(id);
+  if(g('svci-cat')) g('svci-cat').textContent = c.name;
+  if(g('svci-title')) g('svci-title').textContent = it.n;
+  if(g('svci-price')) g('svci-price').textContent = it.p || '';
+  if(g('svci-note')){ g('svci-note').textContent = it.note || ''; g('svci-note').style.display = it.note ? '' : 'none'; }
+  if(g('svci-text')) g('svci-text').textContent = texto;
+  const gal = g('svci-gal');
+  if(gal){
+    if(_svcInfoMedia.length){
+      gal.style.display = '';
+      gal.innerHTML = `<div class="svci-main" id="svci-main"><img src="${_escHtml(_cldOpt(_svcInfoMedia[0],900))}" alt="" loading="lazy"></div>` +
+        (_svcInfoMedia.length > 1 ? `<div class="svci-thumbs">${_svcInfoMedia.map((u,i)=>`<button class="svci-th${i===0?' active':''}" id="svci-th-${i}" onclick="svcInfoShow(${i})" style="background-image:url('${_escHtml(_cldOpt(u,200))}')" aria-label="Foto ${i+1}"></button>`).join('')}</div>` : '');
+    } else { gal.style.display = 'none'; gal.innerHTML=''; }
+  }
+  openOv('svc-info-modal');
+}
+function svcInfoShow(i){
+  const u = _svcInfoMedia[i]; if(!u) return;
+  const m = document.getElementById('svci-main');
+  if(m) m.innerHTML = `<img src="${_escHtml(_cldOpt(u,900))}" alt="" loading="lazy">`;
+  _svcInfoMedia.forEach((_,k)=>{ const t=document.getElementById('svci-th-'+k); if(t) t.classList.toggle('active', k===i); });
+}
+function svcInfoReservar(){
+  closeOv('svc-info-modal');
+  setTimeout(()=>turnoOpenModal(_svcInfoNombre), 180);
+}
+
+
+// ── Editor admin: fichas por servicio y galería de la sección ──
+function _admSvcItemInfos(c, idx){
+  return (c.items||[]).map((it,ii)=>`
+    <div class="svp-item-info">
+      <label>${_escHtml(it.n)}</label>
+      <textarea id="svp-item-info-${idx}-${ii}" data-n="${_escHtml(it.n)}" rows="2" placeholder="Dejalo vacío para usar la ficha de la sección">${_escHtml(it.info||'')}</textarea>
+    </div>`).join('');
+}
+// Al editar la lista de servicios, refrescar los nombres del editor de fichas
+function admSvcPageSyncItems(idx){
+  clearTimeout(window._svpSyncT);
+  window._svpSyncT=setTimeout(()=>{
+    const cont=document.getElementById('svp-cat-infos-'+idx);
+    if(!cont)return;
+    // No re-dibujar si la dueña está escribiendo justo ahí (le robaría el foco)
+    if(cont.contains(document.activeElement))return;
+    const d=_admSvcPageCollect();
+    if(d.cats[idx])cont.innerHTML=_admSvcItemInfos(d.cats[idx],idx);
+  },1200);
+}
+async function admSvcPageAddGal(idx,ev){
+  const files=[...(ev.target.files||[])];if(!files.length)return;
+  ev.target.value='';
+  const d=_admSvcPageCollect(); // preserva todo lo escrito sin guardar
+  if(!d.cats[idx].imgs)d.cats[idx].imgs=[];
+  toast('☁ Subiendo '+files.length+' foto'+(files.length>1?'s':'')+'...');
+  let ok=0,error=0;
+  for(const f of files){
+    try{ d.cats[idx].imgs.push(await uploadToCloudinary(f,'servicios-pagina')); ok++; }
+    catch(e){ error++; }
+  }
+  sSvcPage(d);admRenderSvcPage();
+  toast(ok? ('✅ '+ok+' foto'+(ok!==1?'s':'')+' agregada'+(ok!==1?'s':'')+(error?' · '+error+' fallaron':'')) : '⚠️ No se pudo subir ninguna foto');
+}
+function admSvcPageDelGal(idx,ui){
+  const d=_admSvcPageCollect();
+  if(d.cats[idx]&&d.cats[idx].imgs){d.cats[idx].imgs.splice(ui,1);sSvcPage(d);admRenderSvcPage();}
 }
