@@ -47,7 +47,7 @@ async function _fsGet(key){if(!_fbReady||!_db)return null;try{const d=await _db.
 async function _fsSet(key,value){if(!_fbReady||!_db)return;try{const s=JSON.stringify(value);if(s.length>900000)return;await _db.collection('site').doc(key).set({v:value,t:Date.now()});}catch(e){}}
 async function _syncSiteFromCloud(){
   if(!_fbReady||!_db)return;
-  const KEYS=[{ls:KC,fs:'courses'},{ls:KF,fs:'faq'},{ls:KI,fs:'info'},{ls:KFT,fs:'features'},{ls:KR,fs:'recursos'},{ls:KEB,fs:'ebooks'},{ls:KCF,fs:'config'},{ls:KES,fs:'estetics'},{ls:'ms_banner',fs:'banner'},{ls:'ms_social',fs:'social'},{ls:KSL,fs:'slots'},{ls:'ms_reviews',fs:'reviews_list'},{ls:'ms_taken',fs:'taken'},{ls:'ms_services',fs:'services'},{ls:'ms_services_page',fs:'services_page'}];
+  const KEYS=[{ls:KC,fs:'courses'},{ls:KF,fs:'faq'},{ls:KI,fs:'info'},{ls:KFT,fs:'features'},{ls:KR,fs:'recursos'},{ls:KEB,fs:'ebooks'},{ls:KCF,fs:'config'},{ls:KES,fs:'estetics'},{ls:'ms_banner',fs:'banner'},{ls:'ms_social',fs:'social'},{ls:KSL,fs:'slots'},{ls:'ms_reviews',fs:'reviews_list'},{ls:'ms_taken',fs:'taken'},{ls:'ms_services',fs:'services'},{ls:'ms_services_page',fs:'services_page'},{ls:'ms_cursos_page',fs:'cursos_page'}];
   for(const {ls,fs} of KEYS){try{const v=await _fsGet(fs);if(v!==null){const lc=localStorage.getItem(ls);if(lc!==JSON.stringify(v)){localStorage.setItem(ls,JSON.stringify(v));}}}catch(e){}}
 }
 async function _saveUserProfile(uid,data){if(!_fbReady||!_db)return;try{await _db.collection('users').doc(uid).set(data,{merge:true});}catch(e){}}
@@ -873,7 +873,7 @@ function admPage(name){
     info:admRenderInfoPage,recursos:admRenderRecsList,
     analytics:function(){renderAnalytics();loadTurnosCloud().then(ok=>{if(ok)renderAnalytics();});},
     turnos:function(){admRenderTurnosList();admRenderSlots();loadTurnosCloud().then(ok=>{if(ok)admRenderTurnosList();});},
-    usuarios:admRenderUsersList,config:admRenderConfig,svcpage:admRenderSvcPage};
+    usuarios:admRenderUsersList,config:admRenderConfig,svcpage:admRenderSvcPage,cursospage:admRenderCursosPage};
   if(renders[name])renders[name]();
 }
 
@@ -4903,3 +4903,383 @@ function admSvcPageMoverCat(idx, dir){
   admRenderSvcPage();
   toast('Sección movida a la posición ' + (destino + 1));
 }
+
+
+// ═══════════════════════════════════════════════════════
+// PÁGINA DE CURSOS (cursos.html)
+// Datos en localStorage 'ms_cursos_page' ↔ Firestore site/cursos_page.
+// Los cursos, módulos y clases salen de gc() (los mismos que edita
+// la dueña en "📚 Cursos"): esta página nunca los duplica.
+// ═══════════════════════════════════════════════════════
+const DEF_CURSOS_PAGE = {
+  heroKicker: 'Academia Mira Estudio',
+  heroTitle: 'Aprendé un *oficio* que se ve en cada mirada',
+  heroSub: 'Extensiones de pestañas pelo por pelo, explicado desde cero por quien lo hace todos los días en su estudio. A tu ritmo, desde donde estés.',
+  heroBtn1: 'Empezar gratis',
+  heroBtn2: 'Ver el programa',
+  heroNota: 'Sin tarjeta. Creás tu cuenta y entrás.',
+  tira: ['Clases en video', 'Acceso sin vencimiento', 'Certificado digital al terminar', 'Desde el celular o la compu'],
+  paraQuienTit: 'Este curso es para *vos* si…',
+  paraQuienSub: 'Tres puntos de partida distintos, el mismo lugar donde empezar.',
+  paraQuien: [
+    { t: 'Arrancás de cero', d: 'Nunca hiciste una extensión y no sabés por dónde empezar. El curso te explica desde qué es cada material hasta por qué el adhesivo hace lo que hace, en orden y sin dar nada por sabido.' },
+    { t: 'Ya trabajás, pero a ojo', d: 'Aplicás hace un tiempo y los resultados salen distintos según la clienta: a una le duran tres semanas y a otra se le caen a los cuatro días. Acá está el porqué, para que dejes de improvisar y empieces a decidir con criterio.' },
+    { t: 'Querés que esto sea tu trabajo', d: 'Estás pensando en vivir de las pestañas y sabés que la técnica es lo primero que hay que tener firme. Base sólida, certificado al terminar y una comunidad de colegas del otro lado.' },
+  ],
+  cursoTit: 'El curso que está *abierto* ahora',
+  cursoPie: 'Se abre apenas creás tu cuenta. No vence y lo podés ver las veces que quieras.',
+  aprenderKicker: 'El programa',
+  aprenderTit: 'Lo que vas a saber *hacer* cuando termines',
+  aprenderSub: 'No es teoría suelta: cada clase te deja una decisión que vas a tomar sola frente a la clienta.',
+  aprender: [
+    { t: 'Armar tu mesa y saber para qué sirve cada cosa', d: 'Vas a reconocer todos los materiales de la técnica clásica —qué es cada uno y cuándo se usa— para trabajar ordenada desde el primer día.' },
+    { t: 'Leer la mirada antes de tocarla', d: 'Anatomía del ojo aplicada al trabajo real: la forma del ojo y cómo está implantada la pestaña natural, para que el diseño acompañe su mirada y no la pelee.' },
+    { t: 'Entender el pelo por dentro', d: 'Tricología: de qué está hecha la pestaña y por qué su estructura cambia todo lo que hacés después.' },
+    { t: 'Saber cuánto le va a durar el trabajo (y por qué se cae)', d: 'El ciclo de crecimiento explicado paso a paso, para calcular retoques con criterio y contestar tranquila cuando te preguntan por qué se cayeron.' },
+    { t: 'Reconocer una pestaña porosa y ajustar tu trabajo', d: 'Qué es la porosidad y cómo darte cuenta con qué tipo de pestaña estás trabajando, para entender por qué dos clientas con el mismo adhesivo tienen resultados distintos.' },
+    { t: 'Elegir el adhesivo con criterio y dominar el secado', d: 'Componentes y tipos de cianoacrilato, qué es el pH y qué pasa mientras el adhesivo cura. Se termina el comprar a ciegas.' },
+  ],
+  temarioTit: 'Todo lo que vas a ver, *clase por clase*',
+  temarioPie: 'Son clases cortas y al hueso. Podés verlas de a una, cuando puedas, y volver todas las veces que quieras.',
+  platKicker: 'La plataforma',
+  platTit: 'Estudiás a tu ritmo, pero *no sola*',
+  platSub: 'Entrás, mirás, anotás y seguís. La plataforma se acuerda de dónde quedaste, así no perdés tiempo buscando.',
+  pasos: [
+    { t: 'Mirás la clase', d: 'Video en alta calidad desde el celular, la tablet o la compu. Pausás, volvés atrás y repetís las veces que quieras. El acceso no vence: el curso queda tuyo.' },
+    { t: 'Anotás al lado del video', d: 'Cada clase tiene su bloc de notas privado. Se guarda solo en la nube: lo anotás en la compu y lo tenés en el celular cuando estás trabajando. Nadie más ve tus notas.' },
+    { t: 'Marcás la clase y ves cómo avanzás', d: 'Al terminar marcás la clase como vista y la barra se mueve: por clase, por módulo y del curso completo. Siempre sabés cuánto te falta.' },
+    { t: 'Volvés y el curso te espera donde lo dejaste', d: 'La próxima vez que entres, arranca solo en la primera clase que te quedó pendiente. No tenés que acordarte de nada.' },
+    { t: 'Terminás y te llevás tu certificado', d: 'Al completar el curso descargás tu certificado digital con tu nombre. Y desde el primer día tenés la comunidad: un chat por salas para preguntar y mostrar lo que hacés.' },
+  ],
+  rutaTit: 'La formación completa: lo que *viene*',
+  rutaSub: 'Mira Estudio arranca con Extensiones Clásicas porque es la base de todo. Los demás cursos ya están planificados y se van sumando. Si tenés cuenta, te avisamos apenas se abre cada uno.',
+  estudioTit: 'Quién te *enseña*',
+  estudioTxt: 'Trabajo mirada por mirada en mi propio estudio, todos los días. Lo que te enseño en el curso es exactamente lo que hago con mis clientas: la misma técnica, los mismos materiales, los mismos cuidados. No te voy a enseñar nada que no use yo.',
+  estudioImg: '',
+  faqTit: 'Preguntas antes de *empezar*',
+  faq: [
+    { q: 'Nunca hice pestañas. ¿Igual puedo hacer el curso?', a: 'Sí. Extensiones Clásicas es nivel principiante y arranca de cero: qué son las extensiones y qué materiales se usan. Antes de tocar una pestaña vas a entender la anatomía del ojo, cómo crece el pelo y por qué el adhesivo hace lo que hace. No hace falta formación previa ni experiencia con clientas.' },
+    { q: 'Si me trabo con algo, ¿a quién le pregunto?', a: 'Adentro de la plataforma tenés la comunidad: salas de chat entre alumnas, incluida una sala propia del curso, donde dejás tu pregunta y ves las que hicieron las demás. Te lo decimos derecho: no hay tutoría uno a uno ni corrección personalizada de tus trabajos. Lo que sí tenés es un espacio real para consultar y no quedarte sola con la duda.' },
+    { q: 'El certificado, ¿me sirve para trabajar?', a: 'Al terminar descargás tu certificado digital con tu nombre. Es un certificado de Mira Estudio: acredita que hiciste la formación y sirve para mostrarlo a tus clientas y en tus redes. No es un título oficial del Estado. En este rubro lo que te consigue clientas es tu trabajo bien hecho y tus fotos; el certificado acompaña.' },
+    { q: '¿Cuánto tiempo me lleva?', a: 'Son clases cortas, de pocos minutos cada una. Si te sentás una tarde lo terminás; si preferís una clase por día, también. No hay fecha de inicio, no hay cupos y no hay horarios: empezás cuando te anotás.' },
+    { q: '¿Hasta cuándo lo puedo ver?', a: 'El acceso no vence. Entrás las veces que quieras y volvés a la clase del adhesivo cuando se te complique una aplicación. La plataforma te reanuda sola en la última clase que dejaste sin terminar.' },
+    { q: '¿Tengo que comprar materiales caros antes de empezar?', a: 'No. El curso no incluye kit de materiales ni te obliga a comprar nada para verlo. Podés mirar todas las clases primero, entender qué adhesivo y qué pestañas te convienen, y recién ahí invertir sabiendo lo que estás comprando.' },
+    { q: '¿Lo puedo ver del celular?', a: 'Sí, desde el celular, la tablet o la computadora con el mismo usuario y contraseña. Tus notas y tu progreso quedan guardados en la nube, así que podés arrancar en la compu y seguir desde el celular sin perder nada.' },
+    { q: '¿Cuánto sale? ¿Me van a cobrar todos los meses?', a: 'No hay suscripción ni débito automático. Hoy el curso de Extensiones Clásicas se abre gratis al crear tu cuenta. Los cursos pagos que se sumen se abonan una sola vez por Mercado Pago, con el link que aparece en el curso.' },
+    { q: 'Veo cursos que dicen "En preparación". ¿Qué pasa con esos?', a: 'Todavía no tienen las clases cargadas, por eso aparecen bloqueados. No se pueden comprar ni reservar por ahora. Cuando estén listos los vas a ver habilitados en tu panel.' },
+  ],
+  ctaTit: 'Tu primera clase te está *esperando*',
+  ctaTxt: 'Creás tu cuenta, entrás y empezás. Sin costo, sin tarjeta y sin fecha de vencimiento.',
+  ctaBtn: 'Crear mi cuenta gratis',
+};
+const gCursosPage = () => {
+  try {
+    const d = localStorage.getItem('ms_cursos_page');
+    const v = d ? JSON.parse(d) : null;
+    return (v && typeof v === 'object') ? Object.assign(JSON.parse(JSON.stringify(DEF_CURSOS_PAGE)), v) : JSON.parse(JSON.stringify(DEF_CURSOS_PAGE));
+  } catch(e) { return JSON.parse(JSON.stringify(DEF_CURSOS_PAGE)); }
+};
+const sCursosPage = v => { localStorage.setItem('ms_cursos_page', JSON.stringify(v)); _fsSet('cursos_page', v); };
+
+// Los *asteriscos* marcan la palabra que va en itálica dorada (así la dueña
+// la puede mover desde el panel sin escribir HTML).
+function _emFmt(s){
+  return _escHtml(s).replace(/\*([^*]+)\*/g, '<em>$1</em>');
+}
+function _durTxt(d){
+  const t = String(d || '').trim();
+  if(!t) return '';
+  return /min|hs|hora|seg/i.test(t) ? t : (t + ' min');
+}
+
+function renderCursosPage(){
+  const d = gCursosPage();
+  const cursos = gc();
+  const abierto = cursos.filter(c => !c.locked)[0] || null;
+  const set = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
+  const setEm = (id, txt) => { const el = document.getElementById(id); if(el) el.innerHTML = _emFmt(txt); };
+
+  setEm('cs-hero-tit', d.heroTitle);
+  set('cs-hero-kicker', d.heroKicker);
+  set('cs-hero-sub', d.heroSub);
+  set('cs-hero-b1', d.heroBtn1);
+  set('cs-hero-b2', d.heroBtn2);
+  set('cs-hero-nota', d.heroNota);
+
+  // Sellos del hero y franja de datos
+  const tira = document.getElementById('cs-tira');
+  if(tira) tira.innerHTML = (d.tira||[]).map(t => `<div class="cs-dato"><span class="cs-dato-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6.5 9.5 17 4 11.5"/></svg></span>${_escHtml(t)}</div>`).join('');
+
+  // Maqueta del reproductor con las primeras clases reales
+  const prev = document.getElementById('cs-hero-prev');
+  if(prev && abierto){
+    const clases = [];
+    (abierto.modules||[]).forEach(m => (m.lessons||[]).forEach(l => clases.push(l)));
+    prev.innerHTML = `
+      <div class="cs-prev-top">${abierto.coverImg ? `<img src="${_escHtml(_cldOpt(abierto.coverImg,600))}" alt="">` : '<div class="cs-prev-ph"></div>'}
+        <div class="cs-prev-play"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></div>
+      </div>
+      <div class="cs-prev-body">
+        <div class="cs-prev-tit">${_escHtml(abierto.title)}</div>
+        <div class="cs-prev-bar"><i style="width:32%"></i></div>
+        ${clases.slice(0,3).map((l,i) => `<div class="cs-prev-les"><span class="cs-prev-n">${i+1}</span><span class="cs-prev-lt">${_escHtml(l.title)}</span><span class="cs-prev-ld">${_escHtml(_durTxt(l.duration))}</span></div>`).join('')}
+      </div>`;
+  }
+
+  setEm('cs-paraquien-tit', d.paraQuienTit);
+  set('cs-paraquien-sub', d.paraQuienSub);
+  const pq = document.getElementById('cs-paraquien');
+  if(pq) pq.innerHTML = (d.paraQuien||[]).map((p,i) => `<div class="cs-card"><div class="cs-card-n">0${i+1}</div><h3>${_escHtml(p.t)}</h3><p>${_escHtml(p.d)}</p></div>`).join('');
+
+  // Ficha del curso abierto (datos reales de "📚 Cursos")
+  setEm('cs-curso-tit', d.cursoTit);
+  set('cs-curso-pie', d.cursoPie);
+  const fich = document.getElementById('cs-curso-ficha');
+  if(fich){
+    if(!abierto){ fich.innerHTML = '<p style="color:rgba(255,248,240,.6);text-align:center;">Muy pronto vamos a abrir el primer curso.</p>'; }
+    else {
+      const mods = (abierto.modules||[]).filter(m => (m.lessons||[]).length);
+      const nClases = mods.reduce((a,m) => a + m.lessons.length, 0);
+      const gratis = !abierto.price || abierto.price === '' || abierto.price === '0' || abierto.price === 'Gratis';
+      fich.innerHTML = `
+        <div class="cs-ficha-media">${abierto.coverImg ? `<img src="${_escHtml(_cldOpt(abierto.coverImg,700))}" alt="" loading="lazy">` : '<div class="cs-ficha-ph"></div>'}</div>
+        <div class="cs-ficha-info">
+          <span class="cs-chip-on">Disponible ahora</span>
+          <h3>${_escHtml(abierto.title)}</h3>
+          <p class="cs-ficha-sub">${_escHtml(abierto.subtitle||'')}</p>
+          <p class="cs-ficha-desc">${_escHtml(abierto.description||'')}</p>
+          <div class="cs-ficha-meta">
+            <span>${nClases} clases en video</span><span>${mods.length} módulos</span><span>Certificado al finalizar</span>
+          </div>
+          <button class="btn-gold cs-btn-big" onclick="openAuth('r')">${gratis ? 'Entrar al curso — es gratis' : ('Quiero este curso · ' + _escHtml(abierto.price))}</button>
+        </div>`;
+    }
+  }
+
+  // Qué vas a aprender
+  set('cs-aprender-kicker', d.aprenderKicker);
+  setEm('cs-aprender-tit', d.aprenderTit);
+  set('cs-aprender-sub', d.aprenderSub);
+  const ap = document.getElementById('cs-aprender');
+  if(ap) ap.innerHTML = (d.aprender||[]).map(a => `<div class="cs-ap"><span class="cs-ap-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6.5 9.5 17 4 11.5"/></svg></span><div><h4>${_escHtml(a.t)}</h4><p>${_escHtml(a.d)}</p></div></div>`).join('');
+
+  // Temario real, clase por clase
+  setEm('cs-temario-tit', d.temarioTit);
+  set('cs-temario-pie', d.temarioPie);
+  const tem = document.getElementById('cs-temario');
+  if(tem && abierto){
+    let n = 0;
+    tem.innerHTML = (abierto.modules||[]).filter(m => (m.lessons||[]).length).map((m,mi) => `
+      <div class="cs-mod${mi===0?' open':''}">
+        <button class="cs-mod-h" onclick="csModTog(this)">
+          <span class="cs-mod-n">Módulo ${mi+1}</span>
+          <span class="cs-mod-t">${_escHtml(m.title)}</span>
+          <span class="cs-mod-c">${m.lessons.length} clase${m.lessons.length!==1?'s':''}</span>
+          <span class="cs-mod-chev">▾</span>
+        </button>
+        <div class="cs-mod-body">${m.lessons.map(l => { n++; return `<div class="cs-les"><span class="cs-les-n">${String(n).padStart(2,'0')}</span><span class="cs-les-t">${_escHtml(l.title)}</span><span class="cs-les-d">${_escHtml(_durTxt(l.duration))}</span></div>`; }).join('')}</div>
+      </div>`).join('');
+  }
+
+  // Cómo lo vas a aprender
+  set('cs-plat-kicker', d.platKicker);
+  setEm('cs-plat-tit', d.platTit);
+  set('cs-plat-sub', d.platSub);
+  const ps = document.getElementById('cs-pasos');
+  if(ps) ps.innerHTML = (d.pasos||[]).map((p,i) => `<div class="cs-paso"><div class="cs-paso-n">0${i+1}</div><div><h4>${_escHtml(p.t)}</h4><p>${_escHtml(p.d)}</p></div></div>`).join('');
+
+  // Hoja de ruta: todos los cursos cargados, en orden
+  setEm('cs-ruta-tit', d.rutaTit);
+  set('cs-ruta-sub', d.rutaSub);
+  const ruta = document.getElementById('cs-ruta');
+  if(ruta) ruta.innerHTML = cursos.map((c,i) => `
+    <div class="cs-hito${c.locked?'':' on'}">
+      <div class="cs-hito-p">${i+1}</div>
+      <div class="cs-hito-b">
+        <div class="cs-hito-h"><h4>${_escHtml(c.title)}</h4><span class="cs-hito-chip${c.locked?'':' on'}">${c.locked?'En preparación':'Abierto'}</span></div>
+        <p>${_escHtml(c.description||c.subtitle||'')}</p>
+      </div>
+    </div>`).join('');
+
+  // Quién te enseña
+  setEm('cs-estudio-tit', d.estudioTit);
+  set('cs-estudio-txt', d.estudioTxt);
+  const eimg = document.getElementById('cs-estudio-img');
+  if(eimg){
+    const url = d.estudioImg || 'https://res.cloudinary.com/da0xdmu7k/image/upload/v1785279328/mira-estudio/hero/azfgqziwsctsdeckszab.png';
+    eimg.src = _cldOpt(url, 1400);
+  }
+
+  // Testimonios (los mismos de la portada; se ocultan si no hay)
+  const rsec = document.getElementById('cs-reviews-sec');
+  const rg = document.getElementById('cs-reviews');
+  if(rsec && rg){
+    const list = (typeof gRev==='function' ? gRev() : []).filter(r => r && r.text);
+    if(!list.length) rsec.style.display = 'none';
+    else {
+      rsec.style.display = '';
+      rg.innerHTML = list.map(r => {
+        const stars = '★'.repeat(Math.max(1, Math.min(5, parseInt(r.stars)||5)));
+        return `<div class="cs-rev"><div class="cs-rev-st">${stars}</div><p>“${_escHtml(r.text)}”</p><div class="cs-rev-w"><span class="cs-rev-av">${_escHtml((r.name||'A').trim().charAt(0).toUpperCase())}</span><span><b>${_escHtml(r.name||'Alumna')}</b><i>${_escHtml(r.role||'')}</i></span></div></div>`;
+      }).join('');
+    }
+  }
+
+  // FAQ
+  setEm('cs-faq-tit', d.faqTit);
+  const fq = document.getElementById('cs-faq');
+  if(fq) fq.innerHTML = (d.faq||[]).map((f,i) => `
+    <div class="cs-fq${i===0?' open':''}">
+      <button class="cs-fq-q" onclick="csFaqTog(this)">${_escHtml(f.q)}<span class="cs-fq-chev">▾</span></button>
+      <div class="cs-fq-a"><p>${_escHtml(f.a)}</p></div>
+    </div>`).join('');
+
+  setEm('cs-cta-tit', d.ctaTit);
+  set('cs-cta-txt', d.ctaTxt);
+  set('cs-cta-btn', d.ctaBtn);
+}
+function csModTog(b){ const m = b.closest('.cs-mod'); if(m) m.classList.toggle('open'); }
+function csFaqTog(b){
+  const f = b.closest('.cs-fq'); if(!f) return;
+  const ab = f.classList.contains('open');
+  document.querySelectorAll('#cs-faq .cs-fq.open').forEach(x => x.classList.remove('open'));
+  if(!ab) f.classList.add('open');
+}
+
+
+// ── Admin: editor de la página de cursos (cursos.html) ──
+// Los cursos, módulos y clases NO se editan acá: salen de "📚 Cursos".
+// Acá se editan los textos que envuelven a esos cursos.
+function _admCPTxt(id, label, val, filas){
+  return `<div class="fg" style="margin-bottom:9px;"><label>${label}</label>${filas>1
+    ? `<textarea id="${id}" rows="${filas}">${_escHtml(val||'')}</textarea>`
+    : `<input type="text" id="${id}" value="${_escHtml(val||'')}">`}</div>`;
+}
+function _admCPLista(campo, titulo, items, campos, ayuda){
+  return `<div class="acard">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <h3 style="margin:0;">${titulo}</h3>
+      <button class="abtn-add" onclick="admCPNuevo('${campo}')">+ Agregar</button>
+    </div>
+    ${ayuda ? `<p style="font-size:12.5px;color:var(--adm-muted);margin:6px 0 10px;">${ayuda}</p>` : ''}
+    <div id="cp-list-${campo}">${(items||[]).map((it,i)=>`
+      <div class="arow">
+        <div class="arow-main">
+          ${campos.map(c=>_admCPTxt('cp-'+campo+'-'+c.k+'-'+i, c.l, it[c.k], c.filas||1)).join('')}
+        </div>
+        <div class="arow-acts" style="display:flex;flex-direction:column;gap:5px;">
+          <button class="abtn-mov" onclick="admCPMover('${campo}',${i},-1)" ${i===0?'disabled':''} title="Subir">↑</button>
+          <button class="abtn-mov" onclick="admCPMover('${campo}',${i},1)" ${i===(items||[]).length-1?'disabled':''} title="Bajar">↓</button>
+          <button class="abtn-del" onclick="admCPBorrar('${campo}',${i})" title="Eliminar">✕</button>
+        </div>
+      </div>`).join('')}</div>
+  </div>`;
+}
+function admRenderCursosPage(){
+  const d = gCursosPage();
+  const el = document.getElementById('adm-cursospage-body');
+  if(!el) return;
+  el.innerHTML = `
+    <div class="acard" style="background:rgba(201,168,76,.1);border-color:rgba(201,168,76,.35);">
+      <p style="margin:0;font-size:13.5px;">📚 <strong>Los cursos, módulos y clases se editan en «Cursos».</strong> Acá editás los textos que los rodean en la página. Poné *asteriscos* alrededor de una palabra para que salga en dorado e itálica. <a href="cursos.html" target="_blank" style="color:var(--gold);">Ver la página ↗</a></p>
+    </div>
+    <div class="acard">
+      <h3>Portada de la página</h3>
+      ${_admCPTxt('cp-heroKicker','Etiqueta chica',d.heroKicker,1)}
+      ${_admCPTxt('cp-heroTitle','Título grande (usá *asteriscos* para la palabra dorada)',d.heroTitle,2)}
+      ${_admCPTxt('cp-heroSub','Subtítulo',d.heroSub,3)}
+      <div class="adm-grid2" style="gap:8px;">
+        ${_admCPTxt('cp-heroBtn1','Botón principal',d.heroBtn1,1)}
+        ${_admCPTxt('cp-heroBtn2','Botón secundario',d.heroBtn2,1)}
+      </div>
+      ${_admCPTxt('cp-heroNota','Nota bajo los botones',d.heroNota,1)}
+      ${_admCPTxt('cp-tira','Franja de datos (uno por línea)',(d.tira||[]).join('\n'),4)}
+    </div>
+    ${_admCPLista('paraQuien','Para quién es el curso',d.paraQuien,[{k:'t',l:'Título'},{k:'d',l:'Texto',filas:3}])}
+    <div class="acard">
+      <h3>Títulos de las secciones</h3>
+      ${_admCPTxt('cp-paraQuienTit','Título "para quién es"',d.paraQuienTit,1)}
+      ${_admCPTxt('cp-paraQuienSub','Bajada "para quién es"',d.paraQuienSub,2)}
+      ${_admCPTxt('cp-cursoTit','Título del curso abierto',d.cursoTit,1)}
+      ${_admCPTxt('cp-cursoPie','Nota al pie del curso',d.cursoPie,2)}
+      ${_admCPTxt('cp-aprenderKicker','Etiqueta del programa',d.aprenderKicker,1)}
+      ${_admCPTxt('cp-aprenderTit','Título "qué vas a aprender"',d.aprenderTit,1)}
+      ${_admCPTxt('cp-aprenderSub','Bajada "qué vas a aprender"',d.aprenderSub,2)}
+      ${_admCPTxt('cp-temarioTit','Título del temario',d.temarioTit,1)}
+      ${_admCPTxt('cp-temarioPie','Nota del temario',d.temarioPie,2)}
+      ${_admCPTxt('cp-platKicker','Etiqueta de la plataforma',d.platKicker,1)}
+      ${_admCPTxt('cp-platTit','Título "cómo lo vas a aprender"',d.platTit,1)}
+      ${_admCPTxt('cp-platSub','Bajada de la plataforma',d.platSub,2)}
+      ${_admCPTxt('cp-rutaTit','Título de la hoja de ruta',d.rutaTit,1)}
+      ${_admCPTxt('cp-rutaSub','Bajada de la hoja de ruta',d.rutaSub,3)}
+      ${_admCPTxt('cp-faqTit','Título de las preguntas',d.faqTit,1)}
+    </div>
+    ${_admCPLista('aprender','Qué vas a aprender',d.aprender,[{k:'t',l:'Título'},{k:'d',l:'Texto',filas:3}],'Resultados concretos: qué va a saber hacer la alumna al terminar.')}
+    ${_admCPLista('pasos','Cómo lo vas a aprender (pasos)',d.pasos,[{k:'t',l:'Título'},{k:'d',l:'Texto',filas:3}])}
+    <div class="acard">
+      <h3>Quién te enseña</h3>
+      ${_admCPTxt('cp-estudioTit','Título',d.estudioTit,1)}
+      ${_admCPTxt('cp-estudioTxt','Texto en primera persona',d.estudioTxt,4)}
+      <div class="fg" style="margin:0;"><label>Foto de fondo</label>
+        <div class="svc-adm-imgs">
+          ${d.estudioImg?`<div class="svc-adm-img" style="background-image:url('${_escHtml(_cldOpt(d.estudioImg,200))}')"><button class="svc-adm-img-del" onclick="admCPBorrarFoto()">✕</button></div>`:''}
+          <label class="svc-adm-add">+<input type="file" accept="image/*" style="display:none;" onchange="admCPSubirFoto(event)"></label>
+        </div>
+      </div>
+    </div>
+    ${_admCPLista('faq','Preguntas frecuentes',d.faq,[{k:'q',l:'Pregunta'},{k:'a',l:'Respuesta',filas:4}],'Las primeras son las que más se preguntan antes de anotarse.')}
+    <div class="acard">
+      <h3>Cierre de la página</h3>
+      ${_admCPTxt('cp-ctaTit','Título final',d.ctaTit,1)}
+      ${_admCPTxt('cp-ctaTxt','Texto final',d.ctaTxt,2)}
+      ${_admCPTxt('cp-ctaBtn','Botón final',d.ctaBtn,1)}
+    </div>
+    <div style="margin-top:14px;"><button class="abtn" onclick="admCPGuardar()">Guardar página de cursos</button></div>`;
+}
+// Junta todo lo que hay en pantalla sin guardar
+function _admCPCollect(){
+  const d = gCursosPage();
+  const g = id => document.getElementById(id);
+  ['heroKicker','heroTitle','heroSub','heroBtn1','heroBtn2','heroNota','paraQuienTit','paraQuienSub','cursoTit','cursoPie',
+   'aprenderKicker','aprenderTit','aprenderSub','temarioTit','temarioPie','platKicker','platTit','platSub',
+   'rutaTit','rutaSub','estudioTit','estudioTxt','faqTit','ctaTit','ctaTxt','ctaBtn'].forEach(k=>{
+    const e = g('cp-'+k); if(e) d[k] = e.value.trim();
+  });
+  const t = g('cp-tira'); if(t) d.tira = t.value.split('\n').map(x=>x.trim()).filter(Boolean);
+  [['paraQuien',['t','d']],['aprender',['t','d']],['pasos',['t','d']],['faq',['q','a']]].forEach(([campo,ks])=>{
+    const cont = g('cp-list-'+campo); if(!cont) return;
+    const filas = cont.querySelectorAll('.arow');
+    const arr = [];
+    filas.forEach((_,i)=>{
+      const o = {};
+      ks.forEach(k=>{ const e = g('cp-'+campo+'-'+k+'-'+i); o[k] = e ? e.value.trim() : ''; });
+      if(Object.values(o).some(v=>v)) arr.push(o);
+    });
+    d[campo] = arr;
+  });
+  return d;
+}
+function admCPGuardar(){ sCursosPage(_admCPCollect()); toast('✅ Página de cursos guardada'); admRenderCursosPage(); }
+function admCPNuevo(campo){
+  const d = _admCPCollect();
+  d[campo] = d[campo] || [];
+  d[campo].push(campo==='faq' ? {q:'Nueva pregunta',a:''} : {t:'Nuevo',d:''});
+  sCursosPage(d); admRenderCursosPage();
+}
+function admCPBorrar(campo, i){
+  if(!confirm('¿Eliminar este bloque?')) return;
+  const d = _admCPCollect(); d[campo].splice(i,1); sCursosPage(d); admRenderCursosPage();
+}
+function admCPMover(campo, i, dir){
+  const d = _admCPCollect();
+  const j = i + dir; if(j<0 || j>=d[campo].length) return;
+  const [x] = d[campo].splice(i,1); d[campo].splice(j,0,x);
+  sCursosPage(d); admRenderCursosPage();
+}
+async function admCPSubirFoto(ev){
+  const f = ev.target.files[0]; if(!f) return; ev.target.value='';
+  const d = _admCPCollect();
+  try{ toast('☁ Subiendo foto...'); d.estudioImg = await uploadToCloudinary(f,'cursos'); sCursosPage(d); admRenderCursosPage(); toast('✅ Foto actualizada'); }
+  catch(e){ toast('⚠️ '+e.message); }
+}
+function admCPBorrarFoto(){ const d=_admCPCollect(); d.estudioImg=''; sCursosPage(d); admRenderCursosPage(); }
