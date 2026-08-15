@@ -4708,7 +4708,7 @@ function admRenderSvcPage(){
     <div class="arow">
       <div class="arow-main">
         <div class="adm-grid2" style="gap:8px;margin-bottom:7px;">
-          <div class="fg" style="margin:0;"><label>Nombre de la sección</label><input type="text" id="svp-cat-name-${idx}" value="${_escHtml(c.name)}"></div>
+          <div class="fg" style="margin:0;"><label>Sección ${idx+1} de ${d.cats.length} — nombre</label><input type="text" id="svp-cat-name-${idx}" value="${_escHtml(c.name)}"></div>
           <div class="fg" style="margin:0;"><label>Foto de la sección</label>
             <div class="svc-adm-imgs">
               ${c.img?`<div class="svc-adm-img" style="background-image:url('${_escHtml(_cldOpt(c.img,160))}')"><button class="svc-adm-img-del" onclick="admSvcPageDelImg(${idx})">✕</button></div>`:''}
@@ -4724,14 +4724,18 @@ function admRenderSvcPage(){
             <label class="svc-adm-add" title="Agregar fotos">+<input type="file" accept="image/*" multiple style="display:none;" onchange="admSvcPageAddGal(${idx},event)"></label>
           </div>
         </div>
-        <div class="fg" style="margin-bottom:7px;"><label>Servicios y precios (uno por línea: Nombre | Precio | Nota opcional)</label>
+        <div class="fg" style="margin-bottom:7px;"><label>Servicios y precios — un servicio por línea, con este formato:<br><code style="color:var(--gold);font-size:11.5px;">Nombre | Precio | Nota (opcional)</code><br><span style="font-size:11.5px;color:var(--muted);">Para cambiar el orden, movés las líneas de lugar. Se muestran en el mismo orden en la página.</span></label>
           <textarea id="svp-cat-items-${idx}" rows="${Math.max(3,(c.items||[]).length+1)}" oninput="admSvcPageSyncItems(${idx})">${(c.items||[]).map(it=>[it.n,it.p,it.note].filter((x,i)=>i<2||x).join(' | ')).map(_escHtml).join('\n')}</textarea>
         </div>
         <details class="svp-det"><summary>Ficha propia de cada servicio (opcional) — ${(c.items||[]).length} servicios</summary>
           <div id="svp-cat-infos-${idx}">${_admSvcItemInfos(c,idx)}</div>
         </details>
       </div>
-      <div class="arow-acts"><button class="abtn-del" onclick="admSvcPageDelCat(${idx})">✕</button></div>
+      <div class="arow-acts" style="display:flex;flex-direction:column;gap:5px;">
+        <button class="abtn-mov" onclick="admSvcPageMoverCat(${idx},-1)" title="Subir esta sección" ${idx===0?'disabled':''}>↑</button>
+        <button class="abtn-mov" onclick="admSvcPageMoverCat(${idx},1)" title="Bajar esta sección" ${idx===d.cats.length-1?'disabled':''}>↓</button>
+        <button class="abtn-del" onclick="admSvcPageDelCat(${idx})" title="Eliminar sección">✕</button>
+      </div>
     </div>`).join('');
 }
 function _admSvcPageCollect(){
@@ -4885,4 +4889,17 @@ async function admSvcPageAddGal(idx,ev){
 function admSvcPageDelGal(idx,ui){
   const d=_admSvcPageCollect();
   if(d.cats[idx]&&d.cats[idx].imgs){d.cats[idx].imgs.splice(ui,1);sSvcPage(d);admRenderSvcPage();}
+}
+
+
+// ── Mover una sección del catálogo de lugar (↑ ↓) ──
+function admSvcPageMoverCat(idx, dir){
+  const d = _admSvcPageCollect();           // conserva todo lo escrito sin guardar
+  const destino = idx + dir;
+  if(destino < 0 || destino >= d.cats.length) return;
+  const [sec] = d.cats.splice(idx, 1);
+  d.cats.splice(destino, 0, sec);
+  sSvcPage(d);
+  admRenderSvcPage();
+  toast('Sección movida a la posición ' + (destino + 1));
 }

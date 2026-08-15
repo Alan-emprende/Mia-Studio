@@ -77,8 +77,8 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
       <div class="adm-group">Información</div>
       <button class="adm-ni" data-adm="faq" onclick="admPage('faq')">❓ FAQ</button>
       <button class="adm-ni" data-adm="reviews" onclick="admPage('reviews')">⭐ Testimonios</button>
-      <button class="adm-ni" data-adm="servicios" onclick="admPage('servicios')">💅 Servicios</button>
-      <button class="adm-ni" data-adm="svcpage" onclick="admPage('svcpage')">🗂 Página Servicios</button>
+      <button class="adm-ni" data-adm="servicios" onclick="admPage('servicios')">💅 Servicios del inicio</button>
+      <button class="adm-ni" data-adm="svcpage" onclick="admPage('svcpage')">🗂 Catálogo completo</button>
       <button class="adm-ni" data-adm="info" onclick="admPage('info')">ℹ️ Info General</button>
       <button class="adm-ni" data-adm="recursos" onclick="admPage('recursos')">📎 Recursos</button>
       <div class="adm-group">Analíticas</div>
@@ -298,7 +298,7 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
 
     <!-- SERVICIOS -->
     <div class="adm-pg" id="adm-servicios">
-      <div class="adm-pghdr"><h2>💅 Servicios</h2><p>Los servicios que ofrecés en el estudio. Se muestran en la sección "Servicios" de la página principal y en el formulario de turnos. Dejá el precio vacío para que diga "Consultar".</p></div>
+      <div class="acard" style="background:rgba(201,168,76,.1);border-color:rgba(201,168,76,.35);"><p style="margin:0;font-size:13.5px;color:var(--adm-text);">🗂 <strong>¿Buscás el catálogo completo?</strong> Los 54 servicios con precios, fotos y fichas de «Más info» que se ven en la pestaña <em>Servicios</em> se editan en <button class="abtn" style="font-size:12px;padding:5px 12px;margin-left:6px;" onclick="admPage('svcpage')">Ir a Catálogo completo →</button></p></div><div class="adm-pghdr"><h2>💅 Servicios del inicio</h2><p>Los servicios que ofrecés en el estudio. Se muestran en la sección "Servicios" de la página principal y en el formulario de turnos. Dejá el precio vacío para que diga "Consultar".</p></div>
       <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
         <button class="abtn-add" onclick="admNewService()">+ Nuevo servicio</button>
       </div>
@@ -308,7 +308,7 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
 
     <!-- PÁGINA DE SERVICIOS (servicios.html) -->
     <div class="adm-pg" id="adm-svcpage">
-      <div class="adm-pghdr"><h2>🗂 Página de Servicios</h2><p>El catálogo completo que se ve en <strong>servicios.html</strong> (link "Servicios" de la portada). Cada sección tiene su foto, descripción y lista de precios.</p></div>
+      <div class="adm-pghdr"><h2>🗂 Catálogo completo de servicios</h2><p>Esto es lo que ve la clienta en la <strong>pestaña «Servicios»</strong> de tu página (el catálogo con los 54 servicios, sus precios, sus fotos y las fichas de «Más info»). <a href="servicios.html" target="_blank" style="color:var(--gold);">Ver la página ↗</a></p></div>
       <div class="acard">
         <h3>Encabezado</h3>
         <div class="adm-grid2" style="gap:8px;">

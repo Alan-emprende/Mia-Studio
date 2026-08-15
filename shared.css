@@ -1364,3 +1364,7 @@ body.light-mode .cc2-bar{background:rgba(140,0,38,.1);}
 .svci-cat{color:#8A6A2A;}
 /* Cerrar la ficha siempre accesible aunque el texto sea largo */
 #svc-info-modal .mclose{position:sticky;top:0;float:right;background:rgba(255,248,240,.95);border-radius:50%;z-index:3;}
+/* Botones para mover secciones del catálogo */
+.abtn-mov{background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.3);color:var(--gold);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:14px;line-height:1;transition:.2s;}
+.abtn-mov:hover:not(:disabled){background:var(--gold);color:#1A0008;}
+.abtn-mov:disabled{opacity:.3;cursor:default;}
