@@ -402,7 +402,7 @@ function renderLanding(){
       const tot=(c.modules||[]).reduce((a,m)=>a+m.lessons.length,0);
       const isFree=!c.price||c.price===''||c.price==='Gratis'||c.price==='0';
       const priceLbl=isFree?'Gratis':c.price;
-      const thumbInner=c.coverImg?`<img src="${_cldOpt(c.coverImg,640)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:var(--r3) var(--r3) 0 0;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.6),transparent);"></div><span style="position:relative;z-index:1;font-size:46px;">${c.emoji}</span>`:c.emoji;
+      const thumbInner=c.coverImg?`<img src="${_cldOpt(c.coverImg,640)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:var(--r3) var(--r3) 0 0;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.6),transparent);"></div>`:courseCoverPlaceholder(c);
       return`<div class="cpc" onclick="openAuth('r')"><div class="cpc-thumb" style="background:${c.coverImg?'transparent':c.color};">${thumbInner}${isFree?'':`<span style="position:absolute;top:8px;right:8px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px;">${priceLbl}</span>`}</div><div class="cpc-body"><span class="cpc-tag">${c.levelLabel}</span><div class="cpc-title">${c.title}</div><p class="cpc-desc">${c.description}</p><div class="cpc-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot} clases</div></div></div>`;
     }).join('');
   }
@@ -457,9 +457,21 @@ function switchExplorer(tab){
 }
 
 // ═══ COURSE RENDERS ═══
+// La clienta ya NO ve el emoji del curso (la dueña lo pidió, ago 2026). El campo `emoji` sigue
+// existiendo y editándose en el panel: le sirve a ella para reconocer el curso de un vistazo.
+// Cuando el curso no tiene foto de portada, en vez del emoji va un monograma: la inicial del
+// título en itálica dorada sobre el degradado del curso.
+function _courseInitial(c){
+  const t = String((c && c.title) || '').trim();
+  const m = t.match(/[0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/);
+  return (m ? m[0] : 'M').toUpperCase();
+}
+function courseCoverPlaceholder(c){
+  return `<span class="cmono" aria-hidden="true"><span class="cmono-i">${_escHtml(_courseInitial(c))}</span></span>`;
+}
 function buildCourseThumb(c){
-  if(c.coverImg) return `<img class="cct-img" loading="lazy" src="${_cldOpt(c.coverImg,640)}" alt="${c.title}"><div class="cct-overlay"></div><span class="cct-emoji-over">${c.emoji}</span>`;
-  return `<div class="cctbg" style="background:${c.color||'linear-gradient(135deg,#3D0015,#8C0026)'}"></div><span class="ccte">${c.emoji}</span>`;
+  if(c.coverImg) return `<img class="cct-img" loading="lazy" src="${_cldOpt(c.coverImg,640)}" alt="${_escHtml(c.title)}"><div class="cct-overlay"></div>`;
+  return `<div class="cctbg" style="background:${c.color||'linear-gradient(135deg,#3D0015,#8C0026)'}"></div>${courseCoverPlaceholder(c)}`;
 }
 function buildPriceBadge(c){
   // Los cursos gratuitos no llevan cartel; solo los pagos muestran su precio
@@ -982,7 +994,7 @@ function admUploadLogo(input){
   reader.onload=function(e){
     try{
       const cfg=gCfg();cfg.logoData=e.target.result;sCfg(cfg);
-      document.querySelectorAll('.logo-nav,.logo-hero,.logo-sb').forEach(img=>img.src=e.target.result);
+      document.querySelectorAll('.logo-nav,.logo-hero,.logo-sb,.logo-auth').forEach(img=>img.src=e.target.result);
       admUpdateLogoPreview();toast('✅ Logo actualizado');
     }catch(err){toast('⚠️ Error al guardar logo.');}
   };
@@ -1048,7 +1060,7 @@ function loadSavedTexts(){
   const cfg=gCfg();const saved=cfg.texts||{};
   Object.entries(saved).forEach(([domId,val])=>{const el=document.getElementById(domId);if(el)el.textContent=val;});
   if(cfg.wsub){const el=document.getElementById('wsub');if(el)el.textContent=cfg.wsub;}
-  if(cfg.logoData)document.querySelectorAll('.logo-nav,.logo-hero,.logo-sb').forEach(img=>img.src=cfg.logoData);
+  if(cfg.logoData)document.querySelectorAll('.logo-nav,.logo-hero,.logo-sb,.logo-auth').forEach(img=>img.src=cfg.logoData);
 }
 
 // ── CURSOS ─────────────────────────────────────────────
@@ -1130,7 +1142,7 @@ function admCursoForm(c,isNew){
     ${coverHtml}
     <input type="hidden" id="ce-cover-data" value="${c.coverImg||''}">
     <div class="adm-grid2" style="margin-top:14px;">
-      <div class="fg"><label>Emoji/Ícono</label><input type="text" id="ce-emoji" value="${c.emoji||'📚'}" placeholder="✨"></div>
+      <div class="fg"><label>Emoji (solo lo ves vos)</label><input type="text" id="ce-emoji" value="${c.emoji||'📚'}" placeholder="✨"><div style="font-size:11px;color:var(--adm-muted,var(--muted));margin-top:4px;line-height:1.4;">Te sirve para reconocer el curso acá en el panel. Las alumnas ven la foto de portada y, si el curso no tiene foto, la inicial del curso en dorado.</div></div>
       <div class="fg"><label>Color de fondo (si no hay portada)</label><input type="color" id="ce-color" value="${c.color||'#8C0026'}"></div>
     </div>
     <div class="fg"><label>Título del curso</label><input type="text" id="ce-title" value="${c.title}" placeholder="Nombre del curso"></div>
@@ -1799,7 +1811,7 @@ function renderIcarousel(){
     const tot = (c.modules||[]).reduce((a,m)=>a+m.lessons.length, 0);
     const isFree=!c.price||c.price===''||c.price==='Gratis'||c.price==='0';
     const priceLbl=isFree?'Gratis':c.price;
-    const thumbContent=c.coverImg?`<img src="${_cldOpt(c.coverImg,400)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.5),transparent);"></div><span style="position:relative;z-index:1;font-size:38px;">${c.emoji}</span>`:c.emoji;
+    const thumbContent=c.coverImg?`<img src="${_cldOpt(c.coverImg,400)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.5),transparent);"></div>`:courseCoverPlaceholder(c);
     const priceTag=isFree?'':`<span style="position:absolute;top:7px;right:7px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:50px;z-index:2;">${priceLbl}</span>`;
     if(c.locked) return `<div class="icp-ccard" style="opacity:.55;cursor:default;"><div class="icp-thumb" style="background:${c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${c.levelLabel}</span><div class="icp-name">${c.title}</div><div class="icp-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Próximamente</div></div></div>`;
     return `<div class="icp-ccard" onclick="openAuth('r')"><div class="icp-thumb" style="background:${c.coverImg?'#0a0005':c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${c.levelLabel}</span><div class="icp-name">${c.title}</div><div class="icp-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot} clases · ${(c.modules||[]).length} módulos</div></div></div>`;
@@ -1947,7 +1959,7 @@ function renderProgressPage(totalPct, totalDone, totalLessons){
     const done = (c.modules||[]).reduce((a,m) => a + m.lessons.filter(l => !!prog[l.id]).length, 0);
     const pct = lessons > 0 ? Math.round(done / lessons * 100) : 0;
     return `<div class="prog-course-row">
-      <div class="pcr-emoji">${c.emoji}</div>
+      <div class="pcr-mono" aria-hidden="true">${_escHtml(_courseInitial(c))}</div>
       <div class="pcr-info">
         <div class="pcr-title">${c.title}</div>
         <div class="pcr-bar"><div class="pcr-fill" style="width:${pct}%"></div></div>
@@ -2015,9 +2027,17 @@ function drawCertificate(course, user){
   ctx.textAlign = 'center';
   ctx.letterSpacing = '4px';
   ctx.fillText('MIRA  ESTUDIO', W/2, 62);
-  // Emoji
-  ctx.font = '44px serif';
-  ctx.fillText(course.emoji, W/2, 140);
+  // Monograma dorado con la inicial del curso (antes acá se imprimía el emoji).
+  // El letterSpacing se pone en 0 solo para esta letra y se restaura enseguida, para no
+  // cambiar el espaciado del resto del certificado.
+  const _lsPrev = ctx.letterSpacing;
+  ctx.letterSpacing = '0px';
+  ctx.strokeStyle = '#C9A84C'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(W/2, 130, 31, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = '#8C0026';
+  ctx.font = 'italic 42px Georgia, serif';
+  ctx.fillText(_courseInitial(course), W/2, 145);
+  ctx.letterSpacing = _lsPrev;
   // CERTIFICADO
   ctx.fillStyle = '#3B000F';
   ctx.font = 'italic 15px Georgia, serif';
@@ -2158,14 +2178,24 @@ function renderAnalytics(){
 
   // stats grid
   const sg = document.getElementById('an-stats-grid');
+  // Iconos SVG dorados en vez de emojis, para que combinen con el resto del panel
+  const _sv = d => `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const AN_IC = {
+    alumnas: _sv('<path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/><circle cx="10" cy="8" r="3.2"/><path d="M20 19v-1.4a3.4 3.4 0 0 0-2.6-3.3M15.4 5.3a3.2 3.2 0 0 1 0 5.5"/>'),
+    cursos:  _sv('<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H5.5A1.5 1.5 0 0 1 4 15.5z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h4.5a1.5 1.5 0 0 0 1.5-1.5z"/>'),
+    turnos:  _sv('<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.8h17M8 3.2v3.4M16 3.2v3.4"/>'),
+    clases:  _sv('<circle cx="12" cy="12" r="8.8"/><path d="M8.4 12.2l2.5 2.5 4.7-5"/>'),
+    pend:    _sv('<circle cx="12" cy="12" r="8.8"/><path d="M12 7.3V12l3.2 1.9"/>'),
+    fin:     _sv('<path d="M7.5 4h9v5.2a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 5.6H5.2a2 2 0 0 0 0 4h.9M16.5 5.6h2.3a2 2 0 0 1 0 4h-.9"/><path d="M12 13.7V17M8.8 20h6.4l-.5-3H9.3z"/>'),
+  };
   if(sg) sg.innerHTML = [
-    {num: users.length, lbl:'Alumnas registradas', icon:'👥'},
-    {num: courses.length, lbl:'Cursos activos', icon:'📚'},
-    {num: turnos.length, lbl:'Turnos recibidos', icon:'📅'},
-    {num: totalDone, lbl:'Clases completadas', icon:'✅'},
-    {num: pendingTurnos, lbl:'Turnos pendientes', icon:'⏳'},
-    {num: completedCourses, lbl:'Cursos terminados', icon:'🏆'},
-  ].map(s => `<div class="an-stat"><div style="font-size:26px;margin-bottom:8px;">${s.icon}</div><div class="an-stat-num">${s.num}</div><div class="an-stat-lbl">${s.lbl}</div></div>`).join('');
+    {num: users.length, lbl:'Alumnas registradas', icon:AN_IC.alumnas},
+    {num: courses.length, lbl:'Cursos activos', icon:AN_IC.cursos},
+    {num: turnos.length, lbl:'Turnos recibidos', icon:AN_IC.turnos},
+    {num: totalDone, lbl:'Clases completadas', icon:AN_IC.clases},
+    {num: pendingTurnos, lbl:'Turnos pendientes', icon:AN_IC.pend},
+    {num: completedCourses, lbl:'Cursos terminados', icon:AN_IC.fin},
+  ].map(s => `<div class="an-stat"><div class="an-stat-ic">${s.icon}</div><div class="an-stat-num">${s.num}</div><div class="an-stat-lbl">${s.lbl}</div></div>`).join('');
 
   // courses progress chart
   const cc = document.getElementById('an-courses-chart');
@@ -3058,7 +3088,7 @@ function getChatRooms() {
     { id: 'trabajos', name: 'Mis Trabajos', emoji: '📸', desc: 'Muestra tus resultados' },
   ];
   courses.filter(c => !c.locked).forEach(c => {
-    rooms.push({ id: 'curso-' + c.id, name: c.title, emoji: c.emoji, desc: 'Alumnos de este curso' });
+    rooms.push({ id: 'curso-' + c.id, name: c.title, emoji: _courseInitial(c), desc: 'Alumnos de este curso' });
   });
   return rooms;
 }
@@ -4030,6 +4060,38 @@ const DEF_SERVICES=[
 const gServ=()=>{try{const d=localStorage.getItem('ms_services');const l=d?JSON.parse(d):null;return (l&&l.length)?l:JSON.parse(JSON.stringify(DEF_SERVICES));}catch(e){return JSON.parse(JSON.stringify(DEF_SERVICES));}};
 const sServ=v=>{localStorage.setItem('ms_services',JSON.stringify(v));_fsSet('services',v);};
 
+// ── Servicios sin completar: NO se publican ──
+// El botón "+ Nuevo servicio" del panel crea una ficha vacía llamada "Nuevo servicio" y la
+// guarda al instante en la nube. Si la dueña no la completa, no tiene que salir en el sitio.
+// El criterio es a propósito ESTRICTO: solo se esconde si sigue EXACTAMENTE como la creó el
+// botón (nombre de fábrica y todo lo demás vacío). Apenas le escribe algo, se publica.
+// OJO: esto es solo para lo que ve la clienta. El panel admin usa gServ() SIN filtrar, porque
+// admCollectServicesInputs mapea los inputs por POSICIÓN: si el admin filtrara, la dueña
+// borraría o editaría el servicio equivocado y nunca podría eliminar estos placeholders.
+function _svcVacio(s){
+  if(!s) return true;
+  const n = String(s.name||'').trim();
+  if(!n) return true;
+  if(n.toLowerCase() !== 'nuevo servicio') return false;
+  return !String(s.desc||'').trim() && !String(s.price||'').trim() &&
+         !String(s.dur||'').trim() && !String(s.video||'').trim() &&
+         !((s.imgs||[]).length);
+}
+const gServVis = () => gServ().filter(s => !_svcVacio(s));
+// Lo mismo para el catálogo completo de servicios.html: el botón "+ Agregar servicio" de una
+// sección crea {n:'Nuevo servicio',p:'Consultar'} y también lo guarda al instante.
+// OJO: esto se usa SOLO para los chips del modal de reserva (que van por NOMBRE). NO filtrar
+// dentro de renderServicesPage: ahí el botón «Más info» llama svcInfoOpen(ci,ii) por ÍNDICE.
+function _svcItemVacio(it){
+  if(!it) return true;
+  const n = String(it.n||'').trim();
+  if(!n) return true;
+  if(n.toLowerCase() !== 'nuevo servicio') return false;
+  const p = String(it.p||'').trim().toLowerCase();
+  return (!p || p === 'consultar') && !String(it.note||'').trim() &&
+         !String(it.info||'').trim() && !String(it.video||'').trim();
+}
+
 // ── Catálogo estilo revista en la landing ──
 // Cada servicio puede tener varias imágenes (s.imgs) y un video (s.video).
 function _svcMedia(s){
@@ -4055,7 +4117,7 @@ function _svcMainHtml(m){
 // El primero del panel admin arranca destacado (ordenalos ahí para elegir la "estrella").
 function renderServicesLanding(){
   const el=document.getElementById('icp-services-list');if(!el)return;
-  const list=gServ();
+  const list=gServVis();
   if(!list.length){el.innerHTML='';return;}
   el.innerHTML=`<div class="svc-yt">
     <div class="svc-feat" id="svc-feat"></div>
@@ -4097,7 +4159,7 @@ function _svcFeatHtml(s,idx){
   </div>`;
 }
 function svcFeature(idx,scrollTo){
-  const s=gServ()[idx];if(!s)return;
+  const s=gServVis()[idx];if(!s)return;
   window._featIdx=idx;
   const el=document.getElementById('svc-feat');
   if(el)el.innerHTML=_svcFeatHtml(s,idx); // .svc-feat-inner trae la animación de fundido
@@ -4105,14 +4167,14 @@ function svcFeature(idx,scrollTo){
   if(scrollTo&&window.innerWidth<=760&&el)el.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function svcShowFeatMedia(mi){
-  const s=gServ()[window._featIdx||0];if(!s)return;
+  const s=gServVis()[window._featIdx||0];if(!s)return;
   const media=_svcMedia(s);const m=media[mi];if(!m)return;
   const main=document.getElementById('svc-feat-main');if(main)main.innerHTML=_svcMainHtml(m);
   media.forEach((_,i)=>{const t=document.getElementById('svc-fth-'+i);if(t)t.classList.toggle('active',i===mi);});
 }
 // Al reservar: abre el modal con el servicio ya elegido
 function icarChooseService(idx){
-  const s=gServ()[idx];if(!s)return;
+  const s=gServVis()[idx];if(!s)return;
   turnoOpenModal(s.name);
 }
 // Abre el modal de reserva (desde la landing o desde servicios.html),
@@ -4132,9 +4194,9 @@ function renderTurnoServChips(presel){
   let nombres=[];
   try{
     // Unir el catálogo del inicio con el catálogo completo de la página de servicios
-    nombres=gServ().map(s=>s.name);
+    nombres=gServVis().map(s=>s.name);
     if(typeof gSvcPage==='function'){
-      (gSvcPage().cats||[]).forEach(c=>(c.items||[]).forEach(it=>{ if(it.n&&nombres.indexOf(it.n)<0)nombres.push(it.n); }));
+      (gSvcPage().cats||[]).forEach(c=>(c.items||[]).forEach(it=>{ if(it.n&&!_svcItemVacio(it)&&nombres.indexOf(it.n)<0)nombres.push(it.n); }));
     }
   }catch(e){return;} // aún cargando el script
   window._selServs.forEach(p=>{if(nombres.indexOf(p)<0)nombres.unshift(p);});
@@ -4164,7 +4226,7 @@ function _turnoUpdResumen(){
 
 // Botones de servicio del dashboard, generados desde los mismos datos
 function renderServiceButtonsDash(){
-  const list=gServ();
+  const list=gServVis();
   [['#cpanel-turnos .turno-service-list','setTurnoService'],['#explorer-turnos .turno-service-list','setTurnoService2']].forEach(([sel,fn])=>{
     const el=document.querySelector(sel);if(!el)return;
     el.innerHTML=list.map(s=>`<div class="tsv" onclick="${fn}('${_escHtml(s.name).replace(/'/g,'&#39;')}')"><span class="tsv-name">${_escHtml(s.name)}</span><span class="tsv-dur">${_escHtml(s.dur||'')}</span></div>`).join('');
@@ -4782,7 +4844,7 @@ const sSvcPage = v => { localStorage.setItem('ms_services_page', JSON.stringify(
 function _svcImgForCat(nombre){
   const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const palabras=norm(nombre).split(/\s+/).filter(w=>w.length>=5);
-  for(const s of gServ()){
+  for(const s of gServVis()){
     const sn=norm(s.name);
     if(palabras.some(w=>sn.includes(w))&&(s.imgs||[]).length)return s.imgs[0];
   }

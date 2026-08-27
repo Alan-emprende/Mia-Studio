@@ -32,6 +32,15 @@ body{font-family:var(--fb);background:var(--cr);color:var(--dark);min-height:100
 .brand-btn{background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:11px;font-family:var(--fd);font-size:23px;font-weight:600;letter-spacing:.06em;color:var(--goldl);user-select:none;}
 .logo-nav{height:38px;width:38px;object-fit:contain;mix-blend-mode:screen;border-radius:50%;}
 .logo-hero{height:110px;object-fit:contain;mix-blend-mode:screen;filter:brightness(1.12);}
+/* Logo dentro de los modales (login y clave de admin). Antes usaba mix-blend-mode:multiply,
+   que sobre el fondo casi negro de .auth-card daba un cuadrado NEGRO: multiply oscurece, y el
+   logo es un mosaico bordó. Igual que .logo-nav/.logo-hero va con screen; en tema claro se
+   apaga el blend porque screen sobre blanco borraría el logo. */
+.logo-auth{object-fit:contain;mix-blend-mode:screen;border-radius:12px;}
+/* screen sobre un fondo claro borra el logo: en tema claro se apaga el blend.
+   Vale igual para el logo del sidebar del dashboard (única página con modo claro),
+   donde el sidebar pasa a #FFF0E8 y el logo desaparecía. */
+body.light-mode .logo-auth,body.light-mode .logo-sb{mix-blend-mode:normal;}
 .logo-sb{height:32px;width:32px;object-fit:contain;mix-blend-mode:screen;}
 .nav-links{display:flex;gap:30px;}
 .nav-links a{font-size:14px;color:rgba(255,248,240,.65);text-decoration:none;transition:.2s;}
@@ -176,7 +185,10 @@ body{font-family:var(--fb);background:var(--cr);color:var(--dark);min-height:100
 .pc{padding:26px 24px;flex:1;}
 
 /* ── WELCOME ── */
-.welcome-banner{background:linear-gradient(130deg,var(--dark),var(--c1d));border-radius:var(--r3);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;position:relative;overflow:hidden;border:1px solid rgba(201,168,76,.2);}
+/* Mismo caso que .toast: var(--dark) vale CREMA en tema oscuro, así que el degradado arrancaba
+   crema y el saludo (h2, también crema) quedaba en 1.00:1 — invisible. Arranque bordó oscuro fijo:
+   se lee en los dos temas. */
+.welcome-banner{background:linear-gradient(130deg,#2A0812,var(--c1d));border-radius:var(--r3);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;position:relative;overflow:hidden;border:1px solid rgba(201,168,76,.2);}
 .welcome-banner::before{content:'';position:absolute;right:-40px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(201,168,76,.1);}
 .wb-text h2{font-family:var(--fd);font-size:27px;font-weight:400;color:var(--cr);margin-bottom:5px;position:relative;z-index:1;}
 .wb-text h2 em{font-style:italic;color:var(--goldl);}
@@ -313,7 +325,11 @@ body{font-family:var(--fb);background:var(--cr);color:var(--dark);min-height:100
 .lesson-nav{display:flex;justify-content:space-between;align-items:center;padding:20px 32px 28px;border-top:1px solid var(--crd);}
 
 /* ── TOAST ── */
-.toast{position:fixed;bottom:84px;right:24px;background:var(--dark);color:var(--goldl);padding:10px 16px;border-radius:var(--r2);font-size:14px;box-shadow:var(--s3);z-index:500;opacity:0;pointer-events:none;transform:translateY(10px);transition:.3s ease;border:1px solid rgba(201,168,76,.3);}
+/* El fondo NO puede ser var(--dark): en tema oscuro esa variable vale CREMA (#F0E6D3), así que
+   el aviso salía crema con letra dorada pálida = 1.17:1, ilegible. Todos los "✅ Guardado" del
+   panel y del dashboard eran invisibles. Va con colores fijos: un aviso oscuro se lee bien en
+   los dos temas (14:1). */
+.toast{position:fixed;bottom:84px;right:24px;background:#1A0009;color:#F5E9C8;padding:10px 16px;border-radius:var(--r2);font-size:14px;box-shadow:var(--s3);z-index:500;opacity:0;pointer-events:none;transform:translateY(10px);transition:.3s ease;border:1px solid rgba(201,168,76,.3);}
 .toast.show{opacity:1;transform:translateY(0);}
 
 .menu-toggle{display:none;background:none;border:none;font-size:20px;cursor:pointer;color:var(--dark);margin-right:6px;}
@@ -565,9 +581,14 @@ body{font-family:var(--fb);background:var(--cr);color:var(--dark);min-height:100
 
 /* ── ANALYTICS ── */
 .analytics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:22px;}
-.an-stat{background:linear-gradient(135deg,var(--dark),var(--darkm));border-radius:var(--r3);padding:20px;text-align:center;border:1px solid rgba(201,168,76,.2);}
+/* OJO: estas tarjetas SOLO se usan en el panel admin. Antes el fondo era
+   linear-gradient(var(--dark),var(--darkm)); pero admin.html redefine --dark como el color del
+   TEXTO (#F0E6D3, crema), así que la tarjeta salía crema con números dorado pálido encima:
+   contraste 1.17:1, ilegible. Ahora usa la variable de tarjeta del panel. */
+.an-stat{background:var(--adm-card,#1A0009);border-radius:var(--r3);padding:20px;text-align:center;border:1px solid rgba(201,168,76,.2);}
+.an-stat-ic{display:flex;justify-content:center;align-items:center;color:var(--gold);margin-bottom:8px;}
 .an-stat-num{font-family:var(--fd);font-size:36px;font-weight:500;color:var(--goldl);line-height:1;}
-.an-stat-lbl{font-size:11.5px;color:rgba(255,248,240,.5);margin-top:5px;letter-spacing:.04em;text-transform:uppercase;}
+.an-stat-lbl{font-size:11.5px;color:var(--adm-muted,#A07880);margin-top:5px;letter-spacing:.04em;text-transform:uppercase;}
 .chart-wrap{background:var(--sw);border:1px solid var(--crd);border-radius:var(--r3);padding:20px;margin-bottom:18px;}
 .chart-title{font-family:var(--fd);font-size:19px;font-weight:500;color:var(--dark);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
 .an-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
@@ -614,6 +635,17 @@ body{font-family:var(--fb);background:var(--cr);color:var(--dark);min-height:100
 .hist-v-nota{font-size:12.5px;color:var(--adm-muted,var(--muted));margin-top:4px;line-height:1.55;white-space:pre-wrap;}
 .wa-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:50px;background:#25D366;color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:.2s;font-family:var(--fb);}
 .wa-btn:hover{background:#1ebe5d;}
+
+/* ── PORTADA SIN FOTO: MONOGRAMA (reemplaza los emojis de los cursos, ago 2026) ──
+   Inicial del curso en Cormorant itálica dorada, dentro de un aro fino, sobre el degradado
+   que la dueña eligió para el curso. Todo va en `em` para que se escale solo en las tres
+   medidas de tarjeta (.icp-thumb 44px, .cpc-thumb 52px, .cct 58px) sin una sola media query.
+   Sin z-index a propósito: así el cartel de precio, que va después en el DOM, queda encima. */
+.cmono{position:relative;display:flex;align-items:center;justify-content:center;width:1.3em;height:1.3em;border-radius:50%;border:1px solid rgba(201,168,76,.5);background:radial-gradient(circle at 50% 42%,rgba(59,0,15,.86),rgba(26,0,8,.92));}
+.cmono-i{font-family:var(--fd);font-style:italic;font-weight:500;font-size:.84em;line-height:1;color:var(--goldl);}
+.icp-thumb,.cpc-thumb{position:relative;}
+/* Mi progreso: mismo monograma en chico */
+.pcr-mono{flex-shrink:0;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-style:italic;font-size:24px;color:var(--goldl);background:linear-gradient(135deg,#3D0015,#8C0026);border:1px solid rgba(201,168,76,.4);}
 
 /* ── COURSE COVER IMAGE ── */
 .cct-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
@@ -832,7 +864,11 @@ body.dark-mode .ritem,.attach-item{background:rgba(255,255,255,.04);}
 .chat-room-item{display:flex;align-items:center;gap:9px;padding:10px 13px;cursor:pointer;border-left:3px solid transparent;transition:.15s;border-bottom:1px solid rgba(0,0,0,.04);}
 .chat-room-item:hover{background:rgba(140,0,38,.05);}
 .chat-room-item.active{background:rgba(140,0,38,.08);border-left-color:var(--c1);}
-.chat-room-emoji{font-size:18px;flex-shrink:0;}
+/* Las salas de curso ya no traen emoji sino la inicial del curso: se le da la tipografía
+   display en itálica para que no quede como una letra suelta al lado de los emojis fijos
+   (💬 📎 📸). Sin `color` a propósito: hereda var(--dark), que ya se adapta a los dos temas
+   (un dorado fijo reprobaría el contraste en modo claro). */
+.chat-room-emoji{font-size:18px;flex-shrink:0;font-family:var(--fd);font-style:italic;}
 .chat-room-name{font-size:13px;font-weight:500;color:var(--dark);line-height:1.2;}
 .chat-room-last{font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;}
 .chat-room-badge{margin-left:auto;background:var(--c1);color:#fff;border-radius:50px;font-size:11px;font-weight:700;padding:1px 6px;min-width:16px;text-align:center;flex-shrink:0;}
