@@ -585,9 +585,33 @@ body{font-family:var(--fb);background:var(--cr);color:var(--dark);min-height:100
 .ts-pending{background:#FFF3E0;color:#E65100;}
 .ts-confirmed{background:#E8F5E9;color:#2E7D32;}
 .ts-cancelled{background:#FFEBEE;color:#C62828;}
+.ts-done{background:#F3E5F5;color:#7B1FA2;}
 .ts-pending:hover{background:#FFE0B2;}
 .ts-confirmed:hover{background:#C8E6C9;}
 .ts-cancelled:hover{background:#FFCDD2;}
+.ts-done:hover{background:#E1BEE7;}
+
+/* ── TURNOS: pestañas, ficha de atención e historial por clienta ── */
+.adm-ttabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.adm-ttab{padding:9px 20px;border-radius:50px;border:1px solid rgba(201,168,76,.3);background:transparent;color:var(--adm-muted,var(--muted));font-size:13px;font-weight:600;cursor:pointer;font-family:var(--fb);transition:.2s;}
+.adm-ttab.on{background:var(--gold);border-color:var(--gold);color:#1A0008;}
+.adm-ttab:not(.on):hover{border-color:var(--gold);color:var(--gold);}
+.tnota-row td{padding:0 10px 12px!important;border-bottom:1px solid rgba(201,168,76,.12);}
+.tnota-box{background:rgba(201,168,76,.06);border:1px dashed rgba(201,168,76,.35);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;}
+.tnota-box label{font-size:11.5px;font-weight:600;letter-spacing:.04em;color:var(--gold);}
+.tnota-box textarea{width:100%;resize:vertical;}
+.tnota-box .abtn{align-self:flex-start;font-size:12px;padding:7px 16px;}
+.hist-card{margin-bottom:12px;}
+.hist-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:8px;}
+.hist-nombre{font-size:16px;font-weight:600;}
+.hist-tel{font-size:12.5px;color:var(--adm-muted,var(--muted));margin-top:2px;}
+.hist-prox{font-size:12.5px;font-weight:600;color:#2E7D32;background:#E8F5E9;border-radius:10px;padding:7px 12px;margin-bottom:10px;display:inline-block;}
+.hist-prox.venc{color:#C62828;background:#FFEBEE;}
+.hist-visitas{display:flex;flex-direction:column;gap:8px;}
+.hist-visita{border-left:2px solid rgba(201,168,76,.4);padding:2px 0 2px 12px;}
+.hist-v-linea{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.hist-v-fecha{font-size:12.5px;font-weight:600;}
+.hist-v-nota{font-size:12.5px;color:var(--adm-muted,var(--muted));margin-top:4px;line-height:1.55;white-space:pre-wrap;}
 .wa-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:50px;background:#25D366;color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:.2s;font-family:var(--fb);}
 .wa-btn:hover{background:#1ebe5d;}
 
@@ -1329,30 +1353,38 @@ body.light-mode .cc2-bar{background:rgba(140,0,38,.1);}
 
 /* ═══ BOTÓN "MÁS INFO" Y FICHA DE SERVICIO (servicios.html) ═══ */
 .sp-item-right{display:flex;align-items:center;gap:10px;flex-shrink:0;}
-.sp-info-btn{display:inline-flex;align-items:center;gap:5px;background:none;border:1px solid #E4CDB9;color:#8C0026;padding:6px 12px;border-radius:50px;font-family:var(--fb);font-size:11.5px;cursor:pointer;transition:.2s;white-space:nowrap;min-height:32px;}
-.sp-info-btn:hover{background:#FDF5DC;border-color:#C9A84C;}
+.sp-info-btn{display:inline-flex;align-items:center;gap:5px;background:none;border:1px solid #E4CDB9;color:var(--spc-main,#8C0026);padding:6px 12px;border-radius:50px;font-family:var(--fb);font-size:11.5px;cursor:pointer;transition:.2s;white-space:nowrap;min-height:32px;}
+.sp-info-btn:hover{background:#FDF5DC;border-color:var(--spc-gold,#C9A84C);}
 .sp-info-btn svg{flex-shrink:0;}
 @media(max-width:520px){
   .sp-item{flex-wrap:wrap;}
   .sp-item-right{width:100%;justify-content:space-between;margin-top:6px;}
 }
 /* Ficha */
-#svc-info-modal .mcard{max-width:600px;background:#FFF8F0;color:#1A0008;}
-.svci-cat{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A7A2A;margin-bottom:4px;}
-.svci-title{font-family:var(--fd);font-size:clamp(23px,3.4vw,31px);font-weight:500;color:#2A0818;line-height:1.15;margin-bottom:10px;}
+#svc-info-modal .mcard{max-width:600px;background:var(--spc-bg,#FFF8F0);color:var(--spc-text,#1A0008);}
+.svci-cat{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--spc-goldD,#9A7A2A);margin-bottom:4px;}
+.svci-title{font-family:var(--fd);font-size:clamp(23px,3.4vw,31px);font-weight:500;color:var(--spc-text,#2A0818);line-height:1.15;margin-bottom:10px;}
 .svci-precio-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #F0E2D4;}
-.svci-precio{font-family:var(--fd);font-size:26px;font-weight:600;color:#8C0026;}
+.svci-precio{font-family:var(--fd);font-size:26px;font-weight:600;color:var(--spc-main,#8C0026);}
 .svci-nota{font-size:12.5px;color:#A08088;}
 .svci-main{border-radius:14px;overflow:hidden;aspect-ratio:4/3;background:#F3E4D6;margin-bottom:9px;}
 .svci-main img{width:100%;height:100%;object-fit:cover;display:block;animation:svcFade .3s ease both;}
 .svci-thumbs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px;}
 .svci-th{width:62px;height:46px;border-radius:8px;background-size:cover;background-position:center;border:1px solid #E4CDB9;cursor:pointer;padding:0;transition:.2s;}
-.svci-th:hover{border-color:#C9A84C;}
-.svci-th.active{border-color:#8C0026;box-shadow:0 0 0 1px #8C0026;}
+.svci-th:hover{border-color:var(--spc-gold,#C9A84C);}
+.svci-th.active{border-color:var(--spc-main,#8C0026);box-shadow:0 0 0 1px var(--spc-main,#8C0026);}
 .svci-text{font-size:14.5px;line-height:1.75;color:#4A3038;margin-bottom:20px;}
-#svc-info-modal .mclose{color:#8C0026;}
+.svci-res-tit{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--spc-goldD,#9A7A2A);margin-bottom:10px;font-weight:600;}
+.svci-q{border-left:2px solid var(--spc-gold,#C9A84C);padding:2px 0 2px 14px;margin:0 0 12px;font-size:13.5px;line-height:1.65;color:#4A3038;font-style:italic;}
+.svci-q cite{display:block;font-style:normal;font-size:12px;color:var(--spc-soft,#6A464E);margin-top:4px;}
+#svci-res{margin-bottom:20px;}
+/* Grilla de colores del editor del catálogo (panel admin) */
+.svp-colores{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;}
+.svp-col{display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;}
+.svp-col input[type=color]{width:38px;height:30px;border:1px solid rgba(201,168,76,.4);border-radius:8px;background:none;cursor:pointer;padding:2px;}
+#svc-info-modal .mclose{color:var(--spc-main,#8C0026);}
 /* Editor admin: fichas por servicio */
-.svp-det{margin-top:8px;border:1px solid var(--adm-border,#2A0818);border-radius:10px;padding:8px 12px;}
+.svp-det{margin-top:8px;border:1px solid var(--adm-border,var(--spc-text,#2A0818));border-radius:10px;padding:8px 12px;}
 .svp-det summary{cursor:pointer;font-size:12.5px;color:var(--gold);padding:4px 0;}
 .svp-item-info{margin:10px 0;}
 .svp-item-info label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
@@ -1363,8 +1395,38 @@ body.light-mode .cc2-bar{background:rgba(140,0,38,.1);}
 .sp-item-note{color:#8A6A72;}
 .svci-cat{color:#8A6A2A;}
 /* Cerrar la ficha siempre accesible aunque el texto sea largo */
-#svc-info-modal .mclose{position:sticky;top:0;float:right;background:rgba(255,248,240,.95);border-radius:50%;z-index:3;}
+#svc-info-modal .mclose{position:sticky;top:0;float:right;background:var(--spc-bg95,rgba(255,248,240,.95));border-radius:50%;z-index:3;}
 /* Botones para mover secciones del catálogo */
 .abtn-mov{background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.3);color:var(--gold);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:14px;line-height:1;transition:.2s;}
-.abtn-mov:hover:not(:disabled){background:var(--gold);color:#1A0008;}
+.abtn-mov:hover:not(:disabled){background:var(--gold);color:var(--spc-text,#1A0008);}
 .abtn-mov:disabled{opacity:.3;cursor:default;}
+
+/* ═══ EDITOR DE SERVICIOS v2 (panel admin) ═══ */
+.svp-items{display:flex;flex-direction:column;gap:12px;margin-top:10px;}
+.svp-item{border:1px solid var(--adm-border2,#3A1020);border-radius:12px;padding:12px;background:rgba(255,255,255,.02);}
+.svp-item-top{display:flex;align-items:center;gap:7px;margin-bottom:10px;flex-wrap:wrap;}
+.svp-item-top .it-n{flex:1;min-width:150px;}
+.svp-item-top .it-p{max-width:130px;}
+.svp-item-top input{padding:8px 11px;border-radius:8px;border:1px solid var(--adm-border2,#3A1020);background:var(--adm-input,#200010);color:var(--adm-text,#F0E6D3);font-family:var(--fb);font-size:14px;}
+.svp-item-num{width:26px;height:26px;border-radius:50%;background:rgba(201,168,76,.15);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;}
+.pr-servs{display:flex;flex-wrap:wrap;gap:7px;max-height:190px;overflow-y:auto;padding:8px;border:1px solid var(--adm-border2,#3A1020);border-radius:10px;}
+.pr-chk{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--adm-text,#F0E6D3);background:rgba(255,255,255,.04);border-radius:50px;padding:5px 12px;cursor:pointer;}
+.pr-chk input{accent-color:var(--gold);}
+
+/* ═══ PROMOCIONES EN LA PÁGINA DE SERVICIOS ═══ */
+.sp-promos{max-width:1150px;margin:0 auto 34px;padding:0 5vw;}
+.sp-promos-tit{font-family:var(--fd);font-size:clamp(22px,3vw,30px);font-style:italic;color:var(--spc-main,#8C0026);text-align:center;margin-bottom:16px;}
+.sp-oferta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px;}
+.sp-oferta{background:linear-gradient(125deg,var(--spc-dark,#620018),var(--spc-main,#8C0026));color:var(--spc-bg,#FFF8F0);border-radius:20px;padding:22px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(98,0,24,.22);position:relative;overflow:hidden;}
+.sp-oferta::after{content:'';position:absolute;right:-30px;top:-30px;width:150px;height:150px;border-radius:50%;border:1px solid rgba(201,168,76,.25);pointer-events:none;}
+.sp-oferta-img{border-radius:14px;overflow:hidden;aspect-ratio:16/9;}
+.sp-oferta-img img{width:100%;height:100%;object-fit:cover;display:block;}
+.sp-oferta h3{font-family:var(--fd);font-size:23px;font-weight:500;color:var(--spc-bg,#FFF8F0);}
+.sp-oferta p{font-size:13.5px;line-height:1.6;color:rgba(255,248,240,.82);}
+.sp-oferta-inc{display:flex;flex-wrap:wrap;gap:6px;}
+.sp-oferta-inc span{font-size:11.5px;background:rgba(255,255,255,.14);border-radius:50px;padding:4px 11px;}
+.sp-oferta-precios{display:flex;align-items:baseline;gap:10px;margin-top:auto;}
+.sp-oferta-p{font-family:var(--fd);font-size:30px;font-weight:600;color:#E8D5A0;}
+.sp-oferta-antes{font-size:15px;color:rgba(255,248,240,.6);text-decoration:line-through;}
+.sp-oferta-hasta{font-size:11.5px;color:rgba(255,248,240,.7);}
+.sp-oferta .btn-gold{width:100%;}

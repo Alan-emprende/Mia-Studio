@@ -332,6 +332,27 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
         </div>
         <div class="fg" style="margin-bottom:0;"><label>Texto</label><textarea id="svp-promo-text" rows="2"></textarea></div>
       </div>
+      <div class="acard">
+        <h3>🎨 Colores de la página</h3>
+        <p style="font-size:12.5px;color:var(--adm-muted);margin-bottom:12px;">Tocá cada cuadradito para elegir el color. Los cambios se ven al guardar. Si algo queda mal, «Volver a los de fábrica» lo arregla al toque.</p>
+        <div class="svp-colores">
+          <label class="svp-col"><input type="color" id="svp-c-bg"> Fondo de la página</label>
+          <label class="svp-col"><input type="color" id="svp-c-main"> Color principal (bordó)</label>
+          <label class="svp-col"><input type="color" id="svp-c-dark"> Bordó oscuro (bandas)</label>
+          <label class="svp-col"><input type="color" id="svp-c-gold"> Dorado (botones)</label>
+          <label class="svp-col"><input type="color" id="svp-c-goldD"> Dorado oscuro (etiquetas)</label>
+          <label class="svp-col"><input type="color" id="svp-c-text"> Títulos</label>
+          <label class="svp-col"><input type="color" id="svp-c-soft"> Texto</label>
+        </div>
+        <button class="abtn-add" style="margin-top:10px;" onclick="admSvcColoresFabrica()">↺ Volver a los de fábrica</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px;">
+        <h3 style="font-family:var(--fd);">Promociones y combos</h3>
+        <button class="abtn-add" onclick="admPromoNueva()">+ Nueva promoción</button>
+      </div>
+      <p style="font-size:12.5px;color:var(--adm-muted);margin-bottom:10px;">Una promo puede juntar varios servicios con un precio especial. Aparecen arriba de todo en la pestaña Servicios y la clienta puede reservarlas con un toque.</p>
+      <div id="adm-svcpage-promos"></div>
+
       <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0;">
         <h3 style="font-family:var(--fd);">Secciones del catálogo</h3>
         <button class="abtn-add" onclick="admSvcPageNewCat()">+ Nueva sección</button>

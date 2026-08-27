@@ -2208,7 +2208,7 @@ function renderAnalytics(){
   if(tc){
     if(!turnos.length){ tc.innerHTML='<div class="an-empty">No hay turnos recibidos aún.</div>'; }
     else {
-      const byStatus = {pending:0, confirmed:0, cancelled:0};
+      const byStatus = {pending:0, confirmed:0, done:0, cancelled:0};
       turnos.forEach(t => { const s = t.status||'pending'; byStatus[s] = (byStatus[s]||0)+1; });
       const byServ = {};
       turnos.forEach(t => { byServ[t.serv] = (byServ[t.serv]||0)+1; });
@@ -2217,6 +2217,7 @@ function renderAnalytics(){
         <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
           <div class="turno-status ts-pending" style="cursor:default;">⏳ Pendientes: ${byStatus.pending}</div>
           <div class="turno-status ts-confirmed" style="cursor:default;">✅ Confirmados: ${byStatus.confirmed}</div>
+          <div class="turno-status ts-done" style="cursor:default;">💅 Atendidas: ${byStatus.done}</div>
           <div class="turno-status ts-cancelled" style="cursor:default;">❌ Cancelados: ${byStatus.cancelled}</div>
         </div>
         <div style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px;">Por servicio</div>
@@ -2230,19 +2231,54 @@ function renderAnalytics(){
 }
 
 // ═══ TURNOS CON ESTADOS Y WHATSAPP ═══
+// El panel de Turnos tiene dos pestañas: la lista de solicitudes y el
+// historial por clienta (agrupa los turnos por teléfono para ver qué se
+// le hizo en cada visita y cuándo le tocaría volver).
+let _admTurnosTab = 'lista';
+function admTurnosVerTab(t){ _admTurnosTab = t; admRenderTurnosList(); }
+
+// Agrupa por teléfono (solo dígitos, últimos 8 para unificar +54 9 11 etc.);
+// si no hay teléfono, agrupa por nombre.
+function _turnoClaveClienta(t){
+  const dig = String(t.tel||'').replace(/\D/g,'');
+  if(dig.length >= 6) return 'tel:' + dig.slice(-8);
+  return 'nom:' + String(t.name||'').trim().toLowerCase();
+}
+
+// Busca el "se repite cada X días" de un servicio en el catálogo completo.
+// serv puede venir como "A + B" (turno multi-servicio): usa el mayor intervalo.
+function _svcIntervaloDe(servStr){
+  const nombres = String(servStr||'').split(' + ').map(s=>s.trim()).filter(Boolean);
+  if(!nombres.length) return 0;
+  let max = 0;
+  try{
+    (gSvcPage().cats||[]).forEach(c=>(c.items||[]).forEach(it=>{
+      if(it.intervalo && nombres.indexOf(it.n) >= 0) max = Math.max(max, it.intervalo);
+    }));
+  }catch(e){}
+  return max;
+}
+
 function admRenderTurnosList(){
   const turnos = gT();
   const el = document.getElementById('adm-turnos-content');
   if(!el) return;
+
+  const tabs = `<div class="adm-ttabs">
+    <button class="adm-ttab${_admTurnosTab==='lista'?' on':''}" onclick="admTurnosVerTab('lista')">📋 Solicitudes</button>
+    <button class="adm-ttab${_admTurnosTab==='hist'?' on':''}" onclick="admTurnosVerTab('hist')">👤 Historial por clienta</button>
+  </div>`;
+
   if(!turnos.length){
-    el.innerHTML = '<div class="acard" style="text-align:center;padding:40px;"><div style="font-size:40px;margin-bottom:12px;">📅</div><p style="color:var(--muted);">Aún no hay solicitudes de turno.</p></div>';
+    el.innerHTML = tabs + '<div class="acard" style="text-align:center;padding:40px;"><div style="font-size:40px;margin-bottom:12px;">📅</div><p style="color:var(--muted);">Aún no hay solicitudes de turno.</p></div>';
     return;
   }
+  if(_admTurnosTab === 'hist'){ el.innerHTML = tabs + _admTurnosHistorialHtml(turnos); return; }
 
-  const statusLabel = { pending:'⏳ Pendiente', confirmed:'✅ Confirmado', cancelled:'❌ Cancelado' };
-  const statusClass = { pending:'ts-pending', confirmed:'ts-confirmed', cancelled:'ts-cancelled' };
+  const statusLabel = { pending:'⏳ Pendiente', confirmed:'✅ Confirmado', done:'💅 Atendida', cancelled:'❌ Cancelado' };
+  const statusClass = { pending:'ts-pending', confirmed:'ts-confirmed', done:'ts-done', cancelled:'ts-cancelled' };
 
-  el.innerHTML = `<div class="acard" style="overflow-x:auto;">
+  el.innerHTML = tabs + `<div class="acard" style="overflow-x:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
       <div style="font-size:13px;color:var(--muted);">${turnos.length} solicitud${turnos.length!==1?'es':''} recibida${turnos.length!==1?'s':''}</div>
       <button class="abtn" onclick="exportTurnosCSV()" style="font-size:12px;padding:6px 14px;">⬇ Exportar CSV</button>
@@ -2267,14 +2303,104 @@ function admRenderTurnosList(){
             <select class="turno-status ${statusClass[st]}" onchange="changeTurnoStatus(${t.id},this.value,this)" style="border:none;outline:none;cursor:pointer;font-size:11px;font-weight:600;padding:4px 8px;border-radius:50px;font-family:var(--fb);">
               <option value="pending" ${st==='pending'?'selected':''}>⏳ Pendiente</option>
               <option value="confirmed" ${st==='confirmed'?'selected':''}>✅ Confirmado</option>
+              <option value="done" ${st==='done'?'selected':''}>💅 Atendida</option>
               <option value="cancelled" ${st==='cancelled'?'selected':''}>❌ Cancelado</option>
             </select>
           </td>
-          <td><button class="abtn-del" onclick="admDeleteTurno(${t.id})">✕</button></td>
+          <td style="white-space:nowrap;">
+            <button class="abtn-mov" onclick="admToggleAtencion(${t.id})" title="Ficha de atención: qué se le hizo">${t.atencion?'📝':'✎'}</button>
+            <button class="abtn-del" onclick="admDeleteTurno(${t.id})">✕</button>
+          </td>
+        </tr>
+        <tr id="tnota-${t.id}" class="tnota-row" style="display:none;">
+          <td colspan="7">
+            <div class="tnota-box">
+              <label>Qué se le hizo en este turno (solo lo ves vos)</label>
+              <textarea id="tnota-txt-${t.id}" rows="2" placeholder="Ej: volumen medio, curvatura D, 11mm. Vino con service de 3 semanas. Próxima vez probar wispy.">${_escHtml(t.atencion||'')}</textarea>
+              <button class="abtn" onclick="admSaveAtencion(${t.id})">Guardar nota</button>
+            </div>
+          </td>
         </tr>`;
       }).join('')}
       </tbody>
     </table></div>`;
+}
+
+function admToggleAtencion(id){
+  const row=document.getElementById('tnota-'+id);
+  if(row)row.style.display=row.style.display==='none'?'':'none';
+}
+function admSaveAtencion(id){
+  const ta=document.getElementById('tnota-txt-'+id);if(!ta)return;
+  const txt=ta.value.trim();
+  const turnos=gT();const t=turnos.find(x=>x.id===id);if(!t)return;
+  t.atencion=txt;sT(turnos);
+  if(_fbReady&&_db)_db.collection('turnos').doc(String(id)).set({atencion:txt},{merge:true}).catch(()=>{});
+  toast('✅ Nota de atención guardada');
+}
+
+// ── Historial por clienta: agrupa los turnos por teléfono ──
+function _admTurnosHistorialHtml(turnos){
+  const grupos={};
+  turnos.forEach(t=>{
+    const k=_turnoClaveClienta(t);
+    (grupos[k]=grupos[k]||[]).push(t);
+  });
+  const orden=(a,b)=>String(b.date||'').localeCompare(String(a.date||''))||(b.id-a.id);
+  const clientas=Object.values(grupos).map(ts=>{
+    ts.sort(orden);
+    return {ts, ult:ts[0], visitas:ts.filter(t=>t.status==='done').length};
+  }).sort((a,b)=>orden(a.ult,b.ult));
+
+  const stTxt={pending:'⏳ Pendiente',confirmed:'✅ Confirmado',done:'💅 Atendida',cancelled:'❌ Cancelado'};
+  const stCls={pending:'ts-pending',confirmed:'ts-confirmed',done:'ts-done',cancelled:'ts-cancelled'};
+
+  return `<div class="acard" style="margin-bottom:12px;">
+    <input type="text" id="hist-buscar" placeholder="🔍 Buscar por nombre o teléfono..." oninput="admHistFiltrar(this.value)" style="width:100%;">
+    <div style="font-size:12px;color:var(--muted);margin-top:8px;">${clientas.length} clienta${clientas.length!==1?'s':''} · Marcá un turno como «💅 Atendida» en Solicitudes y anotale la ficha ✎ para armar su historial.</div>
+  </div>` + clientas.map(c=>{
+    const t0=c.ult;
+    // Próxima visita sugerida: última atención + intervalo del servicio (si el catálogo lo define)
+    let prox='';
+    const ultDone=c.ts.find(t=>t.status==='done'&&t.date);
+    if(ultDone){
+      const dias=_svcIntervaloDe(ultDone.serv);
+      if(dias>0){
+        const f=new Date(ultDone.date+'T12:00:00');
+        if(!isNaN(f)){
+          f.setDate(f.getDate()+dias);
+          const venc=f<new Date();
+          prox=`<div class="hist-prox${venc?' venc':''}">⏰ ${venc?'Ya le tocaría volver':'Le tocaría volver'} ~ ${f.toLocaleDateString('es-AR',{day:'numeric',month:'long'})} (${_escHtml(ultDone.serv)} cada ${dias} días)</div>`;
+        }
+      }
+    }
+    return `<div class="acard hist-card" data-buscar="${_escHtml((t0.name+' '+t0.tel).toLowerCase())}">
+      <div class="hist-head">
+        <div>
+          <div class="hist-nombre">${_escHtml(t0.name||'Sin nombre')}</div>
+          <div class="hist-tel">${_escHtml(t0.tel||'')} · ${c.ts.length} turno${c.ts.length!==1?'s':''}${c.visitas?` · ${c.visitas} atendida${c.visitas!==1?'s':''}`:''}</div>
+        </div>
+        ${t0.tel?`<button class="wa-btn" data-tel="${_escHtml(t0.tel)}" data-nom="${_escHtml(t0.name||'')}" data-serv="" data-fecha="" onclick="openWhatsApp(this.dataset.tel,this.dataset.nom,this.dataset.serv,this.dataset.fecha)">WhatsApp</button>`:''}
+      </div>
+      ${prox}
+      <div class="hist-visitas">${c.ts.map(t=>`
+        <div class="hist-visita">
+          <div class="hist-v-linea">
+            <span class="hist-v-fecha">${_escHtml(t.date||'—')}${t.time?' · '+_escHtml(t.time):''}</span>
+            <span class="adm-badge">${_escHtml(t.serv||'')}</span>
+            <span class="turno-status ${stCls[t.status||'pending']}" style="font-size:10.5px;padding:3px 9px;">${stTxt[t.status||'pending']}</span>
+          </div>
+          ${t.atencion?`<div class="hist-v-nota">${_escHtml(t.atencion)}</div>`:''}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+function admHistFiltrar(q){
+  q=String(q||'').toLowerCase().trim();
+  document.querySelectorAll('.hist-card').forEach(c=>{
+    c.style.display=!q||c.getAttribute('data-buscar').indexOf(q)>=0?'':'none';
+  });
 }
 
 function admDeleteTurno(id){
@@ -2293,9 +2419,11 @@ function changeTurnoStatus(id, newStatus, selectEl){
   sT(turnos);
   if(_fbReady&&_db)_db.collection('turnos').doc(String(id)).set({status:newStatus},{merge:true}).catch(()=>{});
   _updateTakenSlot(t.date,t.time,newStatus!=='cancelled');
-  const classMap = {pending:'ts-pending',confirmed:'ts-confirmed',cancelled:'ts-cancelled'};
+  const classMap = {pending:'ts-pending',confirmed:'ts-confirmed',done:'ts-done',cancelled:'ts-cancelled'};
   selectEl.className = 'turno-status ' + (classMap[newStatus]||'ts-pending');
-  toast(newStatus==='confirmed'?'✅ Turno confirmado':newStatus==='cancelled'?'❌ Turno cancelado':'⏳ Marcado como pendiente');
+  toast(newStatus==='confirmed'?'✅ Turno confirmado':newStatus==='cancelled'?'❌ Turno cancelado':newStatus==='done'?'💅 Marcada como atendida — anotá qué se le hizo':'⏳ Marcado como pendiente');
+  // Al marcarla atendida se abre la ficha para anotar qué se hizo
+  if(newStatus==='done'){const row=document.getElementById('tnota-'+id);if(row)row.style.display='';}
 }
 
 function openWhatsApp(tel, name, serv, date){
@@ -2307,8 +2435,8 @@ function openWhatsApp(tel, name, serv, date){
 function exportTurnosCSV(){
   const turnos = gT();
   if(!turnos.length){ toast('No hay turnos para exportar'); return; }
-  const rows = [['Nombre','Teléfono','Servicio','Fecha','Hora','Estado','Mensaje','Recibido']];
-  turnos.forEach(t => rows.push([t.name||'',t.tel||'',t.serv||'',t.date||'',t.time||'',t.status||'pending',t.msg||'',t.ts||'']));
+  const rows = [['Nombre','Teléfono','Servicio','Fecha','Hora','Estado','Mensaje','Qué se hizo','Recibido']];
+  turnos.forEach(t => rows.push([t.name||'',t.tel||'',t.serv||'',t.date||'',t.time||'',t.status||'pending',t.msg||'',t.atencion||'',t.ts||'']));
   const csv = rows.map(r => r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
@@ -3990,7 +4118,9 @@ function icarChooseService(idx){
 // Abre el modal de reserva (desde la landing o desde servicios.html),
 // con un servicio preseleccionado si corresponde.
 function turnoOpenModal(pre){
-  renderTurnoServChips(pre?[pre]:[]);
+  // pre puede ser un nombre suelto o una lista (por ejemplo, una promo con varios servicios)
+  const lista = Array.isArray(pre) ? pre.filter(Boolean) : (pre ? [pre] : []);
+  renderTurnoServChips(lista);
   if(typeof icarNextStep==='function')icarNextStep(0);
   openOv('turno-modal');
 }
@@ -4193,31 +4323,31 @@ const DEF_SERVICES_PAGE = {
           "n": "Técnica clásica",
           "p": "$20.000",
           "note": "service $18.000",
-          "info": ""
+          "info": "La técnica clásica es la colocación 1:1: una extensión sobre cada pestaña natural. El resultado es una mirada definida y natural, como si llevaras rímel puesto todo el día pero con más largo y curvatura. Es la opción ideal si es tu primera vez con extensiones o si preferís un efecto liviano y elegante. El service es el retoque de mantenimiento."
         },
         {
           "n": "Volumen bajo",
           "p": "$22.000",
           "note": "service $20.000",
-          "info": ""
+          "info": "En el volumen bajo se colocan abanicos suaves de 2 a 3 extensiones ultralivianas sobre cada pestaña natural. Da un poco más de densidad que la técnica clásica pero sigue siendo un efecto muy natural: pestañas con más cuerpo, sin que se note que llevás extensiones. Perfecto si querés dar el paso siguiente a la clásica sin llegar a un look marcado."
         },
         {
           "n": "Volumen medio",
           "p": "$26.000",
           "note": "service $23.000",
-          "info": ""
+          "info": "El volumen medio trabaja con abanicos de 3 a 5 extensiones por pestaña natural. La mirada gana densidad y profundidad: se nota que las pestañas están más llenas, con un efecto arreglado y femenino que sigue siendo prolijo de cerca. Es el punto justo entre lo natural y lo glam, y uno de los volúmenes más elegidos del estudio."
         },
         {
           "n": "Volumen alto",
           "p": "$29.000",
           "note": "service $26.000",
-          "info": ""
+          "info": "El volumen alto usa abanicos de 5 a 7 extensiones finísimas por pestaña natural. El resultado es una mirada intensa y tupida, con las pestañas bien pobladas de raíz a punta. Es la elección ideal si te gusta que las extensiones se luzcan y buscás un efecto marcado para el día a día o para eventos."
         },
         {
           "n": "Mega volumen",
           "p": "$32.000",
           "note": "service $27.000",
-          "info": ""
+          "info": "El mega volumen es el máximo nivel de densidad: abanicos de muchas extensiones ultrafinas y livianas sobre cada pestaña natural. El efecto es dramático y glamoroso, con las pestañas súper pobladas y un impacto que se nota. A pesar de la cantidad, se trabaja con fibras muy livianas para cuidar tu pestaña natural."
         }
       ]
     },
@@ -4237,49 +4367,49 @@ const DEF_SERVICES_PAGE = {
           "n": "Híbridas",
           "p": "$21.000",
           "note": "service $18.000",
-          "info": ""
+          "info": "Las híbridas combinan la técnica clásica con abanicos de volumen en un mismo diseño. El resultado es una textura con más cuerpo que la clásica pero sin llegar al tupido total: pestañas con relieve, movimiento y un aire natural. Es el efecto ideal si querés algo intermedio, con definición y volumen a la vez."
         },
         {
           "n": "Humedad / rímel",
           "p": "$23.000",
           "note": "service $21.000",
-          "info": ""
+          "info": "El efecto humedad (o rímel) agrupa las extensiones en pequeños picos con un acabado levemente brillante, como pestañas recién maquilladas. La mirada queda definida y con textura, como si acabaras de pasarte la máscara de pestañas, pero lista así todos los días al despertarte."
         },
         {
           "n": "Wispy",
           "p": "$26.000",
           "note": "service $23.000",
-          "info": ""
+          "info": "El wispy alterna picos largos con pestañas más cortas, creando un diseño despeinado a propósito: esponjoso, con movimiento y muchísimo estilo. Es uno de los efectos más pedidos porque estiliza la mirada sin endurecerla — queda elegante de lejos y súper interesante de cerca."
         },
         {
           "n": "Kim \"K\"",
           "p": "$27.000",
           "note": "sin retoques",
-          "info": ""
+          "info": "El efecto Kim \"K\" está inspirado en las pestañas de Kim Kardashian: picos bien marcados y definidos distribuidos sobre una base tupida. Es un diseño con mucha personalidad, ideal si buscás una mirada de impacto estilo celebrity. Este efecto se realiza sin retoques: cuando termina su ciclo, se retira y se vuelve a hacer."
         },
         {
           "n": "Anime",
           "p": "$28.500",
           "note": "sin retoques",
-          "info": ""
+          "info": "El efecto anime crea picos separados, definidos y bien verticales, inspirados en las miradas de los personajes de anime. Abre muchísimo el ojo y da un aire aniñado y expresivo. Es un diseño llamativo y distinto, para quienes quieren algo fuera de lo común. Se realiza sin retoques: al final de su ciclo se retira y se hace de nuevo."
         },
         {
           "n": "Half lash",
           "p": "$35.000",
           "note": "service $28.000",
-          "info": ""
+          "info": "El half lash coloca las extensiones principalmente en la mitad externa del ojo, alargando la mirada hacia afuera. El efecto es rasgado y felino, levanta visualmente el ojo y estiliza muchísimo las facciones. Ideal si buscás ese aire almendrado sin necesidad de delineado."
         },
         {
           "n": "Delineado",
           "p": "$30.000",
           "note": "sin retoques",
-          "info": ""
+          "info": "El efecto delineado usa extensiones dispuestas de forma que dibujan la línea del ojo, como si llevaras un delineado hecho — pero sin maquillaje. La mirada queda definida y lista las 24 horas. Este diseño se realiza sin retoques: cuando cumple su ciclo, se retira y se vuelve a hacer."
         },
         {
           "n": "Foxy",
           "p": "$35.000",
           "note": "service $28.000",
-          "info": ""
+          "info": "El efecto foxy (o \"zorro\") alarga las pestañas hacia las puntas externas con un ángulo que rasga y levanta la mirada, al estilo del famoso \"fox eye\". Estiliza las facciones y da un aire felino y sofisticado. Es uno de los diseños más buscados para lograr ese lifting visual del ojo sin procedimientos."
         }
       ]
     },
@@ -4299,67 +4429,67 @@ const DEF_SERVICES_PAGE = {
           "n": "Pestañas tech \"Y\"",
           "p": "$23.000",
           "note": "service $20.000",
-          "info": ""
+          "info": "Las pestañas tecnológicas en forma de \"Y\" son fibras que ya vienen armadas con dos puntas unidas en una misma base. Al colocarse crean un efecto entramado, con más densidad que una clásica pero manteniendo un peso mínimo sobre tu pestaña natural. Son livianas, prolijas y de colocación más rápida."
         },
         {
           "n": "Pestañas tech \"UU\"",
           "p": "$26.000",
           "note": "service $23.000",
-          "info": ""
+          "info": "Las tecnológicas \"UU\" son fibras con forma de doble U: cuatro puntas por fibra que multiplican la densidad del diseño. El resultado es una mirada más tupida que la tech \"Y\", siempre con la liviandad característica de la línea tecnológica, que cuida la pestaña natural."
         },
         {
           "n": "Pestañas tech \"W\"",
           "p": "$28.000",
           "note": "service $26.000",
-          "info": ""
+          "info": "Las tecnológicas \"W\" vienen armadas con forma de W, con varias puntas por fibra que generan un volumen parejo y uniforme en toda la línea de pestañas. Dan un efecto tupido y ordenado, comparable a un volumen medio, con menos peso y un acabado muy prolijo."
         },
         {
           "n": "Pestañas Borgoña",
           "p": "$30.000",
           "note": "service $25.000",
-          "info": ""
+          "info": "Las pestañas Borgoña son extensiones en tono vino profundo: de frente se ven oscuras como unas pestañas negras, pero a la luz revelan reflejos rojizos únicos. Un detalle de color elegante y distinto, ideal si querés algo especial sin salir de lo clásico."
         },
         {
           "n": "Tech 4D",
           "p": "$29.500",
           "note": "service $27.000",
-          "info": ""
+          "info": "Las tech 4D son abanicos tecnológicos de 4 puntas que ya vienen armados de fábrica. Logran un volumen liviano y parejo, equivalente a un volumen bajo-medio, con la ventaja de la liviandad de la fibra tecnológica y una colocación más pareja y veloz."
         },
         {
           "n": "Tech 5D",
           "p": "$33.000",
           "note": "service $29.500",
-          "info": ""
+          "info": "Las tech 5D suben la densidad con abanicos tecnológicos de 5 puntas. La mirada queda notablemente más llena y con profundidad, manteniendo el peso mínimo sobre la pestaña natural. Un volumen medio-alto con el acabado prolijo característico de la línea tech."
         },
         {
           "n": "Tech 6D",
           "p": "$35.000",
           "note": "service $33.000",
-          "info": ""
+          "info": "Las tech 6D son el máximo de la línea tecnológica: abanicos de 6 puntas para una mirada bien tupida y de impacto. Logran el efecto de un volumen alto con fibras ultralivianas, cuidando tu pestaña natural incluso con tanta densidad."
         },
         {
           "n": "Efecto híbridas tech",
           "p": "$23.000",
           "note": "service $20.000",
-          "info": ""
+          "info": "Es el mismo diseño híbrido — mezcla de definición clásica y abanicos de volumen — pero armado con fibras tecnológicas. Lográs esa textura con relieve y movimiento con un peso menor y una colocación más rápida. La opción tech del efecto más equilibrado."
         },
         {
           "n": "Efecto wispy tech",
           "p": "$26.000",
           "note": "sin retoque",
-          "info": ""
+          "info": "El diseño wispy — picos largos alternados con pestañas cortas, ese look esponjoso y despeinado con estilo — realizado con fibras tecnológicas: más livianas y de aplicación más veloz. Este efecto se realiza sin retoque: al terminar su ciclo se retira y se hace de nuevo."
         },
         {
           "n": "Efecto Kim \"K\" tech",
           "p": "$27.000",
           "note": "sin retoque",
-          "info": ""
+          "info": "El icónico diseño Kim \"K\" — picos marcados sobre base tupida, estilo celebrity — hecho con fibras tecnológicas, que aportan liviandad y un armado más veloz. Se realiza sin retoque: cuando cumple su ciclo, se retira y se vuelve a hacer."
         },
         {
           "n": "Efecto half lash tech",
           "p": "$29.000",
           "note": "sin retoque",
-          "info": ""
+          "info": "El diseño half lash — extensiones concentradas en la mitad externa del ojo para una mirada rasgada y felina — en su versión tecnológica, con fibras más livianas. Se realiza sin retoque: al final de su ciclo se retira y se renueva por completo."
         }
       ]
     },
@@ -4614,13 +4744,34 @@ const DEF_SERVICES_PAGE = {
     }
   ]
 };
+// Relleno de fichas: si un servicio guardado tiene la ficha «Más info» vacía
+// y el catálogo de fábrica trae texto para ese mismo nombre, se usa el de
+// fábrica al LEER (nunca pisa texto escrito por la dueña ni modifica lo guardado).
+let _defFichasIdx = null;
+function _fichaDeFabrica(nombre){
+  if(!_defFichasIdx){
+    _defFichasIdx = {};
+    (DEF_SERVICES_PAGE.cats||[]).forEach(c=>(c.items||[]).forEach(it=>{
+      if(it.n && it.info) _defFichasIdx[it.n] = it.info;
+    }));
+  }
+  return _defFichasIdx[nombre] || '';
+}
 const gSvcPage = () => {
   try {
     const d = localStorage.getItem('ms_services_page');
     const v = d ? JSON.parse(d) : null;
     // Si existe el objeto guardado se respeta aunque tenga 0 secciones
     // (antes, borrar todo hacía reaparecer el catálogo de fábrica).
-    return (v && Array.isArray(v.cats)) ? v : JSON.parse(JSON.stringify(DEF_SERVICES_PAGE));
+    if (v && Array.isArray(v.cats)) {
+      v.cats.forEach(c=>(c.items||[]).forEach(it=>{
+        if(it && it.n && !(it.info||'').trim()){
+          const f=_fichaDeFabrica(it.n); if(f) it.info=f;
+        }
+      }));
+      return v;
+    }
+    return JSON.parse(JSON.stringify(DEF_SERVICES_PAGE));
   } catch(e) { return JSON.parse(JSON.stringify(DEF_SERVICES_PAGE)); }
 };
 const sSvcPage = v => { localStorage.setItem('ms_services_page', JSON.stringify(v)); _fsSet('services_page', v); };
@@ -4637,8 +4788,26 @@ function _svcImgForCat(nombre){
   }
   return '';
 }
+// Paleta editable de servicios.html: aplica d.colors como variables CSS.
+// Si un color no está definido, la página usa sus valores de fábrica.
+const SPC_DEFAULTS={bg:'#FFF8F0',main:'#8C0026',dark:'#620018',gold:'#C9A84C',goldD:'#9A7A2A',text:'#2A0818',soft:'#6A464E'};
+function _spcAplicarColores(colors){
+  const r=document.documentElement.style;
+  const hexOk=v=>/^#[0-9a-fA-F]{6}$/.test(String(v||''));
+  Object.keys(SPC_DEFAULTS).forEach(k=>{
+    const v=colors&&hexOk(colors[k])?colors[k]:'';
+    if(v)r.setProperty('--spc-'+k,v);else r.removeProperty('--spc-'+k);
+  });
+  // versión translúcida del fondo para la barra de navegación
+  const bg=colors&&hexOk(colors.bg)?colors.bg:'';
+  if(bg){
+    const n=parseInt(bg.slice(1),16);
+    r.setProperty('--spc-bg95','rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+',.95)');
+  } else r.removeProperty('--spc-bg95');
+}
 function renderServicesPage(){
   const d = gSvcPage();
+  _spcAplicarColores(d.colors);
   const set=(id,txt)=>{const el=document.getElementById(id);if(el)el.textContent=txt;};
   set('sp-tag', d.heroTag); set('sp-title', d.heroTitle); set('sp-sub', d.heroSub);
   const hi=document.getElementById('sp-hero-img');
@@ -4646,6 +4815,38 @@ function renderServicesPage(){
     const url=d.heroImg||'https://res.cloudinary.com/da0xdmu7k/image/upload/f_auto,q_auto,w_900/v1785279328/mira-estudio/hero/azfgqziwsctsdeckszab.png';
     hi.src=_cldOpt(url,900);
   }
+  // Promociones vigentes (las vencidas se ocultan solas)
+  const pbox=document.getElementById('sp-promos');
+  if(pbox){
+    const hoy=new Date(); hoy.setHours(0,0,0,0);
+    const vig=(d.promos||[]).filter(p=>{
+      if(!p||!p.nombre)return false;
+      if(!p.hasta)return true;
+      const h=new Date(p.hasta+'T23:59:59');
+      return !isNaN(h) && h>=hoy;
+    });
+    if(!vig.length){ pbox.innerHTML=''; pbox.style.display='none'; }
+    else {
+      pbox.style.display='';
+      pbox.innerHTML='<div class="sp-promos-tit">Promociones del mes</div><div class="sp-oferta-grid">'+vig.map((p,pi)=>{
+        const hastaTxt=p.hasta?('Válida hasta el '+_fechaLinda(p.hasta)):'';
+        return `<article class="sp-oferta">
+          ${p.img?`<div class="sp-oferta-img"><img src="${_escHtml(_cldOpt(p.img,700))}" alt="" loading="lazy"></div>`:''}
+          <h3>${_escHtml(p.nombre)}</h3>
+          ${p.desc?`<p>${_escHtml(p.desc)}</p>`:''}
+          ${(p.servicios||[]).length?`<div class="sp-oferta-inc">${p.servicios.map(s=>`<span>${_escHtml(s)}</span>`).join('')}</div>`:''}
+          <div class="sp-oferta-precios">
+            ${p.precio?`<span class="sp-oferta-p">${_escHtml(p.precio)}</span>`:''}
+            ${p.precioAntes?`<span class="sp-oferta-antes">${_escHtml(p.precioAntes)}</span>`:''}
+          </div>
+          ${hastaTxt?`<div class="sp-oferta-hasta">${_escHtml(hastaTxt)}</div>`:''}
+          <button class="btn-gold" onclick="promoReservar(${pi})">Reservar esta promo</button>
+        </article>`;
+      }).join('')+'</div>';
+      window._promosVig=vig;
+    }
+  }
+
   // chips de navegación
   const chips=document.getElementById('sp-chips');
   if(chips) chips.innerHTML=d.cats.map(c=>`<a class="sp-chip" href="#cat-${_escHtml(c.id)}">${_escHtml(c.name)}</a>`).join('');
@@ -4694,6 +4895,21 @@ function _abrirTurnosSiCorresponde(){
 }
 
 // ── Admin: editor de la página de servicios ──
+// ═══════════════════════════════════════════════════════
+// EDITOR COMPLETO DE LA PÁGINA DE SERVICIOS (panel admin)
+// Cada sección y cada servicio se editan por separado: nombre, precio,
+// nota, ficha, fotos, video y cada cuánto se repite. Más promociones.
+// Al guardar se lee lo que está EN PANTALLA (el DOM manda), así nada
+// se corre de lugar aunque se agreguen, borren o muevan cosas.
+// ═══════════════════════════════════════════════════════
+function _admGal(fotos, onAdd, onDel, titulo){
+  return `<div class="fg" style="margin:0 0 8px;"><label>${titulo}</label>
+    <div class="svc-adm-imgs">
+      ${(fotos||[]).map((u,ui)=>`<div class="svc-adm-img" style="background-image:url('${_escHtml(_cldOpt(u,160))}')"><button class="svc-adm-img-del" onclick="${onDel}(${ui})" title="Quitar foto">✕</button></div>`).join('')}
+      <label class="svc-adm-add" title="Agregar fotos">+<input type="file" accept="image/*" multiple style="display:none;" onchange="${onAdd}(event)"></label>
+    </div></div>`;
+}
+
 function admRenderSvcPage(){
   const d=gSvcPage();
   const g=id=>document.getElementById(id);
@@ -4703,43 +4919,108 @@ function admRenderSvcPage(){
   if(g('svp-promo-title'))g('svp-promo-title').value=d.promoTitle||'';
   if(g('svp-promo-text'))g('svp-promo-text').value=d.promoText||'';
   if(g('svp-promo-price'))g('svp-promo-price').value=d.promoPrice||'';
+
+  // Paleta de colores
+  Object.keys(SPC_DEFAULTS).forEach(k=>{
+    const el=g('svp-c-'+k);
+    if(el)el.value=(d.colors&&d.colors[k])||SPC_DEFAULTS[k];
+  });
+
+  // ── Promociones y combos ──
+  const pel=g('adm-svcpage-promos');
+  if(pel){
+    const todos=[];
+    (d.cats||[]).forEach(c=>(c.items||[]).forEach(it=>{ if(it.n) todos.push(it.n); }));
+    pel.innerHTML=(d.promos||[]).map((p,pi)=>`
+      <div class="arow" data-promo="${pi}">
+        <div class="arow-main">
+          <div class="adm-grid2" style="gap:8px;">
+            <div class="fg" style="margin:0 0 8px;"><label>Nombre de la promo</label><input type="text" class="pr-n" value="${_escHtml(p.nombre||'')}"></div>
+            <div class="fg" style="margin:0 0 8px;"><label>Precio de la promo</label><input type="text" class="pr-p" value="${_escHtml(p.precio||'')}" placeholder="$30.000"></div>
+          </div>
+          <div class="adm-grid2" style="gap:8px;">
+            <div class="fg" style="margin:0 0 8px;"><label>Precio sin promo (sale tachado)</label><input type="text" class="pr-pa" value="${_escHtml(p.precioAntes||'')}" placeholder="$38.000"></div>
+            <div class="fg" style="margin:0 0 8px;"><label>Válida hasta (opcional)</label><input type="date" class="pr-h" value="${_escHtml(p.hasta||'')}"></div>
+          </div>
+          <div class="fg" style="margin:0 0 8px;"><label>Descripción</label><textarea class="pr-d" rows="2">${_escHtml(p.desc||'')}</textarea></div>
+          <div class="fg" style="margin:0 0 8px;"><label>Servicios que incluye (tildá los que entran)</label>
+            <div class="pr-servs">${todos.map(n=>`<label class="pr-chk"><input type="checkbox" value="${_escHtml(n)}" ${(p.servicios||[]).indexOf(n)>=0?'checked':''}> ${_escHtml(n)}</label>`).join('')}</div>
+          </div>
+          ${_admGal(p.img?[p.img]:[], 'admPromoFoto_'+pi, 'admPromoFotoDel_'+pi, 'Foto de la promo (opcional)')}
+        </div>
+        <div class="arow-acts" style="display:flex;flex-direction:column;gap:5px;">
+          <button class="abtn-mov" onclick="admPromoMover(${pi},-1)" ${pi===0?'disabled':''} title="Subir">↑</button>
+          <button class="abtn-mov" onclick="admPromoMover(${pi},1)" ${pi===(d.promos||[]).length-1?'disabled':''} title="Bajar">↓</button>
+          <button class="abtn-del" onclick="admPromoBorrar(${pi})" title="Eliminar promo">✕</button>
+        </div>
+      </div>`).join('') || '<p style="color:var(--adm-muted);font-size:13px;">Todavía no cargaste promociones. Una promo puede juntar varios servicios con un precio especial.</p>';
+    (d.promos||[]).forEach((p,pi)=>{
+      window['admPromoFoto_'+pi]=ev=>admPromoSubirFoto(pi,ev);
+      window['admPromoFotoDel_'+pi]=()=>admPromoBorrarFoto(pi);
+    });
+  }
+
+  // ── Secciones y sus servicios ──
   const el=g('adm-svcpage-cats');if(!el)return;
   el.innerHTML=d.cats.map((c,idx)=>`
-    <div class="arow">
+    <div class="arow" data-cat="${idx}">
       <div class="arow-main">
-        <div class="adm-grid2" style="gap:8px;margin-bottom:7px;">
-          <div class="fg" style="margin:0;"><label>Sección ${idx+1} de ${d.cats.length} — nombre</label><input type="text" id="svp-cat-name-${idx}" value="${_escHtml(c.name)}"></div>
-          <div class="fg" style="margin:0;"><label>Foto de la sección</label>
-            <div class="svc-adm-imgs">
-              ${c.img?`<div class="svc-adm-img" style="background-image:url('${_escHtml(_cldOpt(c.img,160))}')"><button class="svc-adm-img-del" onclick="admSvcPageDelImg(${idx})">✕</button></div>`:''}
-              <label class="svc-adm-add">+<input type="file" accept="image/*" style="display:none;" onchange="admSvcPageAddImg(${idx},event)"></label>
-            </div>
+        <div class="adm-grid2" style="gap:8px;">
+          <div class="fg" style="margin:0 0 8px;"><label>Sección ${idx+1} de ${d.cats.length} — nombre</label><input type="text" class="ct-n" value="${_escHtml(c.name)}"></div>
+          <div class="fg" style="margin:0 0 8px;"><label>Video de la sección (link de YouTube o MP4)</label><input type="text" class="ct-v" value="${_escHtml(c.video||'')}" placeholder="https://youtube.com/..."></div>
+        </div>
+        <div class="fg" style="margin:0 0 8px;"><label>Descripción corta (se ve en la lista)</label><textarea class="ct-d" rows="2">${_escHtml(c.desc)}</textarea></div>
+        <div class="fg" style="margin:0 0 8px;"><label>Ficha «Más info» de la sección (la usan los servicios sin texto propio)</label><textarea class="ct-i" rows="3">${_escHtml(c.info||'')}</textarea></div>
+        ${_admGal(c.img?[c.img]:[], 'admSvcCatFoto_'+idx, 'admSvcCatFotoDel_'+idx, 'Foto principal de la sección')}
+        ${_admGal(c.imgs, 'admSvcCatGal_'+idx, 'admSvcCatGalDel_'+idx, 'Galería de la sección (se ve en «Más info»)')}
+        <details class="svp-det"${idx===0?' open':''}>
+          <summary>Servicios de esta sección (${(c.items||[]).length}) — tocá para editarlos uno por uno</summary>
+          <div class="svp-items">
+            ${(c.items||[]).map((it,ii)=>`
+              <div class="svp-item" data-item="${ii}">
+                <div class="svp-item-top">
+                  <span class="svp-item-num">${ii+1}</span>
+                  <input type="text" class="it-n" value="${_escHtml(it.n)}" placeholder="Nombre del servicio">
+                  <input type="text" class="it-p" value="${_escHtml(it.p)}" placeholder="Precio">
+                  <button class="abtn-mov" onclick="admSvcItemMover(${idx},${ii},-1)" ${ii===0?'disabled':''} title="Subir">↑</button>
+                  <button class="abtn-mov" onclick="admSvcItemMover(${idx},${ii},1)" ${ii===(c.items||[]).length-1?'disabled':''} title="Bajar">↓</button>
+                  <button class="abtn-del" onclick="admSvcItemBorrar(${idx},${ii})" title="Eliminar servicio">✕</button>
+                </div>
+                <div class="adm-grid2" style="gap:8px;">
+                  <div class="fg" style="margin:0 0 8px;"><label>Nota al lado del precio</label><input type="text" class="it-note" value="${_escHtml(it.note||'')}" placeholder="service $18.000"></div>
+                  <div class="fg" style="margin:0 0 8px;"><label>Se repite cada (días) — para avisarle a la clienta</label><input type="number" class="it-int" value="${_escHtml(it.intervalo||'')}" placeholder="21" min="0"></div>
+                </div>
+                <div class="fg" style="margin:0 0 8px;"><label>Ficha «Más info» propia (vacía = usa la de la sección)</label><textarea class="it-i" rows="3">${_escHtml(it.info||'')}</textarea></div>
+                <div class="fg" style="margin:0 0 8px;"><label>Video del servicio (link de YouTube o MP4)</label><input type="text" class="it-v" value="${_escHtml(it.video||'')}" placeholder="https://youtube.com/..."></div>
+                <div class="fg" style="margin:0 0 8px;"><label>Reseñas de clientas (una por línea: Texto | Nombre)</label><textarea class="it-r" rows="2" placeholder="Me encantó, me duraron 4 semanas | Sofía">${_escHtml((it.res||[]).map(r=>r.t+(r.a?' | '+r.a:'')).join('\n'))}</textarea></div>
+                ${_admGal(it.imgs, 'admSvcItemGal_'+idx+'_'+ii, 'admSvcItemGalDel_'+idx+'_'+ii, 'Fotos propias de este servicio')}
+              </div>`).join('')}
           </div>
-        </div>
-        <div class="fg" style="margin-bottom:7px;"><label>Descripción corta (se ve en la lista)</label><textarea id="svp-cat-desc-${idx}" rows="2">${_escHtml(c.desc)}</textarea></div>
-        <div class="fg" style="margin-bottom:7px;"><label>Ficha "Más info" de toda la sección (la usan los servicios que no tienen texto propio)</label><textarea id="svp-cat-info-${idx}" rows="3">${_escHtml(c.info||'')}</textarea></div>
-        <div class="fg" style="margin-bottom:7px;"><label>Fotos de la ficha (se muestran en "Más info")</label>
-          <div class="svc-adm-imgs">
-            ${(c.imgs||[]).map((u,ui)=>`<div class="svc-adm-img" style="background-image:url('${_escHtml(_cldOpt(u,160))}')"><button class="svc-adm-img-del" onclick="admSvcPageDelGal(${idx},${ui})" title="Quitar">✕</button></div>`).join('')}
-            <label class="svc-adm-add" title="Agregar fotos">+<input type="file" accept="image/*" multiple style="display:none;" onchange="admSvcPageAddGal(${idx},event)"></label>
-          </div>
-        </div>
-        <div class="fg" style="margin-bottom:7px;"><label>Servicios y precios — un servicio por línea, con este formato:<br><code style="color:var(--gold);font-size:11.5px;">Nombre | Precio | Nota (opcional)</code><br><span style="font-size:11.5px;color:var(--muted);">Para cambiar el orden, movés las líneas de lugar. Se muestran en el mismo orden en la página.</span></label>
-          <textarea id="svp-cat-items-${idx}" rows="${Math.max(3,(c.items||[]).length+1)}" oninput="admSvcPageSyncItems(${idx})">${(c.items||[]).map(it=>[it.n,it.p,it.note].filter((x,i)=>i<2||x).join(' | ')).map(_escHtml).join('\n')}</textarea>
-        </div>
-        <details class="svp-det"><summary>Ficha propia de cada servicio (opcional) — ${(c.items||[]).length} servicios</summary>
-          <div id="svp-cat-infos-${idx}">${_admSvcItemInfos(c,idx)}</div>
+          <button class="abtn-add" style="margin-top:8px;" onclick="admSvcItemNuevo(${idx})">+ Agregar servicio a esta sección</button>
         </details>
       </div>
       <div class="arow-acts" style="display:flex;flex-direction:column;gap:5px;">
-        <button class="abtn-mov" onclick="admSvcPageMoverCat(${idx},-1)" title="Subir esta sección" ${idx===0?'disabled':''}>↑</button>
-        <button class="abtn-mov" onclick="admSvcPageMoverCat(${idx},1)" title="Bajar esta sección" ${idx===d.cats.length-1?'disabled':''}>↓</button>
+        <button class="abtn-mov" onclick="admSvcPageMoverCat(${idx},-1)" ${idx===0?'disabled':''} title="Subir sección">↑</button>
+        <button class="abtn-mov" onclick="admSvcPageMoverCat(${idx},1)" ${idx===d.cats.length-1?'disabled':''} title="Bajar sección">↓</button>
         <button class="abtn-del" onclick="admSvcPageDelCat(${idx})" title="Eliminar sección">✕</button>
       </div>
     </div>`).join('');
+  d.cats.forEach((c,idx)=>{
+    window['admSvcCatFoto_'+idx]=ev=>admSvcSubirFoto(idx,ev,'img');
+    window['admSvcCatFotoDel_'+idx]=()=>admSvcBorrarFoto(idx,'img');
+    window['admSvcCatGal_'+idx]=ev=>admSvcSubirFoto(idx,ev,'imgs');
+    window['admSvcCatGalDel_'+idx]=ui=>admSvcBorrarFoto(idx,'imgs',ui);
+    (c.items||[]).forEach((it,ii)=>{
+      window['admSvcItemGal_'+idx+'_'+ii]=ev=>admSvcItemSubirFoto(idx,ii,ev);
+      window['admSvcItemGalDel_'+idx+'_'+ii]=ui=>admSvcItemBorrarFoto(idx,ii,ui);
+    });
+  });
 }
+
+// Lee TODO lo que está en pantalla (el DOM manda) sin guardar todavía
 function _admSvcPageCollect(){
   const d=gSvcPage();
+  const guardado=gSvcPage();
   const g=id=>document.getElementById(id);
   if(g('svp-tag'))d.heroTag=g('svp-tag').value.trim();
   if(g('svp-title'))d.heroTitle=g('svp-title').value.trim();
@@ -4747,72 +5028,184 @@ function _admSvcPageCollect(){
   if(g('svp-promo-title'))d.promoTitle=g('svp-promo-title').value.trim();
   if(g('svp-promo-text'))d.promoText=g('svp-promo-text').value.trim();
   if(g('svp-promo-price'))d.promoPrice=g('svp-promo-price').value.trim();
-  d.cats.forEach((c,idx)=>{
-    if(g('svp-cat-name-'+idx))c.name=g('svp-cat-name-'+idx).value.trim();
-    if(g('svp-cat-desc-'+idx))c.desc=g('svp-cat-desc-'+idx).value.trim();
-    if(g('svp-cat-info-'+idx))c.info=g('svp-cat-info-'+idx).value.trim();
-    // Las fichas y fotos por servicio se recuperan por NOMBRE (data-n del textarea),
-    // nunca por índice: así no se corren si se agrega, borra o reordena una línea.
-    const prev={};
-    (c.items||[]).forEach(it=>{ prev[it.n]={info:it.info||'', imgs:it.imgs||null}; });
-    const cont=g('svp-cat-infos-'+idx);
-    if(cont)cont.querySelectorAll('textarea[data-n]').forEach(ta2=>{
-      const n=ta2.getAttribute('data-n');
-      prev[n]=prev[n]||{info:'',imgs:null};
-      prev[n].info=ta2.value.trim();
+
+  // Paleta de colores de la página
+  if(g('svp-c-bg')){
+    d.colors={};
+    Object.keys(SPC_DEFAULTS).forEach(k=>{
+      const el=g('svp-c-'+k);
+      if(el&&el.value&&el.value.toLowerCase()!==SPC_DEFAULTS[k].toLowerCase())d.colors[k]=el.value;
     });
-    const ta=g('svp-cat-items-'+idx);
-    if(ta){
-      const lineas=ta.value.split('\n').map(l=>l.trim()).filter(Boolean);
-      // El respaldo por posición SOLO aplica si no se agregaron ni borraron líneas:
-      // ahí un nombre que no coincide es un renombrado, y la ficha debe seguirlo.
-      const mismaCantidad=lineas.length===(c.items||[]).length;
-      c.items=lineas.map((l,li)=>{
-        const parts=l.split('|').map(x=>x.trim());
-        const n=parts[0]||'';
-        const guardado=prev[n]||{};
-        const item={n, p:parts[1]||'', note:parts[2]||'', info:guardado.info||''};
-        if(guardado.imgs)item.imgs=guardado.imgs; // no perder las fotos propias
-        if(!item.info && mismaCantidad && !prev[n] && (c.items||[])[li]){
-          item.info=c.items[li].info||'';
-          if(!item.imgs && c.items[li].imgs)item.imgs=c.items[li].imgs;
+    if(!Object.keys(d.colors).length)delete d.colors;
+  }
+
+  const cont=g('adm-svcpage-cats');
+  const filas=cont?[...cont.querySelectorAll('.arow[data-cat]')]:[];
+  if(filas.length){
+    d.cats=filas.map(fila=>{
+      const i=parseInt(fila.getAttribute('data-cat'),10);
+      const previa=(guardado.cats||[])[i]||{};
+      const val=cls=>{const e=fila.querySelector(cls);return e?String(e.value).trim():'';};
+      const cat={
+        id: previa.id||('cat'+i),
+        name: val('.ct-n'), desc: val('.ct-d'), info: val('.ct-i'), video: val('.ct-v'),
+        img: previa.img||'', imgs: previa.imgs||[], items: [],
+      };
+      cat.items=[...fila.querySelectorAll('.svp-item[data-item]')].map(box=>{
+        const ii=parseInt(box.getAttribute('data-item'),10);
+        const itPrev=(previa.items||[])[ii]||{};
+        const v=cls=>{const e=box.querySelector(cls);return e?String(e.value).trim():'';};
+        const it={ n:v('.it-n'), p:v('.it-p'), note:v('.it-note'), info:v('.it-i'), video:v('.it-v') };
+        const inter=v('.it-int'); if(inter)it.intervalo=parseInt(inter,10)||0;
+        if(itPrev.imgs&&itPrev.imgs.length)it.imgs=itPrev.imgs;
+        // Reseñas: una por línea, "Texto | Nombre"
+        const rtxt=v('.it-r');
+        if(rtxt){
+          it.res=rtxt.split('\n').map(l=>{
+            const p2=l.split('|'); const t=(p2[0]||'').trim(); const a=(p2.slice(1).join('|')||'').trim();
+            return t?{t,a}:null;
+          }).filter(Boolean);
         }
-        return item;
+        return it;
       }).filter(it=>it.n);
-    }
-  });
+      return cat;
+    });
+  }
+
+  const pc=g('adm-svcpage-promos');
+  if(pc){
+    const pf=[...pc.querySelectorAll('.arow[data-promo]')];
+    d.promos=pf.map(fila=>{
+      const pi=parseInt(fila.getAttribute('data-promo'),10);
+      const prev=(guardado.promos||[])[pi]||{};
+      const val=cls=>{const e=fila.querySelector(cls);return e?String(e.value).trim():'';};
+      return {
+        id: prev.id||('promo'+pi),
+        nombre: val('.pr-n'), precio: val('.pr-p'), precioAntes: val('.pr-pa'),
+        hasta: val('.pr-h'), desc: val('.pr-d'),
+        servicios: [...fila.querySelectorAll('.pr-servs input:checked')].map(c=>c.value),
+        img: prev.img||'',
+      };
+    }).filter(p=>p.nombre);
+  }
   return d;
 }
-function admSvcPageSave(){
+
+function admSvcColoresFabrica(){
   const d=_admSvcPageCollect();
-  sSvcPage(d);toast('✅ Página de servicios guardada');admRenderSvcPage();
+  delete d.colors;
+  sSvcPage(d);admRenderSvcPage();
+  toast('🎨 Colores de fábrica restaurados');
+}
+function admSvcPageSave(){
+  sSvcPage(_admSvcPageCollect());
+  toast('✅ Página de servicios guardada');
+  admRenderSvcPage();
 }
 function admSvcPageNewCat(){
   const d=_admSvcPageCollect();
-  d.cats.push({id:'cat'+Date.now(),name:'Nueva sección',desc:'',img:'',items:[]});
+  d.cats.push({id:'cat_'+d.cats.length+'_n',name:'Nueva sección',desc:'',info:'',img:'',imgs:[],video:'',items:[]});
   sSvcPage(d);admRenderSvcPage();
 }
 function admSvcPageDelCat(idx){
-  if(!confirm('¿Eliminar esta sección completa?'))return;
+  if(!confirm('¿Eliminar esta sección completa, con todos sus servicios?'))return;
   const d=_admSvcPageCollect();d.cats.splice(idx,1);sSvcPage(d);admRenderSvcPage();
 }
-async function admSvcPageAddImg(idx,ev){
-  const file=ev.target.files[0];if(!file)return;
+function admSvcPageMoverCat(idx,dir){
   const d=_admSvcPageCollect();
-  try{
-    toast('☁ Subiendo foto...');
-    d.cats[idx].img=await uploadToCloudinary(file,'servicios-pagina');
-    sSvcPage(d);admRenderSvcPage();toast('✅ Foto de la sección actualizada');
-  }catch(e){toast('⚠️ '+e.message);}
+  const j=idx+dir; if(j<0||j>=d.cats.length)return;
+  const [x]=d.cats.splice(idx,1); d.cats.splice(j,0,x);
+  sSvcPage(d);admRenderSvcPage();toast('Sección movida al lugar '+(j+1));
 }
-function admSvcPageDelImg(idx){
-  const d=_admSvcPageCollect();d.cats[idx].img='';sSvcPage(d);admRenderSvcPage();
+// ── Servicios dentro de una sección ──
+function admSvcItemNuevo(idx){
+  const d=_admSvcPageCollect();
+  if(!d.cats[idx])return;
+  (d.cats[idx].items=d.cats[idx].items||[]).push({n:'Nuevo servicio',p:'Consultar',note:'',info:'',video:''});
+  sSvcPage(d);admRenderSvcPage();
+  toast('Servicio agregado — completá sus datos y guardá');
+}
+function admSvcItemBorrar(idx,ii){
+  if(!confirm('¿Eliminar este servicio?'))return;
+  const d=_admSvcPageCollect();
+  if(d.cats[idx]&&d.cats[idx].items){d.cats[idx].items.splice(ii,1);sSvcPage(d);admRenderSvcPage();}
+}
+function admSvcItemMover(idx,ii,dir){
+  const d=_admSvcPageCollect();
+  const arr=d.cats[idx]&&d.cats[idx].items; if(!arr)return;
+  const j=ii+dir; if(j<0||j>=arr.length)return;
+  const [x]=arr.splice(ii,1); arr.splice(j,0,x);
+  sSvcPage(d);admRenderSvcPage();
+}
+// ── Fotos ──
+async function admSvcSubirFoto(idx,ev,campo){
+  const files=[...(ev.target.files||[])];if(!files.length)return;ev.target.value='';
+  const d=_admSvcPageCollect();
+  if(!d.cats[idx])return;
+  toast('☁ Subiendo...');
+  let ok=0,err=0;
+  for(const f of files){
+    try{
+      const url=await uploadToCloudinary(f,'servicios-pagina');
+      if(campo==='img'){ d.cats[idx].img=url; ok++; break; }
+      (d.cats[idx].imgs=d.cats[idx].imgs||[]).push(url); ok++;
+    }catch(e){err++;}
+  }
+  sSvcPage(d);admRenderSvcPage();
+  toast(ok?('✅ '+ok+' foto'+(ok!==1?'s':'')+' lista'+(ok!==1?'s':'')+(err?' · '+err+' fallaron':'')):'⚠️ No se pudo subir ninguna foto');
+}
+function admSvcBorrarFoto(idx,campo,ui){
+  const d=_admSvcPageCollect();
+  if(!d.cats[idx])return;
+  if(campo==='img')d.cats[idx].img='';
+  else if(d.cats[idx].imgs)d.cats[idx].imgs.splice(ui,1);
+  sSvcPage(d);admRenderSvcPage();
+}
+async function admSvcItemSubirFoto(idx,ii,ev){
+  const files=[...(ev.target.files||[])];if(!files.length)return;ev.target.value='';
+  const d=_admSvcPageCollect();
+  const it=d.cats[idx]&&d.cats[idx].items[ii]; if(!it)return;
+  toast('☁ Subiendo...');
+  let ok=0,err=0;
+  for(const f of files){
+    try{ (it.imgs=it.imgs||[]).push(await uploadToCloudinary(f,'servicios-pagina')); ok++; }catch(e){err++;}
+  }
+  sSvcPage(d);admRenderSvcPage();
+  toast(ok?'✅ Fotos del servicio actualizadas':'⚠️ No se pudo subir');
+}
+function admSvcItemBorrarFoto(idx,ii,ui){
+  const d=_admSvcPageCollect();
+  const it=d.cats[idx]&&d.cats[idx].items[ii];
+  if(it&&it.imgs){it.imgs.splice(ui,1);sSvcPage(d);admRenderSvcPage();}
+}
+// ── Promociones ──
+function admPromoNueva(){
+  const d=_admSvcPageCollect();
+  (d.promos=d.promos||[]).push({id:'promo_'+((d.promos||[]).length+1),nombre:'Nueva promo',desc:'',servicios:[],precio:'',precioAntes:'',hasta:'',img:''});
+  sSvcPage(d);admRenderSvcPage();
+}
+function admPromoBorrar(pi){
+  if(!confirm('¿Eliminar esta promoción?'))return;
+  const d=_admSvcPageCollect();(d.promos||[]).splice(pi,1);sSvcPage(d);admRenderSvcPage();
+}
+function admPromoMover(pi,dir){
+  const d=_admSvcPageCollect();
+  const j=pi+dir; if(!d.promos||j<0||j>=d.promos.length)return;
+  const [x]=d.promos.splice(pi,1); d.promos.splice(j,0,x);
+  sSvcPage(d);admRenderSvcPage();
+}
+async function admPromoSubirFoto(pi,ev){
+  const f=(ev.target.files||[])[0];if(!f)return;ev.target.value='';
+  const d=_admSvcPageCollect();
+  if(!d.promos||!d.promos[pi])return;
+  try{ toast('☁ Subiendo foto...'); d.promos[pi].img=await uploadToCloudinary(f,'promos'); sSvcPage(d);admRenderSvcPage();toast('✅ Foto de la promo lista'); }
+  catch(e){ toast('⚠️ '+e.message); }
+}
+function admPromoBorrarFoto(pi){
+  const d=_admSvcPageCollect();
+  if(d.promos&&d.promos[pi]){d.promos[pi].img='';sSvcPage(d);admRenderSvcPage();}
 }
 
-
-// ═══ FICHA "MÁS INFO" DE CADA SERVICIO (servicios.html) ═══
-// Abre una ficha con las fotos del servicio + la información del catálogo.
-let _svcInfoMedia = [], _svcInfoNombre = '';
 function svcInfoOpen(ci, ii, nombre){
   const d = gSvcPage();
   const c = d.cats[ci]; if(!c){ toast('Ese servicio ya no está disponible'); return; }
@@ -4822,7 +5215,10 @@ function svcInfoOpen(ci, ii, nombre){
     (d.cats.map(cc => (cc.items||[]).find(x => x.n === nombre)).filter(Boolean)[0]);
   if(!it){ toast('Ese servicio ya no está disponible'); return; }
   _svcInfoNombre = it.n;
-  _svcInfoMedia = ((it.imgs && it.imgs.length) ? it.imgs : (c.imgs && c.imgs.length ? c.imgs : [c.img])).filter(Boolean);
+  const fotos = ((it.imgs && it.imgs.length) ? it.imgs : (c.imgs && c.imgs.length ? c.imgs : [c.img])).filter(Boolean);
+  _svcInfoMedia = fotos.slice();
+  const vid = it.video || c.video || '';
+  if(vid){ const v = parseVideoUrl(vid); if(v) _svcInfoMedia.push('__VIDEO__' + v.embed + (v.type==='mp4' ? '|mp4' : '')); }
   const texto = it.info || c.info || '';
   const g = id => document.getElementById(id);
   if(g('svci-cat')) g('svci-cat').textContent = c.name;
@@ -4830,20 +5226,45 @@ function svcInfoOpen(ci, ii, nombre){
   if(g('svci-price')) g('svci-price').textContent = it.p || '';
   if(g('svci-note')){ g('svci-note').textContent = it.note || ''; g('svci-note').style.display = it.note ? '' : 'none'; }
   if(g('svci-text')) g('svci-text').textContent = texto;
+  // Reseñas propias del servicio (las carga la dueña en el editor)
+  const rbox = g('svci-res');
+  if(rbox){
+    const res = (it.res||[]).filter(r=>r&&r.t);
+    if(res.length){
+      rbox.style.display='';
+      rbox.innerHTML = '<div class="svci-res-tit">Lo que dicen las clientas</div>' +
+        res.map(r=>`<blockquote class="svci-q">“${_escHtml(r.t)}”${r.a?`<cite>— ${_escHtml(r.a)}</cite>`:''}</blockquote>`).join('');
+    } else { rbox.style.display='none'; rbox.innerHTML=''; }
+  }
   const gal = g('svci-gal');
   if(gal){
     if(_svcInfoMedia.length){
       gal.style.display = '';
-      gal.innerHTML = `<div class="svci-main" id="svci-main"><img src="${_escHtml(_cldOpt(_svcInfoMedia[0],900))}" alt="" loading="lazy"></div>` +
-        (_svcInfoMedia.length > 1 ? `<div class="svci-thumbs">${_svcInfoMedia.map((u,i)=>`<button class="svci-th${i===0?' active':''}" id="svci-th-${i}" onclick="svcInfoShow(${i})" style="background-image:url('${_escHtml(_cldOpt(u,200))}')" aria-label="Foto ${i+1}"></button>`).join('')}</div>` : '');
+      gal.innerHTML = `<div class="svci-main" id="svci-main">${_svcMediaHtml(_svcInfoMedia[0])}</div>` +
+        (_svcInfoMedia.length > 1 ? `<div class="svci-thumbs">${_svcInfoMedia.map((u,i)=>{
+          const esVid = String(u).indexOf('__VIDEO__')===0;
+          return `<button class="svci-th${i===0?' active':''}" id="svci-th-${i}" onclick="svcInfoShow(${i})" style="${esVid?'':"background-image:url('"+_escHtml(_cldOpt(u,200))+"')"}" aria-label="${esVid?'Ver el video':'Foto '+(i+1)}">${esVid?'<span class="svci-play">▶</span>':''}</button>`;
+        }).join('')}</div>` : '');
     } else { gal.style.display = 'none'; gal.innerHTML=''; }
   }
   openOv('svc-info-modal');
 }
+function _svcMediaHtml(u){
+  const s = String(u||'');
+  if(s.indexOf('__VIDEO__')===0){
+    const cuerpo = s.slice(9);
+    const esMp4 = cuerpo.endsWith('|mp4');
+    const src = esMp4 ? cuerpo.slice(0,-4) : cuerpo;
+    return esMp4
+      ? `<video src="${_escHtml(src)}" controls playsinline style="width:100%;height:100%;object-fit:cover;"></video>`
+      : `<iframe src="${_escHtml(src)}" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="width:100%;height:100%;border:none;"></iframe>`;
+  }
+  return `<img src="${_escHtml(_cldOpt(s,900))}" alt="" loading="lazy">`;
+}
 function svcInfoShow(i){
   const u = _svcInfoMedia[i]; if(!u) return;
   const m = document.getElementById('svci-main');
-  if(m) m.innerHTML = `<img src="${_escHtml(_cldOpt(u,900))}" alt="" loading="lazy">`;
+  if(m) m.innerHTML = _svcMediaHtml(u);
   _svcInfoMedia.forEach((_,k)=>{ const t=document.getElementById('svci-th-'+k); if(t) t.classList.toggle('active', k===i); });
 }
 function svcInfoReservar(){
@@ -4853,56 +5274,6 @@ function svcInfoReservar(){
 
 
 // ── Editor admin: fichas por servicio y galería de la sección ──
-function _admSvcItemInfos(c, idx){
-  return (c.items||[]).map((it,ii)=>`
-    <div class="svp-item-info">
-      <label>${_escHtml(it.n)}</label>
-      <textarea id="svp-item-info-${idx}-${ii}" data-n="${_escHtml(it.n)}" rows="2" placeholder="Dejalo vacío para usar la ficha de la sección">${_escHtml(it.info||'')}</textarea>
-    </div>`).join('');
-}
-// Al editar la lista de servicios, refrescar los nombres del editor de fichas
-function admSvcPageSyncItems(idx){
-  clearTimeout(window._svpSyncT);
-  window._svpSyncT=setTimeout(()=>{
-    const cont=document.getElementById('svp-cat-infos-'+idx);
-    if(!cont)return;
-    // No re-dibujar si la dueña está escribiendo justo ahí (le robaría el foco)
-    if(cont.contains(document.activeElement))return;
-    const d=_admSvcPageCollect();
-    if(d.cats[idx])cont.innerHTML=_admSvcItemInfos(d.cats[idx],idx);
-  },1200);
-}
-async function admSvcPageAddGal(idx,ev){
-  const files=[...(ev.target.files||[])];if(!files.length)return;
-  ev.target.value='';
-  const d=_admSvcPageCollect(); // preserva todo lo escrito sin guardar
-  if(!d.cats[idx].imgs)d.cats[idx].imgs=[];
-  toast('☁ Subiendo '+files.length+' foto'+(files.length>1?'s':'')+'...');
-  let ok=0,error=0;
-  for(const f of files){
-    try{ d.cats[idx].imgs.push(await uploadToCloudinary(f,'servicios-pagina')); ok++; }
-    catch(e){ error++; }
-  }
-  sSvcPage(d);admRenderSvcPage();
-  toast(ok? ('✅ '+ok+' foto'+(ok!==1?'s':'')+' agregada'+(ok!==1?'s':'')+(error?' · '+error+' fallaron':'')) : '⚠️ No se pudo subir ninguna foto');
-}
-function admSvcPageDelGal(idx,ui){
-  const d=_admSvcPageCollect();
-  if(d.cats[idx]&&d.cats[idx].imgs){d.cats[idx].imgs.splice(ui,1);sSvcPage(d);admRenderSvcPage();}
-}
-
-
-// ── Mover una sección del catálogo de lugar (↑ ↓) ──
-function admSvcPageMoverCat(idx, dir){
-  const d = _admSvcPageCollect();           // conserva todo lo escrito sin guardar
-  const destino = idx + dir;
-  if(destino < 0 || destino >= d.cats.length) return;
-  const [sec] = d.cats.splice(idx, 1);
-  d.cats.splice(destino, 0, sec);
-  sSvcPage(d);
-  admRenderSvcPage();
-  toast('Sección movida a la posición ' + (destino + 1));
-}
 
 
 // ═══════════════════════════════════════════════════════
@@ -5283,3 +5654,20 @@ async function admCPSubirFoto(ev){
   catch(e){ toast('⚠️ '+e.message); }
 }
 function admCPBorrarFoto(){ const d=_admCPCollect(); d.estudioImg=''; sCursosPage(d); admRenderCursosPage(); }
+
+
+// Fecha en formato lindo (25 de agosto)
+function _fechaLinda(iso){
+  try{
+    const [a,m,dd]=String(iso).split('-').map(Number);
+    const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    return dd+' de '+meses[(m||1)-1];
+  }catch(e){ return String(iso||''); }
+}
+// Reservar una promo: abre el turno con TODOS sus servicios ya marcados
+function promoReservar(pi){
+  const p=(window._promosVig||[])[pi]; if(!p)return;
+  const elegidos=(p.servicios&&p.servicios.length)?p.servicios.slice():[p.nombre];
+  window._promoElegida=p.nombre;
+  turnoOpenModal(elegidos);
+}
