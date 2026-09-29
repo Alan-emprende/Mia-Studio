@@ -197,7 +197,7 @@
       <button class="btn-auth" onclick="doLogin()">Iniciar sesión</button>
       <div style="text-align:center;margin-top:10px;"><button onclick="showResetPass()" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;font-family:var(--fb);text-decoration:underline;">¿Olvidaste tu contraseña?</button></div>
       <div class="auth-divider">— acceso rápido —</div>
-      <button class="auth-demo" onclick="demoLogin()">🎓 Entrar como alumna demo</button>
+      
     </div>
     <div id="form-reset" style="display:none;">
       <div style="text-align:center;margin-bottom:16px;"><div style="font-size:32px;">🔑</div><div style="font-family:var(--fd);font-size:18px;color:var(--dark);margin:8px 0 4px;">Restablecer contraseña</div><div style="font-size:13px;color:var(--muted);">Te enviamos un link a tu email.</div></div>
@@ -224,8 +224,8 @@
       <p style="font-size:13px;color:var(--muted);margin-top:3px;">Clave de administrador</p>
     </div>
     <div id="admin-key-err" style="background:#fde8e8;border:1px solid #fbb;color:#8B0000;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:10px;display:none;">Clave incorrecta. Intenta de nuevo.</div>
-    <input type="password" class="admin-key-input" id="admin-key" placeholder="••••••••••" onkeydown="if(event.key==='Enter')checkKey()">
-    <button class="btn-auth" onclick="checkKey()">Ingresar al panel</button>
+    <input type="hidden" id="admin-key"><p>Ingresá con la cuenta administradora verificada. No se utiliza una clave compartida.</p>
+    <button class="btn-auth" onclick="checkKey()">Iniciar sesión de administración</button>
     <div style="text-align:center;margin-top:9px;font-size:11px;color:var(--muted);">Clave por defecto: <strong>Mira2025</strong></div>
   </div>
 </div>
@@ -300,6 +300,9 @@
 <!-- ══════════ DASHBOARD ══════════ -->
 
 <script src="shared.js"></script>
+<script src="payment-config.js"></script>
+<script src="payments.js"></script>
+<script src="digital-access.js"></script>
 <script>
 
 // ── INDEX.HTML INIT ─────────────────────────────────────
@@ -309,19 +312,13 @@ function loginOk(u){
   if(_fbReady && _db && u.uid)
     _saveUserProfile(u.uid, {name:u.name,email:u.email,role:u.role||'student',uid:u.uid});
   closeOv('auth-ov');
-  window.location.href = (u.role==='admin') ? 'admin.html' : 'dashboard.html';
+  window.location.href = miraPostLoginDestination(u.role);
 }
 
 function checkKey(){
-  const pw = (gCfg().adminPass) || ADMIN_PASS_DEFAULT;
-  if(document.getElementById('admin-key').value === pw){
-    closeOv('admin-ov');
-    currentUser = {name:'Administrador',email:'admin@mirastudio.com',role:'admin'};
-    localStorage.setItem(KS, JSON.stringify(currentUser));
-    window.location.href = 'admin.html';
-  } else {
-    document.getElementById('admin-key-err').style.display = '';
-  }
+  closeOv('admin-ov');
+  openAuth('l');
+  toast('Ingresá con la cuenta administradora verificada.');
 }
 
 function doLogout(){
@@ -338,7 +335,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     try{
       const u = JSON.parse(s);
       if(u && u.role){
-        window.location.href = (u.role==='admin') ? 'admin.html' : 'dashboard.html';
+        window.location.href = miraPostLoginDestination(u.role);
         return;
       }
     }catch(e){ localStorage.removeItem(KS); }

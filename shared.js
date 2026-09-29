@@ -47,8 +47,19 @@ async function _fsGet(key){if(!_fbReady||!_db)return null;try{const d=await _db.
 async function _fsSet(key,value){if(!_fbReady||!_db)return;try{const s=JSON.stringify(value);if(s.length>900000)return;await _db.collection('site').doc(key).set({v:value,t:Date.now()});}catch(e){}}
 async function _syncSiteFromCloud(){
   if(!_fbReady||!_db)return;
+  const editVersion=window._miraAdminEditVersion||0;
+  if(document.getElementById('view-admin')&&editVersion)return;
+  const uid=_auth?.currentUser?.uid;
   const KEYS=[{ls:KC,fs:'courses'},{ls:KF,fs:'faq'},{ls:KI,fs:'info'},{ls:KFT,fs:'features'},{ls:KR,fs:'recursos'},{ls:KEB,fs:'ebooks'},{ls:KCF,fs:'config'},{ls:KES,fs:'estetics'},{ls:'ms_banner',fs:'banner'},{ls:'ms_social',fs:'social'},{ls:KSL,fs:'slots'},{ls:'ms_reviews',fs:'reviews_list'},{ls:'ms_taken',fs:'taken'},{ls:'ms_services',fs:'services'},{ls:'ms_services_page',fs:'services_page'},{ls:'ms_cursos_page',fs:'cursos_page'}];
-  for(const {ls,fs} of KEYS){try{const v=await _fsGet(fs);if(v!==null){const lc=localStorage.getItem(ls);if(lc!==JSON.stringify(v)){localStorage.setItem(ls,JSON.stringify(v));}}}catch(e){}}
+  for(const {ls,fs} of KEYS){try{
+    const before=localStorage.getItem(ls);
+    const v=await _fsGet(fs);
+    if((window._miraAdminEditVersion||0)!==editVersion||_auth?.currentUser?.uid!==uid)return;
+    if(localStorage.getItem(ls)!==before)continue;
+    if(v!==null&&before!==JSON.stringify(v)){
+      if(['courses','ebooks'].includes(fs)&&window.miraCacheCatalog)window.miraCacheCatalog(fs,v);else localStorage.setItem(ls,JSON.stringify(v));
+    }
+  }catch(e){}}
 }
 async function _saveUserProfile(uid,data){if(!_fbReady||!_db)return;try{await _db.collection('users').doc(uid).set(data,{merge:true});}catch(e){}}
 async function _loadUserProfile(uid){if(!_fbReady||!_db)return null;try{const d=await _db.collection('users').doc(uid).get();return d.exists?d.data():null;}catch(e){return null;}}
@@ -181,11 +192,13 @@ const DEF_INFO='Mira Estudio es una academia de extensión de pestañas profesio
 const ADMIN_PASS_DEFAULT='Mira2025';
 
 // ═══ GETTERS ═══
-const gc=()=>{const d=localStorage.getItem(KC);return d?JSON.parse(d):DEF_COURSES.map(c=>({...c,modules:(c.modules||[]).map(m=>({...m,lessons:[...m.lessons]}))}))}
-const sc=v=>{
-  localStorage.setItem(KC,JSON.stringify(v));
-  _fsSet('courses',v);
-};
+const gc=()=>{const d=localStorage.getItem(KC);const list=d?JSON.parse(d):DEF_COURSES.map(c=>({...c,modules:(c.modules||[]).map(m=>({...m,lessons:[...m.lessons]}))}));return window.miraResolveCatalog?window.miraResolveCatalog('courses',list):list;}
+function _saveDigitalCatalog(type,value){
+  const pending=window.miraSaveCatalog?window.miraSaveCatalog(type,value):Promise.reject(new Error('No se cargó el servidor de contenidos. Recargá el panel.'));
+  pending.catch(()=>{}); // Legacy event handlers may ignore the promise; explicit saves still receive rejection.
+  return pending;
+}
+const sc=v=>_saveDigitalCatalog('courses',v);
 const gT=()=>JSON.parse(localStorage.getItem(KT)||'[]');
 // sT guarda solo localmente: cada turno se sube individualmente con _turnoCloudSave
 // (antes se subía la lista entera a site/turnos_list y una clienta pisaba los turnos de otra)
@@ -196,11 +209,8 @@ const gFt=()=>{const d=localStorage.getItem(KFT);return d?JSON.parse(d):[...DEF_
 const sFt=v=>{localStorage.setItem(KFT,JSON.stringify(v));_fsSet('features',v);};
 const gR=()=>{const d=localStorage.getItem(KR);return d?JSON.parse(d):[...DEF_RECURSOS];}
 const sR=v=>{localStorage.setItem(KR,JSON.stringify(v));_fsSet('recursos',v);};
-const gEB=()=>{const d=localStorage.getItem(KEB);return d?JSON.parse(d):[...DEF_EBOOKS];}
-const sEB=v=>{
-  localStorage.setItem(KEB,JSON.stringify(v));
-  _fsSet('ebooks',v);
-};
+const gEB=()=>{const d=localStorage.getItem(KEB);const list=d?JSON.parse(d):[...DEF_EBOOKS];return window.miraResolveCatalog?window.miraResolveCatalog('ebooks',list):list;}
+const sEB=v=>_saveDigitalCatalog('ebooks',v);
 const gU=()=>JSON.parse(localStorage.getItem(KU)||'[]');
 const sU=v=>localStorage.setItem(KU,JSON.stringify(v));
 const gCfg=()=>JSON.parse(localStorage.getItem(KCF)||'{}');
@@ -239,13 +249,9 @@ function handleLogoClick(){
   }
 }
 function checkKey(){
-  const cfg=gCfg();const pw=cfg.adminPass||ADMIN_PASS_DEFAULT;
-  if(document.getElementById('admin-key').value===pw){
-    closeOv('admin-ov');
-    currentUser={name:'Administrador',email:'admin@mirastudio.com',role:'admin'};
-    localStorage.setItem(KS,JSON.stringify(currentUser));
-    showView('admin');window.loadAdminData&&loadAdminData();
-  }else{document.getElementById('admin-key-err').style.display='';}
+  closeOv('admin-ov');
+  openAuth('l');
+  toast('Ingresá con la cuenta administradora verificada.');
 }
 
 // Alternative: open admin panel from URL ?admin=1
@@ -285,6 +291,17 @@ function showFieldErr(fid,msg){const fg=document.getElementById(fid);if(!fg)retu
 function clearFieldErr(fid){const fg=document.getElementById(fid);if(!fg)return;fg.classList.remove('fg-error');const s=fg.querySelector('.field-err-msg');if(s){s.textContent='';s.style.display='none';}hideErr();}
 function clearAllFieldErrs(){document.querySelectorAll('.fg-error').forEach(el=>{el.classList.remove('fg-error');const s=el.querySelector('.field-err-msg');if(s){s.textContent='';s.style.display='none';}});hideErr();}
 
+function purgeLegacyCredentials(storage=localStorage){
+  const clean=value=>{if(value&&typeof value==='object'){delete value.pass;delete value.password;delete value.adminPass;}return value;};
+  for(const key of ['ms_users','ms_session','ms_config']){
+    try{const raw=storage.getItem(key);if(!raw)continue;const value=JSON.parse(raw);
+      if(key==='ms_session'&&(!value||!value.uid)){storage.removeItem(key);continue;}
+      storage.setItem(key,JSON.stringify(Array.isArray(value)?value.map(clean):clean(value)));
+    }catch{storage.removeItem(key);}
+  }
+}
+purgeLegacyCredentials();
+
 function doLogin(){
   clearAllFieldErrs();
   const em=document.getElementById('li-email').value.trim();
@@ -292,9 +309,13 @@ function doLogin(){
   if(!em){showFieldErr('fg-li-email','Ingresá tu email');return;}
   if(!pw){showFieldErr('fg-li-pass','Ingresá tu contraseña');return;}
   if(_fbReady&&_auth){
-    _auth.signInWithEmailAndPassword(em,pw).then(cred=>{
+    _auth.signInWithEmailAndPassword(em,pw).then(async cred=>{
       const fu=cred.user;
-      if(!fu.emailVerified){_auth.signOut();showErr('⚠️ Verificá tu email antes de iniciar sesión.');return;}
+      if(!fu.emailVerified){
+        try{await fu.sendEmailVerification();showErr('Te enviamos el email de verificación. Revisá tu bandeja de entrada y spam antes de iniciar sesión.');}
+        catch{showErr('Tu email todavía no está verificado. Revisá tu bandeja y spam; si no recibiste el correo, volvé a intentar en unos minutos.');}
+        finally{await _auth.signOut();_fbUid=null;}return;
+      }
       _fbUid=fu.uid;
       _loadUserProfile(fu.uid).then(profile=>{
         const u=profile||{name:fu.displayName||'Alumna',email:fu.email,role:'student'};u.uid=fu.uid;loginOk(u);
@@ -304,9 +325,7 @@ function doLogin(){
       showFieldErr('fg-li-email',msg);showFieldErr('fg-li-pass',msg);showErr(msg);
     });
   }else{
-    const u=gU().find(x=>x.email===em&&x.pass===pw);
-    if(!u){showFieldErr('fg-li-email','Email o contraseña incorrectos');showErr('No encontramos una cuenta con esos datos.');return;}
-    loginOk(u);
+    showErr('No se pudo conectar con el inicio de sesión. Revisá tu conexión y volvé a intentar.');
   }
 }
 function doRegister(){
@@ -323,18 +342,16 @@ function doRegister(){
       fu.updateProfile({displayName:nm});
       const u={name:nm,email:em,uid:fu.uid,role:'student'};
       _saveUserProfile(fu.uid,u);
-      fu.sendEmailVerification().then(()=>{_auth.signOut();_fbUid=null;closeOv('auth-ov');showVerifyBanner(em);}).catch(()=>loginOk(u));
+      fu.sendEmailVerification().then(()=>{_auth.signOut();_fbUid=null;closeOv('auth-ov');showVerifyBanner(em);}).catch(async()=>{await _auth.signOut();_fbUid=null;showErr('Tu cuenta fue creada, pero no pudimos enviar el email de verificación. Volvé a iniciar sesión para reenviarlo.');});
     }).catch(err=>{
       const msg=err.code==='auth/email-already-in-use'?'Ya existe una cuenta con ese email':err.code==='auth/weak-password'?'Contraseña muy débil':'Error al crear la cuenta.';
       showFieldErr('fg-rg-email',msg);showErr(msg);
     });
   }else{
-    const users=gU();
-    if(users.find(x=>x.email===em)){showFieldErr('fg-rg-email','Ya existe una cuenta con ese email');return;}
-    const u={name:nm,email:em,pass:pw};users.push(u);sU(users);loginOk(u);
+    showErr('No se pudo conectar para crear tu cuenta. Revisá tu conexión y volvé a intentar.');
   }
 }
-function demoLogin(){loginOk({name:'Valentina López',email:'demo@mirastudio.com',pass:'demo123'});}
+function demoLogin(){showErr('Para entrar al portal necesitás una cuenta con email verificado.');}
 function loginOk(u){
   currentUser=u;localStorage.setItem(KS,JSON.stringify(u));
   closeOv('auth-ov');setupDash(u);showView('dashboard');
@@ -399,11 +416,11 @@ function renderLanding(){
   if(lc){
     const list=gc().filter(c=>!c.locked).slice(0,3);
     lc.innerHTML=list.map(c=>{
-      const tot=(c.modules||[]).reduce((a,m)=>a+m.lessons.length,0);
+      const tot=(c.modules||[]).reduce((a,m)=>a+(m.lessons||[]).length,0);
       const isFree=!c.price||c.price===''||c.price==='Gratis'||c.price==='0';
       const priceLbl=isFree?'Gratis':c.price;
       const thumbInner=c.coverImg?`<img src="${_cldOpt(c.coverImg,640)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:var(--r3) var(--r3) 0 0;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.6),transparent);"></div>`:courseCoverPlaceholder(c);
-      return`<div class="cpc" onclick="openAuth('r')"><div class="cpc-thumb" style="background:${c.coverImg?'transparent':c.color};">${thumbInner}${isFree?'':`<span style="position:absolute;top:8px;right:8px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px;">${priceLbl}</span>`}</div><div class="cpc-body"><span class="cpc-tag">${c.levelLabel}</span><div class="cpc-title">${c.title}</div><p class="cpc-desc">${c.description}</p><div class="cpc-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot} clases</div></div></div>`;
+      return`<div class="cpc" onclick="location.href='cursos.html'"><div class="cpc-thumb" style="background:${c.coverImg?'transparent':c.color};">${thumbInner}${isFree?'':`<span style="position:absolute;top:8px;right:8px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px;">${_escHtml(priceLbl)}</span>`}</div><div class="cpc-body"><span class="cpc-tag">${_escHtml(c.levelLabel||'Formación')}</span><div class="cpc-title">${_escHtml(c.title||'Curso')}</div><p class="cpc-desc">${_escHtml(c.description||'')}</p><div class="cpc-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot} clases</div></div></div>`;
     }).join('');
   }
 }
@@ -489,12 +506,12 @@ function renderCarouselCourses(filt='todos', q=''){
   if(q){const ql=q.toLowerCase();list=list.filter(c=>(c.title+' '+(c.description||'')).toLowerCase().includes(ql));}
   const lvlC={principiante:'lvl-b',intermedio:'lvl-i',avanzado:'lvl-a'};
   const html=list.map(c=>{
-    const tot=(c.modules||[]).reduce((a,m)=>a+m.lessons.length,0);
+    const tot=(c.modules||[]).reduce((a,m)=>a+(m.lessons||[]).length,0);
     const thumb=buildCourseThumb(c);
     const priceBadge=buildPriceBadge(c);
-    if(c.locked)return`<div class="course-card clocked"><div class="cct">${thumb}${priceBadge}</div><div class="ccc"><div class="cch"><div class="ccn">${c.title}</div><span class="clvl ${lvlC[c.level]||'lvl-b'}">${c.levelLabel}</span></div><p class="ccd">${c.description}</p><div class="ccf"><div class="cmi"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot||'?'} clases</div><div class="lckbdg"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Próximamente</div></div></div></div>`;
+    if(c.locked)return`<div class="course-card clocked"><div class="cct">${thumb}${priceBadge}</div><div class="ccc"><div class="cch"><div class="ccn">${_escHtml(c.title||"Curso")}</div><span class="clvl ${lvlC[c.level]||'lvl-b'}">${_escHtml(c.levelLabel||"Formación")}</span></div><p class="ccd">${_escHtml(c.description||"")}</p><div class="ccf"><div class="cmi"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot||'?'} clases</div><div class="lckbdg"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Próximamente</div></div></div></div>`;
     const buyBtn=buildBuyBtn(c);
-    return`<div class="course-card" onclick="openViewer(${c.id})"><div class="cct">${thumb}${priceBadge}</div><div class="ccc"><div class="cch"><div class="ccn">${c.title}</div><span class="clvl ${lvlC[c.level]||'lvl-b'}">${c.levelLabel}</span></div><p class="ccd">${c.description}</p><div class="ccf"><div class="cmi"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot} clases &nbsp;<svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 5h16M4 12h16M4 19h10"/></svg> ${(c.modules||[]).length} módulos</div>${buyBtn}</div></div></div>`;
+    return`<div class="course-card" onclick="openViewer(${c.id})"><div class="cct">${thumb}${priceBadge}</div><div class="ccc"><div class="cch"><div class="ccn">${_escHtml(c.title||"Curso")}</div><span class="clvl ${lvlC[c.level]||'lvl-b'}">${_escHtml(c.levelLabel||"Formación")}</span></div><p class="ccd">${_escHtml(c.description||"")}</p><div class="ccf"><div class="cmi"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot} clases &nbsp;<svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 5h16M4 12h16M4 19h10"/></svg> ${(c.modules||[]).length} módulos</div>${buyBtn}</div></div></div>`;
   }).join('');
   // Estado vacío amigable cuando la búsqueda o el filtro no encuentran nada
   const vacio=`<div style="grid-column:1/-1;text-align:center;padding:44px 20px;color:var(--muted);">
@@ -514,26 +531,8 @@ function renderEbooks(){
   const cards=ebs.map(e=>{
     const cover=e.cover?`<img src="${_cldOpt(e.cover,480)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`:`<span>${e.emoji||'📕'}</span>`;
     const price=e.paid?(e.price||'De pago'):'Gratis';
-    const isPurchased=!e.paid||hasEbook(e.id);
-    let btn;
-    const dlLink = e.downloadLink || e.link || '';
-    const pyLink = e.payLink || e.link || '';
-    if(!e.paid){
-      // Free ebook → show download link
-      btn=dlLink
-        ?`<a href="${dlLink}" target="_blank" rel="noopener" class="btn-crimson" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;text-decoration:none;border-radius:50px;">⬇ Descargar gratis</a>`
-        :`<button class="btn-g" style="margin-top:10px;width:100%;padding:9px;font-size:13px;opacity:.5;cursor:default;" disabled>Próximamente</button>`;
-    } else if(isPurchased){
-      // Paid + already purchased → show download link
-      btn=dlLink
-        ?`<a href="${dlLink}" target="_blank" rel="noopener" class="btn-crimson" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;text-decoration:none;border-radius:50px;">✅ Ver / Descargar</a>`
-        :`<button class="btn-g" style="margin-top:10px;width:100%;padding:9px;font-size:13px;opacity:.5;cursor:default;" disabled>Sin link de descarga</button>`;
-    } else {
-      // Paid + not yet purchased → show payment link
-      btn=pyLink
-        ?`<button onclick="buyEbook('${e.id}')" style="margin-top:10px;width:100%;padding:9px;font-size:13px;display:block;text-align:center;border:none;border-radius:50px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;cursor:pointer;font-family:var(--fb);">Comprar ${price}</button>`
-        :`<button class="btn-g" style="margin-top:10px;width:100%;padding:9px;font-size:13px;opacity:.5;cursor:default;" disabled>Próximamente</button>`;
-    }
+    const isPurchased=false; // Los datos locales nunca autorizan una descarga.
+    const btn=`<button class="btn-g" data-product-id="${_escHtml(e.id)}" onclick="buyEbook(this.dataset.productId)">Ver acceso al ebook</button>`;
     const lockBadge=e.paid&&!isPurchased?`<div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);border-radius:50px;padding:3px 9px;font-size:11px;color:#fff;display:flex;align-items:center;gap:4px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Pago</div>`:'';
     return`<div class="ebook-card" style="position:relative;"><div class="ebook-cover" style="background:${e.color||'#8C0026'};">${cover}</div>${lockBadge}<div class="ebook-title">${e.title}</div><p class="ebook-desc">${e.desc}</p><div class="ebook-price ${e.paid&&!isPurchased?'':'ebook-free'}">${price}</div>${btn}</div>`;
   }).join('');
@@ -582,6 +581,7 @@ function renderFAQModal(){const faqs=gF();document.getElementById('faq-modal-lis
 
 // ═══ VIEWER ═══
 function openViewer(id){
+  if(!window.miraCourseAuthorized?.(id)){toast('Este curso requiere una compra confirmada o autorización del estudio');return;}
   const courses=gc();const c=courses.find(x=>x.id===id);if(!c||c.locked)return;
   currentCourseId=id;lessonFlat=[];
   (c.modules||[]).forEach((m,mi)=>(m.lessons||[]).forEach((l,li)=>lessonFlat.push({mi,li,mid:m.id,lid:l.id})));
@@ -1260,7 +1260,7 @@ function admRenderModsInline(c){
                         accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.mp4,.zip"
                         onchange="admAttachFiles(event,'${m.id}','${l.id}')">
                     </label>
-                    <span style="font-size:11px;color:var(--muted);">PDF, imágenes, docs, ZIP (máx 5MB c/u)</span>
+                    <span style="font-size:11px;color:var(--muted);">PDF, imágenes, docs, ZIP (máx 500 KB c/u; el catálogo tiene un límite total)</span>
                   </div>
                 </div>
               </div>
@@ -1293,6 +1293,7 @@ function admFlushEdits(){
   const courses=gc();const c=courses.find(x=>x.id===admCurEditId);if(!c)return;
   (c.modules||[]).forEach(m=>{
     const mt=document.getElementById('mt-'+m.id);if(mt)m.title=mt.value;
+    const md=document.getElementById('mdesc-'+m.id);if(md)m.desc=md.value;
     (m.lessons||[]).forEach(l=>{
       const lt=document.getElementById('lt-'+m.id+'-'+l.id);const ld=document.getElementById('ld-'+m.id+'-'+l.id);const ldesc=document.getElementById('ldesc-'+m.id+'-'+l.id);
       const lv=document.getElementById('lv-'+m.id+'-'+l.id);
@@ -1300,12 +1301,23 @@ function admFlushEdits(){
       // attachments are saved directly, no flush needed
     });
   });
-  sc(courses);
+  return sc(courses);
 }
 
-function admSaveModuleInputs(modId){admFlushEdits();toast('✅ Módulo guardado');}
+async function _admConfirmCatalogSave(save){
+  try{
+    toast('Publicando cambios…');
+    const pending=save();
+    if(!pending||typeof pending.then!=='function')throw new Error('No se pudo confirmar el guardado remoto.');
+    await pending;return true;
+  }catch(e){toast('No se pudo publicar. Conservá el editor abierto y volvé a guardar. '+(e.message||''));return false;}
+}
+async function admSaveModuleInputs(modId){
+  if(!await _admConfirmCatalogSave(()=>admFlushEdits()))return;
+  toast('✅ Módulo guardado');
+}
 
-function admSaveCurso(isNew){
+async function admSaveCurso(isNew){
   const courses=gc();
   let c=admCurEditId!==null?courses.find(x=>x.id===admCurEditId):null;
   if(!c){c={id:Date.now(),modules:[]};courses.push(c);}
@@ -1324,12 +1336,14 @@ function admSaveCurso(isNew){
   // Also flush any module/lesson edits
   (c.modules||[]).forEach(m=>{
     const mt=document.getElementById('mt-'+m.id);if(mt)m.title=mt.value;
+    const md=document.getElementById('mdesc-'+m.id);if(md)m.desc=md.value;
     (m.lessons||[]).forEach(l=>{
       const lt=document.getElementById('lt-'+m.id+'-'+l.id);const ld=document.getElementById('ld-'+m.id+'-'+l.id);const ldesc=document.getElementById('ldesc-'+m.id+'-'+l.id);
       if(lt)l.title=lt.value;if(ld)l.duration=ld.value;if(ldesc)l.desc=ldesc.value;
+      const lv=document.getElementById('lv-'+m.id+'-'+l.id);if(lv)l.videoUrl=lv.value.trim();
     });
   });
-  sc(courses);
+  if(!await _admConfirmCatalogSave(()=>sc(courses)))return;
   if(isNew){
     // Keep modal open, show modules section now
     document.getElementById('cmod-title').textContent='Editar: '+c.title;
@@ -1341,43 +1355,43 @@ function admSaveCurso(isNew){
   admRenderCursosList();renderLanding();
 }
 
-function admDeleteCurso(id){
+async function admDeleteCurso(id){
   if(!confirm('¿Eliminar este curso y todos sus módulos/clases?'))return;
-  sc(gc().filter(c=>c.id!==id));admRenderCursosList();renderLanding();toast('Curso eliminado');
+  if(!await _admConfirmCatalogSave(()=>sc(gc().filter(c=>c.id!==id))))return;admRenderCursosList();renderLanding();toast('Curso eliminado');
 }
 
-function admAddModule(){
-  admFlushEdits();
+async function admAddModule(){
+  if(!await _admConfirmCatalogSave(()=>admFlushEdits()))return;
   const courses=gc();const c=courses.find(x=>x.id===admCurEditId);if(!c){toast('⚠️ Guardá el curso primero');return;}
   if(!c.modules)c.modules=[];
   c.modules.push({id:'m'+Date.now(),title:'Nuevo módulo',lessons:[]});
-  sc(courses);document.getElementById('ce-modules').innerHTML=admRenderModsInline(c);
+  if(!await _admConfirmCatalogSave(()=>sc(courses)))return;document.getElementById('ce-modules').innerHTML=admRenderModsInline(c);
 }
 
-function admDelModule(modId){
+async function admDelModule(modId){
   if(!confirm('¿Eliminar este módulo y todas sus clases?'))return;
-  admFlushEdits();
+  if(!await _admConfirmCatalogSave(()=>admFlushEdits()))return;
   const courses=gc();const c=courses.find(x=>x.id===admCurEditId);if(!c)return;
   c.modules=(c.modules||[]).filter(m=>m.id!==modId);
-  sc(courses);document.getElementById('ce-modules').innerHTML=admRenderModsInline(c);toast('Módulo eliminado');
+  if(!await _admConfirmCatalogSave(()=>sc(courses)))return;document.getElementById('ce-modules').innerHTML=admRenderModsInline(c);toast('Módulo eliminado');
 }
 
-function admAddLesson(modId){
-  admFlushEdits();
+async function admAddLesson(modId){
+  if(!await _admConfirmCatalogSave(()=>admFlushEdits()))return;
   const courses=gc();const c=courses.find(x=>x.id===admCurEditId);if(!c)return;
   const m=(c.modules||[]).find(m=>m.id===modId);if(!m)return;
   if(!m.lessons)m.lessons=[];
   m.lessons.push({id:'l'+Date.now(),title:'Nueva clase',duration:'15 min',done:false,desc:'',videoUrl:'',resources:[],attachments:[]});
-  sc(courses);document.getElementById('ce-modules').innerHTML=admRenderModsInline(c);
+  if(!await _admConfirmCatalogSave(()=>sc(courses)))return;document.getElementById('ce-modules').innerHTML=admRenderModsInline(c);
   const body=document.getElementById('mab-'+modId);if(body)body.classList.add('open');
 }
 
-function admDelLesson(modId,lesId){
-  admFlushEdits();
+async function admDelLesson(modId,lesId){
+  if(!await _admConfirmCatalogSave(()=>admFlushEdits()))return;
   const courses=gc();const c=courses.find(x=>x.id===admCurEditId);if(!c)return;
   const m=(c.modules||[]).find(m=>m.id===modId);if(!m)return;
   m.lessons=(m.lessons||[]).filter(l=>l.id!==lesId);
-  sc(courses);document.getElementById('ce-modules').innerHTML=admRenderModsInline(c);
+  if(!await _admConfirmCatalogSave(()=>sc(courses)))return;document.getElementById('ce-modules').innerHTML=admRenderModsInline(c);
   const body=document.getElementById('mab-'+modId);if(body)body.classList.add('open');
 }
 
@@ -1436,7 +1450,7 @@ function admRenderEbooksList(){
   }).join('');
 }
 
-function admSaveEbook(idx){
+async function admSaveEbook(idx){
   const ebs=gEB();if(!ebs[idx])return;
   ebs[idx].emoji=document.getElementById('eb-emoji-'+idx).value;
   ebs[idx].color=document.getElementById('eb-color-'+idx).value;
@@ -1450,7 +1464,8 @@ function admSaveEbook(idx){
   // cover from URL field if filled, otherwise keep existing
   const coverUrlEl=document.getElementById('eb-cover-url-'+idx);
   if(coverUrlEl&&coverUrlEl.value.trim()) ebs[idx].cover=coverUrlEl.value.trim();
-  sEB(ebs);admRenderEbooksList();renderEbooks();toast('✅ Ebook guardado');
+  if(!await _admConfirmCatalogSave(()=>sEB(ebs)))return;
+  admRenderEbooksList();renderEbooks();toast('✅ Ebook guardado');
 }
 
 async function admUploadEbookCover(e,idx){
@@ -1460,22 +1475,23 @@ async function admUploadEbookCover(e,idx){
     const url=await uploadToCloudinary(file,'ebooks');
     const ebs=gEB();if(!ebs[idx])return;
     ebs[idx].cover=url;
-    sEB(ebs);admRenderEbooksList();renderEbooks();toast('✅ Portada subida');
+    if(!await _admConfirmCatalogSave(()=>sEB(ebs)))return;admRenderEbooksList();renderEbooks();toast('✅ Portada subida');
   }catch(err){toast('❌ '+err.message);}
 }
 
-function admClearEbookCover(idx){
+async function admClearEbookCover(idx){
   const ebs=gEB();if(!ebs[idx])return;
   ebs[idx].cover='';
-  sEB(ebs);admRenderEbooksList();renderEbooks();
+  if(!await _admConfirmCatalogSave(()=>sEB(ebs)))return;admRenderEbooksList();renderEbooks();
 }
-function admDeleteEbook(idx){
+async function admDeleteEbook(idx){
   if(!confirm('¿Eliminar este ebook?'))return;
-  sEB(gEB().filter((_,i)=>i!==idx));admRenderEbooksList();renderEbooks();toast('Ebook eliminado');
+  if(!await _admConfirmCatalogSave(()=>sEB(gEB().filter((_,i)=>i!==idx))))return;admRenderEbooksList();renderEbooks();toast('Ebook eliminado');
 }
 function admNewEbook(){
   const ebs=gEB();ebs.push({id:Date.now(),emoji:'📕',title:'Nuevo ebook',desc:'Descripción breve del ebook.',price:'',paid:false,color:'#8C0026',link:'',cover:''});
-  sEB(ebs);admRenderEbooksList();toast('Ebook creado — completá los datos y guardá');
+  if(!window.miraCacheCatalog){toast('Recargá el panel para crear un borrador');return;}
+  window.miraCacheCatalog('ebooks',ebs);admRenderEbooksList();toast('Borrador sin publicar — completá precio, archivo y datos, y guardá.');
 }
 
 // ── FEATURES ───────────────────────────────────────────
@@ -1614,12 +1630,7 @@ function admRenderConfig(){
   const ws=document.getElementById('cfg-wsub');if(ws)ws.value=cfg.wsub||'Continuá donde lo dejaste y seguí avanzando.';
 }
 function admSavePassword(){
-  const np=document.getElementById('cfg-newpass').value;const cp=document.getElementById('cfg-confpass').value;
-  if(!np||np.length<6){toast('⚠️ Mínimo 6 caracteres');return;}
-  if(np!==cp){toast('⚠️ Las claves no coinciden');return;}
-  const cfg=gCfg();cfg.adminPass=np;sCfg(cfg);
-  document.getElementById('cfg-newpass').value='';document.getElementById('cfg-confpass').value='';
-  toast('✅ Contraseña cambiada. Nueva clave: '+np);
+  toast('La contraseña se administra mediante Firebase. Usá Olvidé mi contraseña al iniciar sesión.');
 }
 function admSaveCfgDash(){
   const ws=document.getElementById('cfg-wsub').value;const cfg=gCfg();cfg.wsub=ws;sCfg(cfg);
@@ -1808,13 +1819,13 @@ function renderIcarousel(){
   const lvlC = {principiante:'lvl-b',intermedio:'lvl-i',avanzado:'lvl-a'};
   const cg = document.getElementById('icp-courses-grid');
   if(cg) cg.innerHTML = courses.map(c=>{
-    const tot = (c.modules||[]).reduce((a,m)=>a+m.lessons.length, 0);
+    const tot = (c.modules||[]).reduce((a,m)=>a+(m.lessons||[]).length, 0);
     const isFree=!c.price||c.price===''||c.price==='Gratis'||c.price==='0';
     const priceLbl=isFree?'Gratis':c.price;
     const thumbContent=c.coverImg?`<img src="${_cldOpt(c.coverImg,400)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"><div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(26,0,8,.5),transparent);"></div>`:courseCoverPlaceholder(c);
-    const priceTag=isFree?'':`<span style="position:absolute;top:7px;right:7px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:50px;z-index:2;">${priceLbl}</span>`;
-    if(c.locked) return `<div class="icp-ccard" style="opacity:.55;cursor:default;"><div class="icp-thumb" style="background:${c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${c.levelLabel}</span><div class="icp-name">${c.title}</div><div class="icp-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Próximamente</div></div></div>`;
-    return `<div class="icp-ccard" onclick="openAuth('r')"><div class="icp-thumb" style="background:${c.coverImg?'#0a0005':c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${c.levelLabel}</span><div class="icp-name">${c.title}</div><div class="icp-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot} clases · ${(c.modules||[]).length} módulos</div></div></div>`;
+    const priceTag=isFree?'':`<span style="position:absolute;top:7px;right:7px;background:linear-gradient(135deg,#B8860B,#DAA520);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:50px;z-index:2;">${_escHtml(priceLbl)}</span>`;
+    if(c.locked) return `<div class="icp-ccard" style="opacity:.55;cursor:default;"><div class="icp-thumb" style="background:${c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${_escHtml(c.levelLabel||'Formación')}</span><div class="icp-name">${_escHtml(c.title||'Curso')}</div><div class="icp-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Próximamente</div></div></div>`;
+    return `<div class="icp-ccard" onclick="location.href='cursos.html'"><div class="icp-thumb" style="background:${c.coverImg?'#0a0005':c.color};position:relative;">${thumbContent}${priceTag}</div><div class="icp-body"><span class="icp-tag">${_escHtml(c.levelLabel||'Formación')}</span><div class="icp-name">${_escHtml(c.title||'Curso')}</div><div class="icp-meta"><svg class="mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10 9.3l5 2.7-5 2.7V9.3z"/></svg> ${tot} clases · ${(c.modules||[]).length} módulos</div></div></div>`;
   }).join('');
   // ebooks
   const ebs = gEB();
@@ -1822,14 +1833,14 @@ function renderIcarousel(){
   if(eg) eg.innerHTML = ebs.map(e=>{
     // Usar la portada subida desde el panel; el emoji queda como respaldo
     const cov=e.cover?`<img src="${_escHtml(_cldOpt(e.cover,240))}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;">`:(e.emoji||'📕');
-    return `<div class="icp-ebook" onclick="openAuth('r')"><div class="icp-ecov" style="background:${e.color||'#8C0026'};">${cov}</div><div class="icp-etit">${e.title}</div><div class="icp-eprice ${e.paid?'':'icp-efree'}">${e.price}</div><button class="icp-ebtn">${e.paid?'Comprar':'Descargar gratis'}</button></div>`;
+    return `<div class="icp-ebook" data-product-id="${_escHtml(e.id)}" onclick="buyEbook(this.dataset.productId)"><div class="icp-ecov" style="background:${e.color||'#8C0026'};">${cov}</div><div class="icp-etit">${_escHtml(e.title||'Ebook')}</div><div class="icp-eprice ${e.paid?'':'icp-efree'}">${_escHtml(e.price??'')}</div><button class="icp-ebtn">${e.paid?'Comprar':'Consultar acceso'}</button></div>`;
   }).join('');
 }
 
 
 // ═══ DASHBOARD REAL STATS ═══
 function calcAllProgress(){
-  const courses = gc().filter(c => !c.locked && c.modules && c.modules.length);
+  const courses = gc().filter(c => !c.locked && c.modules && c.modules.length && window.miraHasDigitalAccess?.('course',c.id));
   let totalLessons = 0, totalDone = 0, completedCourses = 0;
   const inProgress = [];
   courses.forEach(c => {
@@ -1952,7 +1963,7 @@ function renderProgressPage(totalPct, totalDone, totalLessons){
   if(ts) ts.textContent = totalDone + ' de ' + totalLessons + ' clases completadas';
   const list = document.getElementById('prog-courses-list');
   if(!list) return;
-  const courses = gc().filter(c => !c.locked && c.modules && c.modules.length);
+  const courses = gc().filter(c => !c.locked && c.modules && c.modules.length && window.miraHasDigitalAccess?.('course',c.id));
   list.innerHTML = courses.map(c => {
     const prog = getProgress(c.id);
     const lessons = (c.modules||[]).reduce((a,m) => a + m.lessons.length, 0);
@@ -2330,7 +2341,7 @@ function admRenderTurnosList(){
           <td style="font-size:13px;">${_escHtml(t.date||'—')}</td>
           <td style="max-width:160px;font-size:12px;color:var(--muted);">${_escHtml(t.msg||'—')}</td>
           <td>
-            <select class="turno-status ${statusClass[st]}" onchange="changeTurnoStatus(${t.id},this.value,this)" style="border:none;outline:none;cursor:pointer;font-size:11px;font-weight:600;padding:4px 8px;border-radius:50px;font-family:var(--fb);">
+            <select class="turno-status ${statusClass[st]}" data-turno="${_escHtml(t.id)}" onchange="changeTurnoStatus(this.dataset.turno,this.value,this)" style="border:none;outline:none;cursor:pointer;font-size:11px;font-weight:600;padding:4px 8px;border-radius:50px;font-family:var(--fb);">
               <option value="pending" ${st==='pending'?'selected':''}>⏳ Pendiente</option>
               <option value="confirmed" ${st==='confirmed'?'selected':''}>✅ Confirmado</option>
               <option value="done" ${st==='done'?'selected':''}>💅 Atendida</option>
@@ -2338,8 +2349,8 @@ function admRenderTurnosList(){
             </select>
           </td>
           <td style="white-space:nowrap;">
-            <button class="abtn-mov" onclick="admToggleAtencion(${t.id})" title="Ficha de atención: qué se le hizo">${t.atencion?'📝':'✎'}</button>
-            <button class="abtn-del" onclick="admDeleteTurno(${t.id})">✕</button>
+            <button class="abtn-mov" data-turno="${_escHtml(t.id)}" onclick="admToggleAtencion(this.dataset.turno)" title="Ficha de atención: qué se le hizo">${t.atencion?'📝':'✎'}</button>
+            <button class="abtn-del" data-turno="${_escHtml(t.id)}" onclick="admDeleteTurno(this.dataset.turno)">✕</button>
           </td>
         </tr>
         <tr id="tnota-${t.id}" class="tnota-row" style="display:none;">
@@ -2347,7 +2358,7 @@ function admRenderTurnosList(){
             <div class="tnota-box">
               <label>Qué se le hizo en este turno (solo lo ves vos)</label>
               <textarea id="tnota-txt-${t.id}" rows="2" placeholder="Ej: volumen medio, curvatura D, 11mm. Vino con service de 3 semanas. Próxima vez probar wispy.">${_escHtml(t.atencion||'')}</textarea>
-              <button class="abtn" onclick="admSaveAtencion(${t.id})">Guardar nota</button>
+              <button class="abtn" data-turno="${_escHtml(t.id)}" onclick="admSaveAtencion(this.dataset.turno)">Guardar nota</button>
             </div>
           </td>
         </tr>`;
@@ -2363,7 +2374,7 @@ function admToggleAtencion(id){
 function admSaveAtencion(id){
   const ta=document.getElementById('tnota-txt-'+id);if(!ta)return;
   const txt=ta.value.trim();
-  const turnos=gT();const t=turnos.find(x=>x.id===id);if(!t)return;
+  const turnos=gT();const t=turnos.find(x=>String(x.id)===String(id));if(!t)return;
   t.atencion=txt;sT(turnos);
   if(_fbReady&&_db)_db.collection('turnos').doc(String(id)).set({atencion:txt},{merge:true}).catch(()=>{});
   toast('✅ Nota de atención guardada');
@@ -2524,36 +2535,39 @@ function formatFileSize(bytes){
   if(bytes<1024*1024)return Math.round(bytes/1024)+'KB';
   return (bytes/1024/1024).toFixed(1)+'MB';
 }
-function admAttachFiles(e,modId,lesId){
+async function admAttachFiles(e,modId,lesId){
   const files=Array.from(e.target.files);if(!files.length)return;
-  admFlushEdits();
+  if(!await _admConfirmCatalogSave(()=>admFlushEdits()))return;
   const courses=gc();const c=courses.find(x=>x.id===admCurEditId);if(!c)return;
   const m=(c.modules||[]).find(x=>x.id===modId);if(!m)return;
   const l=(m.lessons||[]).find(x=>x.id===lesId);if(!l)return;
   if(!l.attachments)l.attachments=[];
-  let pending=files.length;
-  files.forEach(file=>{
-    if(file.size>5*1024*1024){toast('⚠️ '+file.name+' supera 5MB');pending--;if(!pending)afterAttach(c,m,l,courses);return;}
-    const reader=new FileReader();
-    reader.onload=ev=>{
-      l.attachments.push({name:file.name,type:file.type,size:formatFileSize(file.size),data:ev.target.result});
-      pending--;if(!pending)afterAttach(c,m,l,courses);
-    };
-    reader.readAsDataURL(file);
-  });
+  let added=0;
+  for(const file of files){
+    if(file.size>500*1024){toast('⚠️ '+file.name+' supera 500 KB. Reducí el archivo antes de adjuntarlo.');continue;}
+    try{
+      const data=await new Promise((resolve,reject)=>{
+        const reader=new FileReader();reader.onload=ev=>resolve(ev.target.result);
+        reader.onerror=()=>reject(new Error('No se pudo leer '+file.name));reader.readAsDataURL(file);
+      });
+      l.attachments.push({name:file.name,type:file.type,size:formatFileSize(file.size),data});added++;
+    }catch(err){toast(err.message);}
+  }
+  e.target.value='';
+  if(added)await afterAttach(c,m,l,courses);
 }
-function afterAttach(c,m,l,courses){
-  sc(courses);
+async function afterAttach(c,m,l,courses){
+  if(!await _admConfirmCatalogSave(()=>sc(courses)))return;
   const listEl=document.getElementById('lattach-'+m.id+'-'+l.id);
   if(listEl)listEl.innerHTML=(l.attachments||[]).map((a,ai)=>`<div class="les-attach-item"><span style="font-size:17px;">${fileIcon(a.type)}</span><span class="les-attach-name" title="${a.name}">${a.name}</span><span class="les-attach-size">${a.size||''}</span><button class="les-attach-del" onclick="admDelAttach('${m.id}','${l.id}',${ai})" title="Eliminar">✕</button></div>`).join('');
   toast('✅ '+l.attachments.length+' archivo'+(l.attachments.length!==1?'s':'')+' adjunto'+(l.attachments.length!==1?'s':''));
 }
-function admDelAttach(modId,lesId,idx){
-  admFlushEdits();
+async function admDelAttach(modId,lesId,idx){
+  if(!await _admConfirmCatalogSave(()=>admFlushEdits()))return;
   const courses=gc();const c=courses.find(x=>x.id===admCurEditId);if(!c)return;
   const m=(c.modules||[]).find(x=>x.id===modId);if(!m)return;
   const l=(m.lessons||[]).find(x=>x.id===lesId);if(!l||!l.attachments)return;
-  l.attachments.splice(idx,1);sc(courses);
+  l.attachments.splice(idx,1);if(!await _admConfirmCatalogSave(()=>sc(courses)))return;
   const listEl=document.getElementById('lattach-'+modId+'-'+lesId);
   if(listEl)listEl.innerHTML=(l.attachments||[]).map((a,ai)=>`<div class="les-attach-item"><span style="font-size:17px;">${fileIcon(a.type)}</span><span class="les-attach-name" title="${a.name}">${a.name}</span><span class="les-attach-size">${a.size||''}</span><button class="les-attach-del" onclick="admDelAttach('${modId}','${lesId}',${ai})" title="Eliminar">✕</button></div>`).join('');
   toast('Archivo eliminado');
@@ -2665,7 +2679,7 @@ function initDragCourses() {
       card.classList.remove('drag-over-top','drag-over-bottom');
     });
 
-    card.addEventListener('drop', e => {
+    card.addEventListener('drop', async e => {
       e.preventDefault();
       if (!dragSrcId || card.dataset.cid === dragSrcId) return;
 
@@ -2680,7 +2694,7 @@ function initDragCourses() {
       if (half === 'top'    && toIdx > fromIdx) toIdx--;
 
       const reordered = dndReorder(courses, fromIdx, toIdx);
-      sc(reordered);
+      if(!await _admConfirmCatalogSave(()=>sc(reordered)))return;
       admRenderCursosList();
       toast('✅ Cursos reordenados');
     });
@@ -2740,12 +2754,12 @@ function initDragModules() {
         modEl.classList.remove('drag-over-top','drag-over-bottom');
     });
 
-    modEl.addEventListener('drop', e => {
+    modEl.addEventListener('drop', async e => {
       e.preventDefault();
       e.stopPropagation();
       if (!dragSrcMid || modEl.dataset.mid === dragSrcMid) return;
 
-      admFlushEdits();           // guardar textos antes de reordenar
+      if(!await _admConfirmCatalogSave(()=>admFlushEdits()))return;           // guardar textos antes de reordenar
       const courses  = gc();
       const course   = courses.find(c => String(c.id) === String(admCurEditId));
       if (!course) return;
@@ -2760,7 +2774,7 @@ function initDragModules() {
       if (half === 'top'    && toIdx > fromIdx) toIdx--;
 
       course.modules = dndReorder(mods, fromIdx, toIdx);
-      sc(courses);
+      if(!await _admConfirmCatalogSave(()=>sc(courses)))return;
 
       // Re-render only modules section
       const ceModules = document.getElementById('ce-modules');
@@ -2824,12 +2838,12 @@ function initDragLessons(modId) {
         lesEl.classList.remove('drag-over-top','drag-over-bottom');
     });
 
-    lesEl.addEventListener('drop', e => {
+    lesEl.addEventListener('drop', async e => {
       e.preventDefault();
       e.stopPropagation();
       if (!dragSrcLid || lesEl.dataset.lid === dragSrcLid) return;
 
-      admFlushEdits();
+      if(!await _admConfirmCatalogSave(()=>admFlushEdits()))return;
       const courses = gc();
       const course  = courses.find(c => String(c.id) === String(admCurEditId));
       if (!course) return;
@@ -2846,7 +2860,7 @@ function initDragLessons(modId) {
       if (half === 'top'    && toIdx > fromIdx) toIdx--;
 
       mod.lessons = dndReorder(lsns, fromIdx, toIdx);
-      sc(courses);
+      if(!await _admConfirmCatalogSave(()=>sc(courses)))return;
 
       // Re-render only this lesson list
       const wasOpen = lesEl.closest('.mod-acc-body') &&
@@ -3779,6 +3793,7 @@ function _dashToggleServ(prefix,serv,el){
   if(i>=0){a.splice(i,1);el.classList.remove('sel');}
   else{a.push(serv);el.classList.add('sel');}
   _dashServ[prefix]=a.join(' + '); // los guardados existentes siguen funcionando
+  if(window.miraPayments)dashLoadSlots(prefix);
 }
 function setTurnoService(serv){_dashToggleServ('t',serv,event.currentTarget);}
 function setTurnoService2(serv){_dashToggleServ('t2',serv,event.currentTarget);}
@@ -3823,6 +3838,8 @@ async function admForcSync(){
     toast('⚠️ Firebase no disponible');
     return;
   }
+  if(window._miraAdminEditVersion&&!confirm('Sincronizar reemplaza los campos sin guardar con la versión del servidor. ¿Continuar?'))return;
+  window._miraAdminEditVersion=0;
   toast('☁ Sincronizando con la nube...');
   try{
     await _syncSiteFromCloud();
@@ -3871,15 +3888,7 @@ function mpVerifyPayment(orderId){
 
 // Hook en botones de compra de ebooks
 function buyEbook(ebookId){
-  const eb = gEB().find(e=>String(e.id)===String(ebookId));
-  if(!eb) return;
-  if(!eb.paid || hasEbook(ebookId)){
-    // Free or already purchased
-    if(eb.downloadLink || eb.link) window.open(eb.downloadLink||eb.link,'_blank','noopener');
-    return;
-  }
-  // Paid and not purchased yet
-  mpCheckout(eb.payLink||eb.link, eb.title, eb.price);
+  toast('No se cargó la verificación de acceso. Recargá la página.');
 }
 
 // Hook en botones de compra de cursos
@@ -4077,7 +4086,20 @@ function _svcVacio(s){
          !String(s.dur||'').trim() && !String(s.video||'').trim() &&
          !((s.imgs||[]).length);
 }
-const gServVis = () => gServ().filter(s => !_svcVacio(s));
+function _servicesForHome(){
+  // Preserve legacy content until a full catalog has actually been saved.
+  if(!localStorage.getItem('ms_services_page'))return gServ().filter(s=>!_svcVacio(s));
+  let position=0;
+  return (gSvcPage().cats||[]).flatMap(c=>(c.items||[]).map(it=>{
+    const featured=it.home??(position<6);position++;
+    if(!featured||_svcItemVacio(it))return null;
+    const old=gServ().find(s=>s.name===it.n);
+    return {name:it.n,price:it.p,desc:it.info||c.desc||'',
+      imgs:it.imgs?.length?it.imgs:(c.imgs?.length?c.imgs:(c.img?[c.img]:(old?.imgs||[]))),
+      video:it.video||c.video||'',dur:old?.dur||''};
+  })).filter(Boolean);
+}
+const gServVis = () => _servicesForHome();
 // Lo mismo para el catálogo completo de servicios.html: el botón "+ Agregar servicio" de una
 // sección crea {n:'Nuevo servicio',p:'Consultar'} y también lo guarda al instante.
 // OJO: esto se usa SOLO para los chips del modal de reserva (que van por NOMBRE). NO filtrar
@@ -4214,6 +4236,7 @@ function turnoToggleServ(btn){
   if(i>=0){window._selServs.splice(i,1);btn.classList.remove('sel');btn.setAttribute('aria-pressed','false');btn.textContent=n;}
   else{window._selServs.push(n);btn.classList.add('sel');btn.setAttribute('aria-pressed','true');btn.textContent='✓ '+n;}
   _turnoUpdResumen();
+  if(window.miraPayments)icarLoadSlots();
 }
 // Resumen fijo arriba de los chips: la clienta siempre ve qué eligió
 function _turnoUpdResumen(){
@@ -4235,6 +4258,7 @@ function renderServiceButtonsDash(){
 
 // Admin CRUD con galería de imágenes y video por servicio
 function admRenderServicesList(){
+  if(localStorage.getItem('ms_services_page')){admPage('svcpage');return;}
   const list=gServ();const el=document.getElementById('adm-services-list');if(!el)return;
   el.innerHTML=list.map((s,idx)=>`
     <div class="arow">
@@ -4836,7 +4860,19 @@ const gSvcPage = () => {
     return JSON.parse(JSON.stringify(DEF_SERVICES_PAGE));
   } catch(e) { return JSON.parse(JSON.stringify(DEF_SERVICES_PAGE)); }
 };
-const sSvcPage = v => { localStorage.setItem('ms_services_page', JSON.stringify(v)); _fsSet('services_page', v); };
+async function _saveEditablePage(key,cacheKey,value){
+  try{
+    const user=_auth?.currentUser;
+    if(!_fbReady||!_db||!user||user.email!=='estudiosmira@gmail.com'||!user.emailVerified)throw new Error('Iniciá sesión con la cuenta administradora verificada.');
+    const serialized=JSON.stringify(value);
+    if(new TextEncoder().encode(serialized).length>900000)throw new Error('El contenido es demasiado grande. Reducí textos o imágenes incrustadas.');
+    toast('Guardando cambios…');
+    await _db.collection('site').doc(key).set({v:JSON.parse(serialized),t:Date.now()});
+    localStorage.setItem(cacheKey,serialized);
+    return true;
+  }catch(e){toast('No se pudo guardar. Tus campos siguen en el editor. '+(e.code==='permission-denied'?'Revisá los permisos de tu cuenta.':e.message||'Intentá nuevamente.'));return false;}
+}
+const sSvcPage = v => _saveEditablePage('services_page','ms_services_page',v);
 
 // ── Render de servicios.html ──
 // Si una sección del catálogo no tiene foto propia, usa la del servicio
@@ -4844,7 +4880,7 @@ const sSvcPage = v => { localStorage.setItem('ms_services_page', JSON.stringify(
 function _svcImgForCat(nombre){
   const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const palabras=norm(nombre).split(/\s+/).filter(w=>w.length>=5);
-  for(const s of gServVis()){
+  for(const s of gServ().filter(s=>!_svcVacio(s))){
     const sn=norm(s.name);
     if(palabras.some(w=>sn.includes(w))&&(s.imgs||[]).length)return s.imgs[0];
   }
@@ -4867,10 +4903,35 @@ function _spcAplicarColores(colors){
     r.setProperty('--spc-bg95','rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+',.95)');
   } else r.removeProperty('--spc-bg95');
 }
+function _svcPageFields(){
+  return [
+    ['heroImg','Imagen de portada (URL)',''],
+    ['heroBook','Botón principal','Reservar turno'],
+    ['heroBrowse','Botón para ver el catálogo','Ver servicios ↓'],
+    ['badge1Title','Primera franja: título','Profesionales certificadas'],
+    ['badge1Text','Primera franja: descripción','Años de experiencia real'],
+    ['badge2Title','Segunda franja: título','Productos de calidad'],
+    ['badge2Text','Segunda franja: descripción','Cuidamos tu piel y tu mirada'],
+    ['badge3Title','Tercera franja: título','Turnos online'],
+    ['badge3Text','Tercera franja: descripción','Reservá en un minuto'],
+    ['promosTitle','Título de promociones','Promociones del mes'],
+    ['promoBook','Botón de promociones','Reservar esta promo'],
+    ['categoryBook','Botón de cada sección','Elegir servicio y reservar'],
+    ['infoLabel','Botón de información','Más información'],
+    ['infoBook','Botón de la ficha del servicio','Reservar este servicio'],
+    ['bandBook','Botón de la banda promocional','Elegir servicios'],
+    ['ctaTitle','Cierre: título','¿Lista para tu momento?'],
+    ['ctaText','Cierre: descripción','Elegí tus servicios y reservá tu turno online.'],
+    ['ctaBook','Cierre: botón','Reservar mi turno'],
+    ['footerText','Pie de página','© 2026 Mira Estudio'],
+  ];
+}
 function renderServicesPage(){
   const d = gSvcPage();
+  const texts=Object.fromEntries(_svcPageFields().map(([k,,fallback])=>[k,d[k]??fallback]));
   _spcAplicarColores(d.colors);
   const set=(id,txt)=>{const el=document.getElementById(id);if(el)el.textContent=txt;};
+  _svcPageFields().forEach(([k])=>set('sp-'+k,texts[k]));
   set('sp-tag', d.heroTag); set('sp-title', d.heroTitle); set('sp-sub', d.heroSub);
   const hi=document.getElementById('sp-hero-img');
   if(hi){
@@ -4890,7 +4951,7 @@ function renderServicesPage(){
     if(!vig.length){ pbox.innerHTML=''; pbox.style.display='none'; }
     else {
       pbox.style.display='';
-      pbox.innerHTML='<div class="sp-promos-tit">Promociones del mes</div><div class="sp-oferta-grid">'+vig.map((p,pi)=>{
+      pbox.innerHTML='<div class="sp-promos-tit">'+_escHtml(texts.promosTitle)+'</div><div class="sp-oferta-grid">'+vig.map((p,pi)=>{
         const hastaTxt=p.hasta?('Válida hasta el '+_fechaLinda(p.hasta)):'';
         return `<article class="sp-oferta">
           ${p.img?`<div class="sp-oferta-img"><img src="${_escHtml(_cldOpt(p.img,700))}" alt="" loading="lazy"></div>`:''}
@@ -4902,7 +4963,7 @@ function renderServicesPage(){
             ${p.precioAntes?`<span class="sp-oferta-antes">${_escHtml(p.precioAntes)}</span>`:''}
           </div>
           ${hastaTxt?`<div class="sp-oferta-hasta">${_escHtml(hastaTxt)}</div>`:''}
-          <button class="btn-gold" onclick="promoReservar(${pi})">Reservar esta promo</button>
+          <button class="btn-gold" onclick="promoReservar(${pi})">${_escHtml(texts.promoBook)}</button>
         </article>`;
       }).join('')+'</div>';
       window._promosVig=vig;
@@ -4925,17 +4986,17 @@ function renderServicesPage(){
           <p>${_escHtml(c.desc||'')}</p>
           <div class="sp-items">
             ${(c.items||[]).map((it,ii)=>{
-              const hayInfo=(it.info||c.info);
+              const hayInfo=(it.info||c.info||it.video||c.video||it.imgs?.length||c.imgs?.length||c.img||it.res?.length);
               return `<div class="sp-item">
                 <div class="sp-item-n">${_escHtml(it.n)}${it.note?`<span class="sp-item-note">${_escHtml(it.note)}</span>`:''}</div>
                 <div class="sp-item-right">
                   <span class="sp-item-p">${_escHtml(it.p)}</span>
-                  ${hayInfo?`<button class="sp-info-btn" onclick="svcInfoOpen(${ci},${ii},this.dataset.n)" data-n="${_escHtml(it.n)}" aria-label="Más información sobre ${_escHtml(it.n)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.6"/></svg> Más info</button>`:''}
+                  ${hayInfo?`<button class="sp-info-btn" onclick="svcInfoOpen(${ci},${ii},this.dataset.n)" data-n="${_escHtml(it.n)}" aria-label="Más información sobre ${_escHtml(it.n)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.6"/></svg> ${_escHtml(texts.infoLabel)}</button>`:''}
                 </div>
               </div>`;
             }).join('')}
           </div>
-          <button class="btn-gold sp-book" data-cat="${_escHtml(c.name)}" onclick="turnoOpenModal(this.dataset.cat)">Reservar turno</button>
+          <button class="btn-gold sp-book" onclick="turnoOpenModal()">${_escHtml(texts.categoryBook)}</button>
         </div>
       </div>
     </section>`).join('');
@@ -4975,6 +5036,8 @@ function _admGal(fotos, onAdd, onDel, titulo){
 function admRenderSvcPage(){
   const d=gSvcPage();
   const g=id=>document.getElementById(id);
+  const fields=g('svp-page-fields');
+  if(fields)fields.innerHTML=_svcPageFields().map(([k,label,fallback])=>`<div class="fg"><label for="svp-page-${k}">${label}</label><input type="${k==='heroImg'?'url':'text'}" id="svp-page-${k}" value="${_escHtml(d[k]??fallback)}"></div>`).join('');
   if(g('svp-tag'))g('svp-tag').value=d.heroTag||'';
   if(g('svp-title'))g('svp-title').value=d.heroTitle||'';
   if(g('svp-sub'))g('svp-sub').value=d.heroSub||'';
@@ -5024,6 +5087,7 @@ function admRenderSvcPage(){
 
   // ── Secciones y sus servicios ──
   const el=g('adm-svcpage-cats');if(!el)return;
+  let homePosition=0;
   el.innerHTML=d.cats.map((c,idx)=>`
     <div class="arow" data-cat="${idx}">
       <div class="arow-main">
@@ -5040,6 +5104,7 @@ function admRenderSvcPage(){
           <div class="svp-items">
             ${(c.items||[]).map((it,ii)=>`
               <div class="svp-item" data-item="${ii}">
+                <label class="pr-chk"><input type="checkbox" class="it-home" ${(it.home??(homePosition<6))?'checked':''}${(++homePosition,'')}> Mostrar también en el inicio</label>
                 <div class="svp-item-top">
                   <span class="svp-item-num">${ii+1}</span>
                   <input type="text" class="it-n" value="${_escHtml(it.n)}" placeholder="Nombre del servicio">
@@ -5083,7 +5148,9 @@ function admRenderSvcPage(){
 function _admSvcPageCollect(){
   const d=gSvcPage();
   const guardado=gSvcPage();
+  const renamed=new Map();
   const g=id=>document.getElementById(id);
+  _svcPageFields().forEach(([k])=>{const el=g('svp-page-'+k);if(el)d[k]=el.value.trim();});
   if(g('svp-tag'))d.heroTag=g('svp-tag').value.trim();
   if(g('svp-title'))d.heroTitle=g('svp-title').value.trim();
   if(g('svp-sub'))d.heroSub=g('svp-sub').value.trim();
@@ -5117,11 +5184,14 @@ function _admSvcPageCollect(){
         const ii=parseInt(box.getAttribute('data-item'),10);
         const itPrev=(previa.items||[])[ii]||{};
         const v=cls=>{const e=box.querySelector(cls);return e?String(e.value).trim():'';};
-        const it={ n:v('.it-n'), p:v('.it-p'), note:v('.it-note'), info:v('.it-i'), video:v('.it-v') };
-        const inter=v('.it-int'); if(inter)it.intervalo=parseInt(inter,10)||0;
+        const it={ ...itPrev, n:v('.it-n'), p:v('.it-p'), note:v('.it-note'), info:v('.it-i'), video:v('.it-v') };
+        it.bookingKey=itPrev.bookingKey||(itPrev.n&&itPrev.n!=='Nuevo servicio'?itPrev.n:it.n);
+        if(itPrev.n&&it.n&&itPrev.n!==it.n)renamed.set(itPrev.n,it.n);
+        const home=box.querySelector('.it-home');if(home)it.home=home.checked;
+        const inter=v('.it-int'); if(inter)it.intervalo=parseInt(inter,10)||0;else delete it.intervalo;
         if(itPrev.imgs&&itPrev.imgs.length)it.imgs=itPrev.imgs;
         // Reseñas: una por línea, "Texto | Nombre"
-        const rtxt=v('.it-r');
+        const rtxt=v('.it-r');delete it.res;
         if(rtxt){
           it.res=rtxt.split('\n').map(l=>{
             const p2=l.split('|'); const t=(p2[0]||'').trim(); const a=(p2.slice(1).join('|')||'').trim();
@@ -5150,54 +5220,68 @@ function _admSvcPageCollect(){
       };
     }).filter(p=>p.nombre);
   }
+  (d.promos||[]).forEach(p=>{p.servicios=(p.servicios||[]).map(n=>renamed.get(n)||n);});
   return d;
 }
 
-function admSvcColoresFabrica(){
+async function admSvcColoresFabrica(){
   const d=_admSvcPageCollect();
   delete d.colors;
-  sSvcPage(d);admRenderSvcPage();
+  if(!await sSvcPage(d))return;admRenderSvcPage();
   toast('🎨 Colores de fábrica restaurados');
 }
-function admSvcPageSave(){
-  sSvcPage(_admSvcPageCollect());
+async function admSvcCoverUpload(ev){
+  const input=ev.target,file=input.files?.[0];if(!file)return;
+  const status=document.getElementById('svp-cover-status');
+  input.disabled=true;
+  if(status)status.textContent='Subiendo imagen…';
+  try{
+    const url=await uploadToCloudinary(file,'servicios-pagina');
+    const field=document.getElementById('svp-page-heroImg');
+    if(field)field.value=url;
+    if(status)status.textContent='Imagen cargada. Guardá la página para publicarla.';
+  }catch(e){if(status)status.textContent='No se pudo subir la imagen. Intentá nuevamente.';}
+  finally{input.disabled=false;input.value='';}
+}
+async function admSvcPageSave(){
+  if(!await sSvcPage(_admSvcPageCollect()))return;
   toast('✅ Página de servicios guardada');
   admRenderSvcPage();
 }
-function admSvcPageNewCat(){
+async function admSvcPageNewCat(){
   const d=_admSvcPageCollect();
   d.cats.push({id:'cat_'+d.cats.length+'_n',name:'Nueva sección',desc:'',info:'',img:'',imgs:[],video:'',items:[]});
-  sSvcPage(d);admRenderSvcPage();
+  if(!await sSvcPage(d))return;admRenderSvcPage();
 }
-function admSvcPageDelCat(idx){
+async function admSvcPageDelCat(idx){
   if(!confirm('¿Eliminar esta sección completa, con todos sus servicios?'))return;
-  const d=_admSvcPageCollect();d.cats.splice(idx,1);sSvcPage(d);admRenderSvcPage();
+  const d=_admSvcPageCollect();d.cats.splice(idx,1);if(!await sSvcPage(d))return;admRenderSvcPage();
 }
-function admSvcPageMoverCat(idx,dir){
+async function admSvcPageMoverCat(idx,dir){
   const d=_admSvcPageCollect();
   const j=idx+dir; if(j<0||j>=d.cats.length)return;
   const [x]=d.cats.splice(idx,1); d.cats.splice(j,0,x);
-  sSvcPage(d);admRenderSvcPage();toast('Sección movida al lugar '+(j+1));
+  if(!await sSvcPage(d))return;admRenderSvcPage();toast('Sección movida al lugar '+(j+1));
 }
 // ── Servicios dentro de una sección ──
-function admSvcItemNuevo(idx){
+async function admSvcItemNuevo(idx){
   const d=_admSvcPageCollect();
   if(!d.cats[idx])return;
   (d.cats[idx].items=d.cats[idx].items||[]).push({n:'Nuevo servicio',p:'Consultar',note:'',info:'',video:''});
-  sSvcPage(d);admRenderSvcPage();
+  if(!await sSvcPage(d))return;admRenderSvcPage();
   toast('Servicio agregado — completá sus datos y guardá');
 }
-function admSvcItemBorrar(idx,ii){
+async function admSvcItemBorrar(idx,ii){
   if(!confirm('¿Eliminar este servicio?'))return;
   const d=_admSvcPageCollect();
-  if(d.cats[idx]&&d.cats[idx].items){d.cats[idx].items.splice(ii,1);sSvcPage(d);admRenderSvcPage();}
+  if(d.cats[idx]&&d.cats[idx].items){d.cats[idx].items.splice(ii,1);if(!await sSvcPage(d))return;admRenderSvcPage();}
 }
-function admSvcItemMover(idx,ii,dir){
+async function admSvcItemMover(idx,ii,dir){
   const d=_admSvcPageCollect();
   const arr=d.cats[idx]&&d.cats[idx].items; if(!arr)return;
   const j=ii+dir; if(j<0||j>=arr.length)return;
   const [x]=arr.splice(ii,1); arr.splice(j,0,x);
-  sSvcPage(d);admRenderSvcPage();
+  if(!await sSvcPage(d))return;admRenderSvcPage();
 }
 // ── Fotos ──
 async function admSvcSubirFoto(idx,ev,campo){
@@ -5213,15 +5297,15 @@ async function admSvcSubirFoto(idx,ev,campo){
       (d.cats[idx].imgs=d.cats[idx].imgs||[]).push(url); ok++;
     }catch(e){err++;}
   }
-  sSvcPage(d);admRenderSvcPage();
+  if(!await sSvcPage(d))return;admRenderSvcPage();
   toast(ok?('✅ '+ok+' foto'+(ok!==1?'s':'')+' lista'+(ok!==1?'s':'')+(err?' · '+err+' fallaron':'')):'⚠️ No se pudo subir ninguna foto');
 }
-function admSvcBorrarFoto(idx,campo,ui){
+async function admSvcBorrarFoto(idx,campo,ui){
   const d=_admSvcPageCollect();
   if(!d.cats[idx])return;
   if(campo==='img')d.cats[idx].img='';
   else if(d.cats[idx].imgs)d.cats[idx].imgs.splice(ui,1);
-  sSvcPage(d);admRenderSvcPage();
+  if(!await sSvcPage(d))return;admRenderSvcPage();
 }
 async function admSvcItemSubirFoto(idx,ii,ev){
   const files=[...(ev.target.files||[])];if(!files.length)return;ev.target.value='';
@@ -5232,40 +5316,40 @@ async function admSvcItemSubirFoto(idx,ii,ev){
   for(const f of files){
     try{ (it.imgs=it.imgs||[]).push(await uploadToCloudinary(f,'servicios-pagina')); ok++; }catch(e){err++;}
   }
-  sSvcPage(d);admRenderSvcPage();
+  if(!await sSvcPage(d))return;admRenderSvcPage();
   toast(ok?'✅ Fotos del servicio actualizadas':'⚠️ No se pudo subir');
 }
-function admSvcItemBorrarFoto(idx,ii,ui){
+async function admSvcItemBorrarFoto(idx,ii,ui){
   const d=_admSvcPageCollect();
   const it=d.cats[idx]&&d.cats[idx].items[ii];
-  if(it&&it.imgs){it.imgs.splice(ui,1);sSvcPage(d);admRenderSvcPage();}
+  if(it&&it.imgs){it.imgs.splice(ui,1);if(!await sSvcPage(d))return;admRenderSvcPage();}
 }
 // ── Promociones ──
-function admPromoNueva(){
+async function admPromoNueva(){
   const d=_admSvcPageCollect();
   (d.promos=d.promos||[]).push({id:'promo_'+((d.promos||[]).length+1),nombre:'Nueva promo',desc:'',servicios:[],precio:'',precioAntes:'',hasta:'',img:''});
-  sSvcPage(d);admRenderSvcPage();
+  if(!await sSvcPage(d))return;admRenderSvcPage();
 }
-function admPromoBorrar(pi){
+async function admPromoBorrar(pi){
   if(!confirm('¿Eliminar esta promoción?'))return;
-  const d=_admSvcPageCollect();(d.promos||[]).splice(pi,1);sSvcPage(d);admRenderSvcPage();
+  const d=_admSvcPageCollect();(d.promos||[]).splice(pi,1);if(!await sSvcPage(d))return;admRenderSvcPage();
 }
-function admPromoMover(pi,dir){
+async function admPromoMover(pi,dir){
   const d=_admSvcPageCollect();
   const j=pi+dir; if(!d.promos||j<0||j>=d.promos.length)return;
   const [x]=d.promos.splice(pi,1); d.promos.splice(j,0,x);
-  sSvcPage(d);admRenderSvcPage();
+  if(!await sSvcPage(d))return;admRenderSvcPage();
 }
 async function admPromoSubirFoto(pi,ev){
   const f=(ev.target.files||[])[0];if(!f)return;ev.target.value='';
   const d=_admSvcPageCollect();
   if(!d.promos||!d.promos[pi])return;
-  try{ toast('☁ Subiendo foto...'); d.promos[pi].img=await uploadToCloudinary(f,'promos'); sSvcPage(d);admRenderSvcPage();toast('✅ Foto de la promo lista'); }
+  try{ toast('☁ Subiendo foto...'); d.promos[pi].img=await uploadToCloudinary(f,'promos'); if(!await sSvcPage(d))return;admRenderSvcPage();toast('✅ Foto de la promo lista'); }
   catch(e){ toast('⚠️ '+e.message); }
 }
-function admPromoBorrarFoto(pi){
+async function admPromoBorrarFoto(pi){
   const d=_admSvcPageCollect();
-  if(d.promos&&d.promos[pi]){d.promos[pi].img='';sSvcPage(d);admRenderSvcPage();}
+  if(d.promos&&d.promos[pi]){d.promos[pi].img='';if(!await sSvcPage(d))return;admRenderSvcPage();}
 }
 
 function svcInfoOpen(ci, ii, nombre){
@@ -5348,9 +5432,9 @@ const DEF_CURSOS_PAGE = {
   heroKicker: 'Academia Mira Estudio',
   heroTitle: 'Aprendé un *oficio* que se ve en cada mirada',
   heroSub: 'Extensiones de pestañas pelo por pelo, explicado desde cero por quien lo hace todos los días en su estudio. A tu ritmo, desde donde estés.',
-  heroBtn1: 'Empezar gratis',
+  heroBtn1: 'Ver acceso al curso',
   heroBtn2: 'Ver el programa',
-  heroNota: 'Sin tarjeta. Creás tu cuenta y entrás.',
+  heroNota: 'Creá tu cuenta y consultá el acceso y el precio de cada curso.',
   tira: ['Clases en video', 'Acceso sin vencimiento', 'Certificado digital al terminar', 'Desde el celular o la compu'],
   paraQuienTit: 'Este curso es para *vos* si…',
   paraQuienSub: 'Tres puntos de partida distintos, el mismo lugar donde empezar.',
@@ -5360,7 +5444,7 @@ const DEF_CURSOS_PAGE = {
     { t: 'Querés que esto sea tu trabajo', d: 'Estás pensando en vivir de las pestañas y sabés que la técnica es lo primero que hay que tener firme. Base sólida, certificado al terminar y una comunidad de colegas del otro lado.' },
   ],
   cursoTit: 'El curso que está *abierto* ahora',
-  cursoPie: 'Se abre apenas creás tu cuenta. No vence y lo podés ver las veces que quieras.',
+  cursoPie: 'Los cursos pagos se habilitan cuando se confirma el pago. Podés volver a ver las clases desde tu cuenta.',
   aprenderKicker: 'El programa',
   aprenderTit: 'Lo que vas a saber *hacer* cuando termines',
   aprenderSub: 'No es teoría suelta: cada clase te deja una decisión que vas a tomar sola frente a la clienta.',
@@ -5398,21 +5482,22 @@ const DEF_CURSOS_PAGE = {
     { q: '¿Hasta cuándo lo puedo ver?', a: 'El acceso no vence. Entrás las veces que quieras y volvés a la clase del adhesivo cuando se te complique una aplicación. La plataforma te reanuda sola en la última clase que dejaste sin terminar.' },
     { q: '¿Tengo que comprar materiales caros antes de empezar?', a: 'No. El curso no incluye kit de materiales ni te obliga a comprar nada para verlo. Podés mirar todas las clases primero, entender qué adhesivo y qué pestañas te convienen, y recién ahí invertir sabiendo lo que estás comprando.' },
     { q: '¿Lo puedo ver del celular?', a: 'Sí, desde el celular, la tablet o la computadora con el mismo usuario y contraseña. Tus notas y tu progreso quedan guardados en la nube, así que podés arrancar en la compu y seguir desde el celular sin perder nada.' },
-    { q: '¿Cuánto sale? ¿Me van a cobrar todos los meses?', a: 'No hay suscripción ni débito automático. Hoy el curso de Extensiones Clásicas se abre gratis al crear tu cuenta. Los cursos pagos que se sumen se abonan una sola vez por Mercado Pago, con el link que aparece en el curso.' },
+    { q: '¿Cuánto sale? ¿Me van a cobrar todos los meses?', a: 'El precio se muestra en la ficha de cada curso. Los cursos pagos se abonan una sola vez por Mercado Pago y se habilitan al confirmar el pago. Los cursos sin costo requieren autorización del estudio. No hay suscripción ni débito automático.' },
     { q: 'Veo cursos que dicen "En preparación". ¿Qué pasa con esos?', a: 'Todavía no tienen las clases cargadas, por eso aparecen bloqueados. No se pueden comprar ni reservar por ahora. Cuando estén listos los vas a ver habilitados en tu panel.' },
   ],
   ctaTit: 'Tu primera clase te está *esperando*',
-  ctaTxt: 'Creás tu cuenta, entrás y empezás. Sin costo, sin tarjeta y sin fecha de vencimiento.',
+  ctaTxt: 'Creá tu cuenta, elegí tu curso y empezá cuando tengas el acceso habilitado. Podés estudiar a tu ritmo.',
   ctaBtn: 'Crear mi cuenta gratis',
 };
 const gCursosPage = () => {
   try {
     const d = localStorage.getItem('ms_cursos_page');
-    const v = d ? JSON.parse(d) : null;
+    const legacyCopy = {"Sin tarjeta. Creás tu cuenta y entrás.": "Creá tu cuenta y consultá el acceso y el precio de cada curso.", "Se abre apenas creás tu cuenta. No vence y lo podés ver las veces que quieras.": "Los cursos pagos se habilitan cuando se confirma el pago. Podés volver a ver las clases desde tu cuenta.", "No hay suscripción ni débito automático. Hoy el curso de Extensiones Clásicas se abre gratis al crear tu cuenta. Los cursos pagos que se sumen se abonan una sola vez por Mercado Pago, con el link que aparece en el curso.": "El precio se muestra en la ficha de cada curso. Los cursos pagos se abonan una sola vez por Mercado Pago y se habilitan al confirmar el pago. Los cursos sin costo requieren autorización del estudio. No hay suscripción ni débito automático.", "Creás tu cuenta, entrás y empezás. Sin costo, sin tarjeta y sin fecha de vencimiento.": "Creá tu cuenta, elegí tu curso y empezá cuando tengas el acceso habilitado. Podés estudiar a tu ritmo."};
+    const v = d ? JSON.parse(d, (key,value) => typeof value === 'string' && Object.prototype.hasOwnProperty.call(legacyCopy,value) ? legacyCopy[value] : value) : null;
     return (v && typeof v === 'object') ? Object.assign(JSON.parse(JSON.stringify(DEF_CURSOS_PAGE)), v) : JSON.parse(JSON.stringify(DEF_CURSOS_PAGE));
   } catch(e) { return JSON.parse(JSON.stringify(DEF_CURSOS_PAGE)); }
 };
-const sCursosPage = v => { localStorage.setItem('ms_cursos_page', JSON.stringify(v)); _fsSet('cursos_page', v); };
+const sCursosPage = v => _saveEditablePage('cursos_page','ms_cursos_page',v);
 
 // Los *asteriscos* marcan la palabra que va en itálica dorada (así la dueña
 // la puede mover desde el panel sin escribir HTML).
@@ -5429,6 +5514,10 @@ function renderCursosPage(){
   const d = gCursosPage();
   const cursos = gc();
   const abierto = cursos.filter(c => !c.locked)[0] || null;
+  const sticky = document.getElementById('cs-sticky-price');
+  if(sticky) sticky.textContent = abierto ? ((abierto.paid !== true && [0,'0','Gratis'].includes(abierto.price)) ? 'Curso gratuito' : 'Curso · '+(abierto.price || 'Consultar precio')) : 'Próximos cursos';
+  const stickyButton = document.getElementById('cs-sticky-buy');
+  if(stickyButton){stickyButton.disabled=!abierto;stickyButton.onclick=()=>{if(abierto)buyCourse(String(abierto.id));};}
   const set = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
   const setEm = (id, txt) => { const el = document.getElementById(id); if(el) el.innerHTML = _emFmt(txt); };
 
@@ -5473,7 +5562,7 @@ function renderCursosPage(){
     else {
       const mods = (abierto.modules||[]).filter(m => (m.lessons||[]).length);
       const nClases = mods.reduce((a,m) => a + m.lessons.length, 0);
-      const gratis = !abierto.price || abierto.price === '' || abierto.price === '0' || abierto.price === 'Gratis';
+      const gratis = abierto.paid !== true && (abierto.price === 0 || abierto.price === '0' || abierto.price === 'Gratis');
       fich.innerHTML = `
         <div class="cs-ficha-media">${abierto.coverImg ? `<img src="${_escHtml(_cldOpt(abierto.coverImg,700))}" alt="" loading="lazy">` : '<div class="cs-ficha-ph"></div>'}</div>
         <div class="cs-ficha-info">
@@ -5484,7 +5573,7 @@ function renderCursosPage(){
           <div class="cs-ficha-meta">
             <span>${nClases} clases en video</span><span>${mods.length} módulos</span><span>Certificado al finalizar</span>
           </div>
-          <button class="btn-gold cs-btn-big" onclick="openAuth('r')">${gratis ? 'Entrar al curso — es gratis' : ('Quiero este curso · ' + _escHtml(abierto.price))}</button>
+          <button class="btn-gold cs-btn-big" data-product-id="${_escHtml(abierto.id)}" onclick="buyCourse(this.dataset.productId)">${gratis ? 'Consultar acceso al curso' : ('Quiero este curso · ' + _escHtml(abierto.price))}</button>
         </div>`;
     }
   }
@@ -5692,30 +5781,30 @@ function _admCPCollect(){
   });
   return d;
 }
-function admCPGuardar(){ sCursosPage(_admCPCollect()); toast('✅ Página de cursos guardada'); admRenderCursosPage(); }
-function admCPNuevo(campo){
+async function admCPGuardar(){ if(!await sCursosPage(_admCPCollect()))return; toast('✅ Página de cursos guardada'); admRenderCursosPage(); }
+async function admCPNuevo(campo){
   const d = _admCPCollect();
   d[campo] = d[campo] || [];
   d[campo].push(campo==='faq' ? {q:'Nueva pregunta',a:''} : {t:'Nuevo',d:''});
-  sCursosPage(d); admRenderCursosPage();
+  if(!await sCursosPage(d))return; admRenderCursosPage();
 }
-function admCPBorrar(campo, i){
+async function admCPBorrar(campo, i){
   if(!confirm('¿Eliminar este bloque?')) return;
-  const d = _admCPCollect(); d[campo].splice(i,1); sCursosPage(d); admRenderCursosPage();
+  const d = _admCPCollect(); d[campo].splice(i,1); if(!await sCursosPage(d))return; admRenderCursosPage();
 }
-function admCPMover(campo, i, dir){
+async function admCPMover(campo, i, dir){
   const d = _admCPCollect();
   const j = i + dir; if(j<0 || j>=d[campo].length) return;
   const [x] = d[campo].splice(i,1); d[campo].splice(j,0,x);
-  sCursosPage(d); admRenderCursosPage();
+  if(!await sCursosPage(d))return; admRenderCursosPage();
 }
 async function admCPSubirFoto(ev){
   const f = ev.target.files[0]; if(!f) return; ev.target.value='';
   const d = _admCPCollect();
-  try{ toast('☁ Subiendo foto...'); d.estudioImg = await uploadToCloudinary(f,'cursos'); sCursosPage(d); admRenderCursosPage(); toast('✅ Foto actualizada'); }
+  try{ toast('☁ Subiendo foto...'); d.estudioImg = await uploadToCloudinary(f,'cursos'); if(!await sCursosPage(d))return; admRenderCursosPage(); toast('✅ Foto actualizada'); }
   catch(e){ toast('⚠️ '+e.message); }
 }
-function admCPBorrarFoto(){ const d=_admCPCollect(); d.estudioImg=''; sCursosPage(d); admRenderCursosPage(); }
+async function admCPBorrarFoto(){ const d=_admCPCollect(); d.estudioImg=''; if(!await sCursosPage(d))return; admRenderCursosPage(); }
 
 
 // Fecha en formato lindo (25 de agosto)

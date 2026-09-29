@@ -102,7 +102,7 @@
             <div class="sec-heading" style="margin-bottom:14px;">Todos los cursos</div>
             <div class="search-wrap">
               <span class="search-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16 16"/></svg></span>
-              <input class="search-inp" id="course-search" type="text" placeholder="Buscar curso por título o descripción..." oninput="filterCoursesSearch(this.value)">
+              <input class="search-inp" id="course-search" name="buscar-cursos" type="search" autocomplete="off" placeholder="Buscar curso por título o descripción..." oninput="filterCoursesSearch(this.value)">
               <button class="search-clear" id="search-clear" onclick="clearSearch()">×</button>
             </div>
             <div class="courses-list" id="carousel-courses-list"></div>
@@ -402,6 +402,9 @@
 </div>
 
 <script src="shared.js"></script>
+<script src="payment-config.js"></script>
+<script src="payments.js"></script>
+<script src="digital-access.js"></script>
 <script>
 
 // ── DASHBOARD INIT ──────────────────────────────────────

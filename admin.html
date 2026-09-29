@@ -56,6 +56,24 @@ body.dark-mode .adm-exit{color:var(--muted);border-color:var(--adm-border);}
 body.dark-mode .adm-exit:hover{background:rgba(255,255,255,.07);}
 body.light-mode .adm-body{background:#F5F0EB;}
 body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
+@media(max-width:700px){
+  #view-admin{flex-direction:column!important;}
+  .adm-sb{position:relative;width:100%;height:auto;overflow:visible;}
+  .adm-sb-top{padding:10px 14px;}
+  .adm-nav{display:flex;flex:none;overflow-x:auto;gap:4px;padding:8px;}
+  .adm-group{display:none;}
+  .adm-ni{width:auto;flex:0 0 auto;white-space:nowrap;min-height:44px;}
+  .adm-exit{padding:10px 14px;min-height:44px;}
+  .adm-body{width:100%;min-width:0;min-height:60vh;overflow:visible;}
+  .adm-pg{padding:20px 14px;max-width:100%;}
+  .adm-grid2,.adm-grid3{grid-template-columns:minmax(0,1fr);}
+  .acard{padding:16px;min-width:0;}
+  .arow{flex-wrap:wrap;min-width:0;}
+  .arow-main{min-width:0;width:100%;}
+  .svp-item-top{flex-wrap:wrap;}
+  .svp-item-top input{min-width:0;max-width:100%;}
+  .fg input,.fg select,.fg textarea{max-width:100%;}
+}
 </style>
 </head>
 <body class="dark-mode">
@@ -88,16 +106,18 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
       <button class="adm-ni" data-adm="turnos" onclick="admPage('turnos')">📅 Turnos</button>
       <button class="adm-ni" data-adm="usuarios" onclick="admPage('usuarios')">👥 Usuarios</button>
       <button class="adm-ni" data-adm="social" onclick="admPage('social')">🌐 Redes Sociales</button>
+      <button class="adm-ni" data-adm="pagos" onclick="admPage('pagos')">Cobros y señas</button>
       <button class="adm-ni" data-adm="config" onclick="admPage('config')">⚙️ Configuración</button>
     </nav>
     <button class="adm-exit" onclick="admForcSync()" style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.25);color:var(--goldd);margin-bottom:6px;">☁ Sincronizar</button>
-    <button class="adm-exit" onclick="admLogout()">← Volver al sitio</button>
+    <button class="adm-exit" onclick="admLogout()">Cerrar sesión y volver al sitio</button>
   </aside>
 
   <div class="adm-body">
 
     <!-- ESTÉTICA -->
-    <div class="adm-pg" id="adm-estetica">
+    <div class="adm-pg" id="adm-pagos"><h2>Cobros y señas</h2><div class="acard" id="payments-editor"></div></div>
+<div class="adm-pg" id="adm-estetica">
       <div class="adm-pghdr"><h2>🎨 Estética & Colores</h2><p>Personalizá los colores, el fondo del hero y el logo.</p></div>
       <div class="acard">
         <h3>Colores del sitio</h3>
@@ -315,7 +335,14 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
 
     <!-- PÁGINA DE SERVICIOS (servicios.html) -->
     <div class="adm-pg" id="adm-svcpage">
-      <div class="adm-pghdr"><h2>🗂 Catálogo completo de servicios</h2><p>Esto es lo que ve la clienta en la <strong>pestaña «Servicios»</strong> de tu página (el catálogo con los 54 servicios, sus precios, sus fotos y las fichas de «Más info»). <a href="servicios.html" target="_blank" style="color:var(--gold);">Ver la página ↗</a></p></div>
+      <div class="adm-pghdr"><h2>🗂 Catálogo completo de servicios</h2><p>Editá las secciones, precios, fotos y fichas de la <strong>pestaña «Servicios»</strong>. <a href="servicios.html" target="_blank" style="color:var(--gold);">Ver la página ↗</a></p></div>
+      <div class="acard">
+        <h3>Portada, franjas, botones y cierre</h3>
+        <p>Podés cambiar estos textos y la foto principal. Los cambios se publican al guardar la página.</p>
+        <div class="adm-grid2" id="svp-page-fields"></div>
+        <div class="fg"><label for="svp-cover-file">Subir una foto de portada</label><input id="svp-cover-file" type="file" accept="image/*" onchange="admSvcCoverUpload(event)"></div>
+        <p id="svp-cover-status" role="status"></p>
+      </div>
       <div class="acard">
         <h3>Encabezado</h3>
         <div class="adm-grid2" style="gap:8px;">
@@ -425,11 +452,8 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
     <div class="adm-pg" id="adm-config">
       <div class="adm-pghdr"><h2>⚙️ Configuración</h2><p>Ajustes generales del panel de admin.</p></div>
       <div class="acard">
-        <h3>Cambiar contraseña de admin</h3>
-        <div class="fg"><label>Nueva contraseña (mín. 6 caracteres)</label><input type="password" id="cfg-newpass" placeholder="••••••••"></div>
-        <div class="fg"><label>Confirmar contraseña</label><input type="password" id="cfg-confpass" placeholder="••••••••"></div>
-        <button class="abtn" onclick="admSavePassword()">Cambiar contraseña</button>
-        <p style="font-size:12px;color:var(--muted);margin-top:10px;">La clave actual por defecto es <strong>Mira2025</strong></p>
+        <h3>Acceso de administración</h3>
+        <p>El panel usa tu cuenta verificada de Firebase. Para cambiar la contraseña, cerrá sesión y elegí “¿Olvidaste tu contraseña?” en el inicio de sesión.</p>
       </div>
       <div class="acard">
         <h3>Nombre del sitio</h3>
@@ -537,9 +561,16 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
 <div class="save-ind" id="save-ind">✓ Guardado</div>
 
 <script src="shared.js"></script>
+<script src="payment-config.js"></script>
+<script src="payments.js"></script>
+<script src="digital-access.js"></script>
 <script>
 
 // ── ADMIN.HTML INIT ─────────────────────────────────────
+window._miraAdminEditVersion=0;
+for(const event of ['input','change','pointerdown'])document.addEventListener(event,e=>{
+  if(e.target.closest?.('#view-admin'))window._miraAdminEditVersion++;
+},true);
 function admLogout(){
   currentUser = null;
   localStorage.removeItem(KS);
@@ -574,8 +605,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   // Sync from cloud in background
   setTimeout(()=>{
+    if(window._miraAdminEditVersion)return;
     if(_fbReady && _db){
       _syncSiteFromCloud().then(()=>{
+        if(window._miraAdminEditVersion)return;
         const active = document.querySelector('.adm-ni.active');
         if(active && active.dataset.adm) admPage(active.dataset.adm);
       }).catch(()=>{});

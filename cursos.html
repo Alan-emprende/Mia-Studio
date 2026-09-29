@@ -272,8 +272,8 @@ body{background:#0D0005;color:#F0E6D3;}
 <footer class="cs-footer">© 2026 Mira Estudio · <a href="index.html">mirastudiotb.com</a> · <a href="servicios.html">Servicios</a></footer>
 
 <div class="cs-sticky">
-  <span>Curso abierto · gratis</span>
-  <button class="btn-gold" style="padding:10px 22px;font-size:13.5px;" onclick="openAuth('r')">Empezar</button>
+  <span id="cs-sticky-price">Cursos disponibles</span>
+  <button id="cs-sticky-buy" class="btn-gold" style="padding:10px 22px;font-size:13.5px;">Ver acceso</button>
 </div>
 
 <div class="ov" id="auth-ov" onclick="hovClick(event,'auth-ov')">
@@ -293,7 +293,7 @@ body{background:#0D0005;color:#F0E6D3;}
       <button class="btn-auth" onclick="doLogin()">Iniciar sesión</button>
       <div style="text-align:center;margin-top:10px;"><button onclick="showResetPass()" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;font-family:var(--fb);text-decoration:underline;">¿Olvidaste tu contraseña?</button></div>
       <div class="auth-divider">— acceso rápido —</div>
-      <button class="auth-demo" onclick="demoLogin()">🎓 Entrar como alumna demo</button>
+      
     </div>
     <div id="form-reset" style="display:none;">
       <div style="text-align:center;margin-bottom:16px;"><div style="font-size:32px;">🔑</div><div style="font-family:var(--fd);font-size:18px;color:var(--dark);margin:8px 0 4px;">Restablecer contraseña</div><div style="font-size:13px;color:var(--muted);">Te enviamos un link a tu email.</div></div>
@@ -311,12 +311,15 @@ body{background:#0D0005;color:#F0E6D3;}
 </div>
 
 <script src="shared.js"></script>
+<script src="payment-config.js"></script>
+<script src="payments.js"></script>
+<script src="digital-access.js"></script>
 <script>
 // La sesión de esta página lleva al área de alumnas
 function loginOk(u){
   currentUser = u;
   localStorage.setItem(KS, JSON.stringify(u));
-  window.location.href = (u.role === 'admin') ? 'admin.html' : 'dashboard.html';
+  window.location.href = miraPostLoginDestination(u.role);
 }
 function doLogout(){ currentUser = null; localStorage.removeItem(KS); if(_fbReady && _auth) _auth.signOut().catch(()=>{}); }
 
