@@ -61,7 +61,7 @@ async function _syncSiteFromCloud(){
     }
   }catch(e){}}
 }
-async function _saveUserProfile(uid,data){if(!_fbReady||!_db)return;try{await _db.collection('users').doc(uid).set(data,{merge:true});}catch(e){}}
+async function _saveUserProfile(uid,data){if(!_fbReady||!_db)throw Error('No se pudo conectar para guardar tu perfil.');await _db.collection('users').doc(uid).set(data,{merge:true});}
 async function _loadUserProfile(uid){if(!_fbReady||!_db)return null;try{const d=await _db.collection('users').doc(uid).get();return d.exists?d.data():null;}catch(e){return null;}}
 
 // ════════════ TURNOS EN LA NUBE ════════════
@@ -317,9 +317,10 @@ function doLogin(){
         finally{await _auth.signOut();_fbUid=null;}return;
       }
       _fbUid=fu.uid;
-      _loadUserProfile(fu.uid).then(profile=>{
-        const u=profile||{name:fu.displayName||'Alumna',email:fu.email,role:'student'};u.uid=fu.uid;loginOk(u);
-      });
+      const profile=await _loadUserProfile(fu.uid);
+      const u={...(profile||{}),name:profile?.name||fu.displayName||'Alumna',email:fu.email,role:profile?.role||'student',uid:fu.uid};
+      await _saveUserProfile(fu.uid,profile?{name:u.name,email:u.email,uid:u.uid}:{name:u.name,email:u.email,uid:u.uid,role:'student'});
+      loginOk(u);
     }).catch(err=>{
       const msg=err.code==='auth/wrong-password'||err.code==='auth/user-not-found'||err.code==='auth/invalid-credential'?'Email o contraseña incorrectos.':err.code==='auth/too-many-requests'?'Demasiados intentos. Esperá unos minutos.':'Error al iniciar sesión.';
       showFieldErr('fg-li-email',msg);showFieldErr('fg-li-pass',msg);showErr(msg);
@@ -337,11 +338,11 @@ function doRegister(){
   if(!em){showFieldErr('fg-rg-email','Ingresá tu email');return;}
   if(!pw||pw.length<6){showFieldErr('fg-rg-pass','Mínimo 6 caracteres');return;}
   if(_fbReady&&_auth){
-    _auth.createUserWithEmailAndPassword(em,pw).then(cred=>{
+    _auth.createUserWithEmailAndPassword(em,pw).then(async cred=>{
       const fu=cred.user;_fbUid=fu.uid;
-      fu.updateProfile({displayName:nm});
+      await fu.updateProfile({displayName:nm});
       const u={name:nm,email:em,uid:fu.uid,role:'student'};
-      _saveUserProfile(fu.uid,u);
+      try{await _saveUserProfile(fu.uid,u);}catch{await _auth.signOut();_fbUid=null;showErr('Tu cuenta fue creada, pero no se pudo guardar el perfil. Volvé a iniciar sesión para recuperarlo.');return;}
       fu.sendEmailVerification().then(()=>{_auth.signOut();_fbUid=null;closeOv('auth-ov');showVerifyBanner(em);}).catch(async()=>{await _auth.signOut();_fbUid=null;showErr('Tu cuenta fue creada, pero no pudimos enviar el email de verificación. Volvé a iniciar sesión para reenviarlo.');});
     }).catch(err=>{
       const msg=err.code==='auth/email-already-in-use'?'Ya existe una cuenta con ese email':err.code==='auth/weak-password'?'Contraseña muy débil':'Error al crear la cuenta.';

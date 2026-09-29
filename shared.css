@@ -1466,3 +1466,42 @@ body.light-mode .cc2-bar{background:rgba(140,0,38,.1);}
 .sp-oferta-antes{font-size:15px;color:rgba(255,248,240,.6);text-decoration:line-through;}
 .sp-oferta-hasta{font-size:11.5px;color:rgba(255,248,240,.7);}
 .sp-oferta .btn-gold{width:100%;}
+
+/* Cobros: controles legibles en ambos temas */
+.pay-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:20px 0}.pay-fields label,#payments-editor label{display:block;color:var(--adm-text,#f5eadd)}.pay-fields input,.pay-fields select,#payments-editor input[type=number]{display:block;width:100%;min-height:44px;margin-top:6px;padding:10px;background:var(--adm-input,#260710);color:var(--adm-text,#f5eadd);border:1px solid var(--adm-border,#80656b);border-radius:8px;font:inherit}.pay-order{padding:16px;border:1px solid var(--adm-border,#80656b);border-radius:12px;margin:12px 0}.pay-order p{overflow-wrap:anywhere}#payments-editor button{min-height:44px}#payment-content .btn-g{display:inline-block;margin:8px 8px 8px 0;min-height:44px;padding:12px 20px}#payment-content a{color:#e5cc87}
+
+/* Reservas: contraste de servicios y horarios en ambos temas. */
+.tsv.sel,.tsv:hover,body.dark-mode .tsv.sel,body.dark-mode .tsv:hover{background:#fff3d1;border-color:#c9a84c;color:#3b1720;}
+.tsv.sel .tsv-name,.tsv:hover .tsv-name,body.dark-mode .tsv.sel .tsv-name,body.dark-mode .tsv:hover .tsv-name{color:#3b1720;}
+.tsv.sel .tsv-dur,.tsv:hover .tsv-dur{color:#624536;}
+body:not(.dark-mode) #t-slots-grid .ict-slot,body:not(.dark-mode) #t2-slots-grid .ict-slot{background:#fff3d1;color:#3b1720;border-color:#ad8732;}
+body:not(.dark-mode) #t-slots-grid .ict-slot.sel,body:not(.dark-mode) #t2-slots-grid .ict-slot.sel{background:#8c0026;color:#fff8f0;border-color:#8c0026;}
+
+/* Contraste comprobado en el portal y aula, en ambos temas. */
+body .welcome-banner .wb-text2 h2,body .welcome-banner .wb-text2 h2 em{color:#fff8f0;}
+body .welcome-banner .wb-text2 p{color:#f1dfdf;}
+body .vid-no-url-txt{color:#fff8f0;}
+body .vid-no-url-sub{color:#cbbbc3;}
+body .notes-textarea::placeholder{color:#715963;opacity:1;}
+body.dark-mode .notes-textarea::placeholder{color:#cbbbc3;opacity:1;}
+body #btn-next{background:#c9a84c;color:#2a0818!important;}
+body #btn-next:hover{background:#e8d5a0;color:#2a0818!important;}
+body.dark-mode .dark-toggle,body.dark-mode .notif-btn{background:#25141c;color:#e8d5a0;border-color:#72535a;}
+/* Alumnas: directorio compacto y permisos de una sola cuenta a la vez. */
+.access-toolbar{display:flex;gap:16px;align-items:end;flex-wrap:wrap;margin:20px 0}
+.access-toolbar label{display:grid;gap:8px;flex:1;min-width:200px;color:var(--adm-text,var(--dark));font-size:13px}
+.access-toolbar input{width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid var(--adm-border2,var(--crd));border-radius:10px;background:var(--adm-input,var(--cr));color:var(--adm-text,var(--dark));font:inherit}
+.access-layout{display:grid;grid-template-columns:minmax(250px,1fr) minmax(0,1.7fr);gap:20px;align-items:start}
+.access-layout .acard{min-width:0;margin:0}
+.access-person{display:flex;flex-direction:column;gap:5px;width:100%;padding:14px 12px;text-align:left;border:1px solid transparent;border-bottom-color:var(--adm-border,var(--crd));border-radius:8px;background:transparent;color:var(--adm-text,var(--dark));font:inherit;cursor:pointer}
+.access-person span{font-size:12px;overflow-wrap:anywhere;color:var(--adm-muted,var(--muted))}
+.access-person:hover,.access-person[aria-pressed=true]{background:var(--adm-input,var(--cr));border-color:var(--gold)}
+.access-pagination{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:20px;font-size:12px}
+.access-pagination button:disabled{opacity:.4;cursor:default}
+.access-products{margin-top:24px;border-top:1px solid var(--adm-border,var(--crd));padding-top:12px}
+.access-products h4{color:var(--adm-text,var(--dark));font-size:15px;margin:8px 0 12px}
+.access-products .abtn{display:block;width:100%;margin:0 0 8px!important;padding:12px!important;text-align:left;white-space:normal;overflow-wrap:anywhere;border-radius:8px!important;background:var(--adm-input,var(--cr))!important;color:var(--adm-text,var(--dark))!important;border:1px solid var(--adm-border2,var(--crd))!important}
+.access-products .abtn[aria-pressed=true]{border-color:var(--gold)!important;box-shadow:inset 3px 0 var(--gold)}
+#adm-users-content summary{cursor:pointer;color:var(--adm-muted,var(--muted));font-size:12px}
+#access-admin-status{min-height:20px}
+@media(max-width:850px){.access-layout{grid-template-columns:1fr}.access-toolbar{align-items:stretch}.access-toolbar label{min-width:0;flex-basis:100%}}

@@ -64,14 +64,33 @@
     same(u.uid);await ref('manualAccess/'+uid+'/products',productKey).set({kind,productId:String(id),active,source:'admin',grantedBy:u.uid,updatedAt:Date.now()});same(u.uid);
   }
   let rights={uid:null,items:[]};
+  function repaint(){for(const name of ['renderCarouselCourses','renderEbooks','updateDashStats']){try{window[name]?.();}catch{}}}
+  async function ensureProfile(u){
+    if(isAdmin(u))return;
+    const profile=ref('users',u.uid),snap=await profile.get(server);same(u.uid);
+    if(!snap.exists){await profile.set({uid:u.uid,name:u.displayName||'Alumna',email:u.email,role:'student'});same(u.uid);}
+  }
   window.miraHasDigitalAccess=(kind,id)=>{const u=auth().currentUser;return !!u&&(isAdmin(u)||(rights.uid===u.uid&&rights.items.some(x=>x.kind===kind&&String(x.productId)===String(id))));};
   async function refresh(){
     const u=auth().currentUser;rights={uid:u?.uid||null,items:[]};if(!u?.emailVerified)return;
     try{
+      await ensureProfile(u);
+      if(!isAdmin(u)){
+        const catalogs=await Promise.all(['courses','ebooks'].map(async type=>{
+          const snap=await ref('site',type).get(server);
+          if(!snap.exists||snap.data().accessVersion!==2)throw Error('El catálogo todavía no está disponible. Contactá al estudio.');
+          return {type,items:snap.data().v.map(p=>publicItem(p,type))};
+        }));
+        same(u.uid);for(const {type,items} of catalogs)window.miraCacheCatalog(type,items);
+        repaint();
+      }
       const items=window.MIRA_PAYMENTS_API?await window.miraPayments.api('/my-access'):(await db().collection('manualAccess/'+u.uid+'/products').get(server)).docs.map(d=>d.data()).filter(d=>d.active===true);
       same(u.uid);rights={uid:u.uid,items};
-      for(const name of ['updateDashStats','renderProgreso','renderEbooks'])if(typeof window[name]==='function')window[name]();
-    }catch{ /* Fallo cerrado: ningún permiso se deduce de la caché. */ }
+      repaint();document.getElementById('digital-load-status')?.remove();
+    }catch(e){
+      if(auth().currentUser?.uid!==u.uid)return;
+      const host=document.getElementById('view-dashboard');if(host){let status=document.getElementById('digital-load-status');if(!status){status=document.createElement('div');status.id='digital-load-status';status.className='acard';status.setAttribute('role','status');host.prepend(status);}status.replaceChildren();const text=document.createElement('p');text.textContent='No pudimos cargar tus productos: '+e.message;const retry=document.createElement('button');retry.className='btn-g';retry.textContent='Volver a cargar';retry.onclick=()=>refresh();status.append(text,retry);}
+    }
   }
   window.miraDigitalAccess={read,catalog,save,migrate,grant,refresh};
   const oldLesson=window.selLesson;
@@ -83,29 +102,52 @@
   };
   window.admRenderUsersList=async function(){
     const box=document.getElementById('adm-users-content');if(!box)return;
-    box.innerHTML='<div class="acard"><h3>Accesos a cursos y ebooks</h3><p>El registro no habilita contenido. Autorizá cada producto después de confirmar el pago por tu cuenta, o cuando quieras otorgarlo.</p><p>Quitar una autorización manual no cancela una compra confirmada independiente.</p><button class="abtn" id="protect-catalog">Proteger / actualizar catálogo existente</button><p id="access-admin-status" role="status"></p></div><div id="access-user-list">Cargando alumnas…</div>';
+    box.innerHTML='<div class="acard"><h3>Alumnas y accesos</h3><p>Buscá una alumna y seleccioná los cursos o ebooks que querés habilitar.</p><div class="access-toolbar"><label for="access-search">Buscar por nombre o email<input type="search" id="access-search" placeholder="Escribí un nombre o email" autocomplete="off"></label><button class="abtn" id="access-refresh">Actualizar lista</button></div><p id="access-admin-status" role="status"></p><details><summary>Mantenimiento del catálogo</summary><p>Solo usá esta opción para separar un catálogo antiguo. No hace falta repetirla para dar accesos.</p><button class="abtn" id="protect-catalog">Proteger / actualizar catálogo existente</button></details></div><div class="access-layout"><section class="acard"><h3>Alumnas registradas</h3><p id="access-count" role="status"></p><div id="access-user-list">Cargando alumnas…</div><div class="access-pagination"><button class="abtn" id="access-prev">Anterior</button><span id="access-page"></span><button class="abtn" id="access-next">Siguiente</button></div></section><section class="acard" id="access-detail"><h3>Seleccioná una alumna</h3><p>Acá vas a ver sus accesos, separados en cursos y ebooks.</p></section></div>';
     const status=box.querySelector('#access-admin-status');
+    let users=[],page=0,selected=null,revision=0;
+    const search=box.querySelector('#access-search'),holder=box.querySelector('#access-user-list'),detail=box.querySelector('#access-detail');
+    const normalized=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    function renderList(){
+      const q=normalized(search.value.trim()),filtered=users.filter(u=>normalized(u.name+' '+u.email).includes(q));
+      page=Math.min(page,Math.max(0,Math.ceil(filtered.length/10)-1));holder.replaceChildren();
+      for(const person of filtered.slice(page*10,page*10+10)){
+        const button=document.createElement('button');button.type='button';button.className='access-person';button.dataset.uid=person.uid;button.setAttribute('aria-pressed',String(selected===person.uid));
+        button.innerHTML='<strong>'+esc(person.name||'Alumna')+'</strong><span>'+esc(person.email||person.uid)+'</span>';
+        button.onclick=()=>selectPerson(person);holder.appendChild(button);
+      }
+      if(!filtered.length)holder.textContent=q?'No hay alumnas que coincidan con la búsqueda.':'Todavía no hay perfiles registrados. Si la cuenta se creó antes de esta corrección, pedile que vuelva a iniciar sesión.';
+      box.querySelector('#access-count').textContent=filtered.length+' de '+users.length+' alumnas';
+      box.querySelector('#access-page').textContent='Página '+(page+1)+' de '+Math.max(1,Math.ceil(filtered.length/10));
+      box.querySelector('#access-prev').disabled=page===0;box.querySelector('#access-next').disabled=(page+1)*10>=filtered.length;
+    }
+    search.oninput=()=>{page=0;renderList();};
+    box.querySelector('#access-prev').onclick=()=>{page--;renderList();};box.querySelector('#access-next').onclick=()=>{page++;renderList();};
+    box.querySelector('#access-refresh').onclick=async()=>{try{await renderUsers();status.textContent='Lista actualizada.';}catch(e){status.textContent='No se pudo actualizar: '+e.message;}};
     box.querySelector('#protect-catalog').onclick=async e=>{
       if(!confirm('Se conservarán las clases y archivos en el catálogo privado. Las fichas públicas quedarán sin enlaces de contenido. No se dará acceso automático a ninguna alumna. ¿Continuar?'))return;
       e.target.disabled=true;try{await migrate();status.textContent='Catálogo protegido. Ya podés dar accesos por alumna.';await renderUsers();}catch(err){status.textContent='No se completó: '+err.message;}finally{e.target.disabled=false;}
     };
     async function renderUsers(){
       const u=session(true),snap=await db().collection('users').get(server);same(u.uid);
-      const holder=box.querySelector('#access-user-list');holder.replaceChildren();
-      const products=[...gc().map(p=>({p,kind:'course'})),...gEB().map(p=>({p,kind:'ebook'}))];
-      for(const doc of snap.docs){
-        const person=doc.data(),manual=await db().collection('manualAccess/'+doc.id+'/products').get(server);same(u.uid);
+      users=snap.docs.map(d=>({...d.data(),uid:d.id})).sort((a,b)=>String(a.name||a.email).localeCompare(String(b.name||b.email),'es'));
+      renderList();if(selected){const person=users.find(p=>p.uid===selected);if(person)await selectPerson(person);}
+    }
+    async function selectPerson(person){
+      const version=++revision;selected=person.uid;renderList();detail.textContent='Cargando accesos…';
+      try{const u=session(true),manual=await db().collection('manualAccess/'+person.uid+'/products').get(server);same(u.uid);if(version!==revision||!box.contains(detail))return;
         const enabled=new Set(manual.docs.filter(d=>d.data().active===true).map(d=>d.id));
-        const card=document.createElement('section');card.className='acard';card.style.marginBottom='12px';
-        card.innerHTML='<h3>'+esc(person.name||'Alumna')+'</h3><p>'+esc(person.email||doc.id)+'</p>';
-        for(const {p,kind} of products){
+        detail.innerHTML='<h3>'+esc(person.name||'Alumna')+'</h3><p>'+esc(person.email||person.uid)+'</p><p>Quitar un permiso manual no cancela una compra confirmada independiente.</p>';
+        for(const [kind,title,products] of [['course','Cursos',gc()],['ebook','Ebooks',gEB()]]){
+          const group=document.createElement('section');group.className='access-products';const heading=document.createElement('h4');heading.textContent=title;group.appendChild(heading);
+          if(!products.length){const empty=document.createElement('p');empty.textContent='No hay productos cargados.';group.appendChild(empty);}
+          for(const p of products){
           const k=key(kind,p.id),button=document.createElement('button');button.className='abtn';button.style.margin='4px';
           const label=()=>{button.textContent=(enabled.has(k)?'Quitar acceso manual · ':'Dar acceso · ')+(kind==='course'?'Curso: ':'Ebook: ')+(p.title||p.id);button.setAttribute('aria-pressed',String(enabled.has(k)));};label();
           button.onclick=async()=>{const active=!enabled.has(k);if(!active&&!confirm('¿Quitar esta autorización manual?'))return;button.disabled=true;
-            try{await grant(doc.id,kind,p.id,active);if(active)enabled.add(k);else enabled.delete(k);label();status.textContent=active?'Acceso manual guardado.':'Autorización manual retirada.';}catch(e){status.textContent='No se guardó: '+e.message;}finally{button.disabled=false;}};
-          card.appendChild(button);
-        }holder.appendChild(card);
-      }if(!snap.docs.length)holder.textContent='Todavía no hay alumnas registradas.';
+            try{await grant(person.uid,kind,p.id,active);if(active)enabled.add(k);else enabled.delete(k);label();status.textContent=active?'Acceso manual guardado.':'Autorización manual retirada.';}catch(e){status.textContent='No se guardó: '+e.message;}finally{button.disabled=false;}};
+          group.appendChild(button);
+        }detail.appendChild(group);}
+      }catch(e){if(version===revision)detail.textContent='No se pudieron cargar los accesos: '+e.message;}
     }
     try{await renderUsers();}catch(e){box.querySelector('#access-user-list').textContent='No se pudo cargar: '+e.message;}
   };
