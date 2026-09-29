@@ -73,8 +73,9 @@ body{background:var(--spc-bg,#FFF8F0);color:var(--spc-text,#1A0008);}
   .sp-nav-links a:not(.btn-gold){display:none;}
 }
 </style>
+<link rel="stylesheet" href="reviews.css?v=20260929r1">
 </head>
-<body>
+<body class="mr-catalog">
 
 <nav class="sp-nav">
   <a class="sp-brand" href="index.html">Mira Estudio</a>
@@ -127,6 +128,7 @@ body{background:var(--spc-bg,#FFF8F0);color:var(--spc-text,#1A0008);}
   <button id="sp-ctaBook" class="btn-gold sp-book" onclick="turnoOpenModal()" style="padding:14px 38px;">Reservar mi turno</button>
 </div>
 
+<section data-mira-reviews="service" aria-label="Opiniones sobre servicios"></section>
 <footer class="sp-footer"><span id="sp-footerText">© 2026 Mira Estudio</span> · <a href="index.html">mirastudiotb.com</a></footer>
 
 <div class="modal-ov" id="svc-info-modal" onclick="hovClick(event,'svc-info-modal')">
@@ -186,10 +188,11 @@ body{background:var(--spc-bg,#FFF8F0);color:var(--spc-text,#1A0008);}
   </div>
 </div>
 
-<script src="shared.js?v=20260929b"></script>
+<script src="shared.js?v=20260929r1"></script>
 <script src="payment-config.js"></script>
 <script src="payments.js"></script>
 <script src="digital-access.js?v=20260929b"></script>
+<script src="reviews.js?v=20260929r1"></script>
 <script>
 document.addEventListener('DOMContentLoaded', ()=>{
   initFirebase();

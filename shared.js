@@ -535,7 +535,7 @@ function renderEbooks(){
     const isPurchased=false; // Los datos locales nunca autorizan una descarga.
     const btn=`<button class="btn-g" data-product-id="${_escHtml(e.id)}" onclick="buyEbook(this.dataset.productId)">Ver acceso al ebook</button>`;
     const lockBadge=e.paid&&!isPurchased?`<div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);border-radius:50px;padding:3px 9px;font-size:11px;color:#fff;display:flex;align-items:center;gap:4px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Pago</div>`:'';
-    return`<div class="ebook-card" style="position:relative;"><div class="ebook-cover" style="background:${e.color||'#8C0026'};">${cover}</div>${lockBadge}<div class="ebook-title">${e.title}</div><p class="ebook-desc">${e.desc}</p><div class="ebook-price ${e.paid&&!isPurchased?'':'ebook-free'}">${price}</div>${btn}</div>`;
+    return`<div class="ebook-card" style="position:relative;"><div class="ebook-cover" style="background:${e.color||'#8C0026'};">${cover}</div>${lockBadge}<div class="ebook-title">${e.title}</div><p class="ebook-desc">${e.desc}</p><div class="ebook-price ${e.paid&&!isPurchased?'':'ebook-free'}">${price}</div>${btn}<button class="btn-g" data-review-kind="ebook" data-review-id="${_escHtml(e.id)}">Ver opiniones</button></div>`;
   }).join('');
   const el1=document.getElementById('ebook-grid');if(el1)el1.innerHTML=cards;
   const el2=document.getElementById('explorer-ebook-grid');if(el2)el2.innerHTML=cards;
@@ -1834,7 +1834,7 @@ function renderIcarousel(){
   if(eg) eg.innerHTML = ebs.map(e=>{
     // Usar la portada subida desde el panel; el emoji queda como respaldo
     const cov=e.cover?`<img src="${_escHtml(_cldOpt(e.cover,240))}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;">`:(e.emoji||'📕');
-    return `<div class="icp-ebook" data-product-id="${_escHtml(e.id)}" onclick="buyEbook(this.dataset.productId)"><div class="icp-ecov" style="background:${e.color||'#8C0026'};">${cov}</div><div class="icp-etit">${_escHtml(e.title||'Ebook')}</div><div class="icp-eprice ${e.paid?'':'icp-efree'}">${_escHtml(e.price??'')}</div><button class="icp-ebtn">${e.paid?'Comprar':'Consultar acceso'}</button></div>`;
+    return `<div class="icp-ebook" data-product-id="${_escHtml(e.id)}" onclick="buyEbook(this.dataset.productId)"><div class="icp-ecov" style="background:${e.color||'#8C0026'};">${cov}</div><div class="icp-etit">${_escHtml(e.title||'Ebook')}</div><div class="icp-eprice ${e.paid?'':'icp-efree'}">${_escHtml(e.price??'')}</div><button class="icp-ebtn">${e.paid?'Comprar':'Consultar acceso'}</button><button class="icp-ebtn" data-review-kind="ebook" data-review-id="${_escHtml(e.id)}">Ver opiniones</button></div>`;
   }).join('');
 }
 
@@ -5574,7 +5574,7 @@ function renderCursosPage(){
           <div class="cs-ficha-meta">
             <span>${nClases} clases en video</span><span>${mods.length} módulos</span><span>Certificado al finalizar</span>
           </div>
-          <button class="btn-gold cs-btn-big" data-product-id="${_escHtml(abierto.id)}" onclick="buyCourse(this.dataset.productId)">${gratis ? 'Consultar acceso al curso' : ('Quiero este curso · ' + _escHtml(abierto.price))}</button>
+          <button class="btn-gold cs-btn-big" data-product-id="${_escHtml(abierto.id)}" onclick="buyCourse(this.dataset.productId)">${gratis ? 'Consultar acceso al curso' : ('Quiero este curso · ' + _escHtml(abierto.price))}</button><button class="btn-g" data-review-kind="course" data-review-id="${_escHtml(abierto.id)}">Ver opiniones del curso</button>
         </div>`;
     }
   }

@@ -75,6 +75,7 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
   .fg input,.fg select,.fg textarea{max-width:100%;}
 }
 </style>
+<link rel="stylesheet" href="reviews.css?v=20260929r1">
 </head>
 <body class="dark-mode">
 
@@ -94,7 +95,7 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
       <button class="adm-ni" data-adm="features" onclick="admPage('features')">✨ Beneficios</button>
       <div class="adm-group">Información</div>
       <button class="adm-ni" data-adm="faq" onclick="admPage('faq')">❓ FAQ</button>
-      <button class="adm-ni" data-adm="reviews" onclick="admPage('reviews')">⭐ Testimonios</button>
+      <button class="adm-ni" data-adm="reviews" onclick="admPage('reviews')">Reseñas</button>
       <button class="adm-ni" data-adm="servicios" onclick="admPage('servicios')">💅 Servicios del inicio</button>
       <button class="adm-ni" data-adm="svcpage" onclick="admPage('svcpage')">🗂 Catálogo completo</button>
       <button class="adm-ni" data-adm="cursospage" onclick="admPage('cursospage')">🎓 Página de Cursos</button>
@@ -308,14 +309,7 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
     </div>
 
     <!-- TESTIMONIOS -->
-    <div class="adm-pg" id="adm-reviews">
-      <div class="adm-pghdr"><h2>⭐ Testimonios</h2><p>Opiniones de alumnas que se muestran en la página principal. La sección solo aparece cuando cargás al menos un testimonio — usá opiniones reales.</p></div>
-      <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-        <button class="abtn-add" onclick="admNewReview()">+ Nuevo testimonio</button>
-      </div>
-      <div id="adm-reviews-list"></div>
-      <div style="margin-top:14px;"><button class="abtn" onclick="admSaveReviewsAll()">Guardar testimonios</button></div>
-    </div>
+    <div class="adm-pg" id="adm-reviews"><div id="mr-admin"></div></div>
 
     <!-- SERVICIOS -->
     <div class="adm-pg" id="adm-servicios">
@@ -560,10 +554,11 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
 <!-- Save indicator -->
 <div class="save-ind" id="save-ind">✓ Guardado</div>
 
-<script src="shared.js?v=20260929b"></script>
+<script src="shared.js?v=20260929r1"></script>
 <script src="payment-config.js"></script>
 <script src="payments.js"></script>
 <script src="digital-access.js?v=20260929b"></script>
+<script src="reviews.js?v=20260929r1"></script>
 <script>
 
 // ── ADMIN.HTML INIT ─────────────────────────────────────
