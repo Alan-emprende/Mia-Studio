@@ -306,7 +306,7 @@ body{background:#0D0005;color:#F0E6D3;}
   </div>
 </div>
 
-<script src="shared.js?v=20260929r1"></script>
+<script src="shared.js?v=20261001"></script>
 <script src="payment-config.js"></script>
 <script src="payments.js"></script>
 <script src="digital-access.js?v=20260929b"></script>
@@ -318,7 +318,7 @@ function loginOk(u){
   localStorage.setItem(KS, JSON.stringify(u));
   window.location.href = miraPostLoginDestination(u.role);
 }
-function doLogout(){ currentUser = null; localStorage.removeItem(KS); if(_fbReady && _auth) _auth.signOut().catch(()=>{}); }
+function doLogout(){ return miraSignOutToHome(); }
 
 document.addEventListener('DOMContentLoaded', ()=>{
   initFirebase();

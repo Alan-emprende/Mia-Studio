@@ -302,6 +302,31 @@ function purgeLegacyCredentials(storage=localStorage){
 }
 purgeLegacyCredentials();
 
+// La identidad y el destino dependen de Firebase, nunca del rol de una caché antigua.
+function miraSessionFromFirebase(user,profile={}){
+  return {...profile,uid:user.uid,email:user.email,name:profile.name||user.displayName||'Alumna',role:user.emailVerified&&user.email==='estudiosmira@gmail.com'?'admin':'student'};
+}
+let _miraSigningOut=false;
+async function miraSignOutToHome(){
+  if(_miraSigningOut)return;
+  _miraSigningOut=true;
+  try{
+    if(_fbReady&&_auth)await _auth.signOut();
+    currentUser=null;_fbUid=null;localStorage.removeItem(KS);clearUserLocalData();
+    window.miraClearPrivateContent?.();window.location.replace('index.html');
+  }catch(e){_miraSigningOut=false;toast('No pudimos cerrar la sesión. Revisá tu conexión y volvé a intentar.');}
+}
+function miraAuthNotice(text,retry=false){
+  let box=document.getElementById('session-start-status');
+  if(!box){box=document.createElement('div');box.id='session-start-status';box.className='acard';box.style.cssText='margin:24px auto;padding:24px;max-width:560px;position:relative;z-index:1000';document.body.prepend(box);}
+  box.setAttribute('role',retry?'alert':'status');box.replaceChildren();const msg=document.createElement('p');msg.textContent=text;box.append(msg);
+  if(retry){const btn=document.createElement('button');btn.className='btn-gold';btn.textContent='Volver a intentar';btn.onclick=()=>location.reload();box.append(btn);}
+}
+function miraObserveSession(ready,failed){
+  const timer=setTimeout(()=>failed(),12000);
+  return _auth.onAuthStateChanged(user=>{clearTimeout(timer);if(!_miraSigningOut)ready(user);},()=>{clearTimeout(timer);failed();});
+}
+
 function doLogin(){
   clearAllFieldErrs();
   const em=document.getElementById('li-email').value.trim();
@@ -318,7 +343,7 @@ function doLogin(){
       }
       _fbUid=fu.uid;
       const profile=await _loadUserProfile(fu.uid);
-      const u={...(profile||{}),name:profile?.name||fu.displayName||'Alumna',email:fu.email,role:profile?.role||'student',uid:fu.uid};
+      const u=miraSessionFromFirebase(fu,profile||{});
       await _saveUserProfile(fu.uid,profile?{name:u.name,email:u.email,uid:u.uid}:{name:u.name,email:u.email,uid:u.uid,role:'student'});
       loginOk(u);
     }).catch(err=>{

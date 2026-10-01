@@ -402,7 +402,7 @@
   </div>
 </div>
 
-<script src="shared.js?v=20260929r1"></script>
+<script src="shared.js?v=20261001"></script>
 <script src="payment-config.js"></script>
 <script src="payments.js"></script>
 <script src="digital-access.js?v=20260929b"></script>
@@ -417,14 +417,7 @@ function loginOk(u){
   loadUserPurchases();
 }
 
-function doLogout(){
-  currentUser = null;
-  localStorage.removeItem(KS);
-  clearUserLocalData();
-  if(_fbReady && _auth) _auth.signOut().catch(()=>{});
-  _fbUid = null;
-  window.location.href = 'index.html';
-}
+function doLogout(){return miraSignOutToHome();}
 
 function backDash(){
   showView('dashboard');
@@ -435,6 +428,7 @@ function backDash(){
 (function initDashboard(){
   document.addEventListener('DOMContentLoaded', ()=>{
     function failed(){
+      document.getElementById('session-start-status')?.remove();
       showView('dashboard');
       let box=document.getElementById('dashboard-start-error');
       if(!box){box=document.createElement('div');box.id='dashboard-start-error';box.className='acard';box.setAttribute('role','alert');document.getElementById('view-dashboard').prepend(box);}
@@ -442,23 +436,26 @@ function backDash(){
       const message=document.createElement('p');message.textContent='No pudimos iniciar tu perfil. Revisá tu conexión y volvé a intentar.';
       const retry=document.createElement('button');retry.className='btn-gold';retry.textContent='Volver a intentar';retry.onclick=()=>location.reload();box.append(message,retry);
     }
+    miraAuthNotice('Verificando tu sesión…');
     initFirebase();
     if(!_fbReady||!_auth){failed();return;}
     let revision=0;
-    _auth.onAuthStateChanged(async user=>{
+    miraObserveSession(async user=>{
       const request=++revision;
       if(!user||!user.emailVerified){
         currentUser=null;localStorage.removeItem(KS);clearUserLocalData();
-        window.location.href='index.html';return;
+        window.location.replace('index.html');return;
       }
-      if(user.email==='estudiosmira@gmail.com'){window.location.href='admin.html';return;}
+      const identity=miraSessionFromFirebase(user);
+      if(identity.role==='admin'){currentUser=identity;localStorage.setItem(KS,JSON.stringify(identity));window.location.replace('admin.html');return;}
       try{
+        miraAuthNotice('Cargando tu perfil…');
         _fbUid=user.uid;
         const ref=_db.collection('users').doc(user.uid);
         const snap=await ref.get({source:'server'});
         if(request!==revision||_auth.currentUser?.uid!==user.uid)return;
         const profile=snap.exists?snap.data():{};
-        const u={...profile,uid:user.uid,email:user.email,name:profile.name||user.displayName||'Alumna',role:'student'};
+        const u=miraSessionFromFirebase(user,profile);
         // Recuperar perfiles ausentes sin otorgar productos ni modificar permisos.
         await ref.set({uid:u.uid,email:u.email,name:u.name,...(!snap.exists?{role:'student'}:{})},{merge:true});
         if(request!==revision||_auth.currentUser?.uid!==user.uid)return;
@@ -466,6 +463,7 @@ function backDash(){
         loadDarkMode();loadSavedEstetics();showView('dashboard');
         setupDash(u);showPage('home');loadUserPurchases();loadSocialLinks();
         document.getElementById('dashboard-start-error')?.remove();
+        document.getElementById('session-start-status')?.remove();
       }catch(e){if(request===revision){console.warn('No se pudo iniciar el portal',e);failed();}}
     },failed);
   });

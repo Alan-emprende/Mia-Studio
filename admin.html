@@ -554,7 +554,7 @@ body.light-mode .adm-sb{background:#FFF0E8 !important;border-color:#E8D8CC;}
 <!-- Save indicator -->
 <div class="save-ind" id="save-ind">✓ Guardado</div>
 
-<script src="shared.js?v=20260929r1"></script>
+<script src="shared.js?v=20261001"></script>
 <script src="payment-config.js"></script>
 <script src="payments.js"></script>
 <script src="digital-access.js?v=20260929b"></script>
@@ -566,49 +566,31 @@ window._miraAdminEditVersion=0;
 for(const event of ['input','change','pointerdown'])document.addEventListener(event,e=>{
   if(e.target.closest?.('#view-admin'))window._miraAdminEditVersion++;
 },true);
-function admLogout(){
-  currentUser = null;
-  localStorage.removeItem(KS);
-  if(_fbReady && _auth) _auth.signOut().catch(()=>{});
-  window.location.href = 'index.html';
-}
-function doLogout(){ admLogout(); }
+function admLogout(){return miraSignOutToHome();}
+function doLogout(){ return admLogout(); }
 
 document.addEventListener('DOMContentLoaded', ()=>{
-  const s = localStorage.getItem(KS);
-  if(!s){ window.location.href = 'index.html?admin=1'; return; }
-
-  let u;
-  try{ u = JSON.parse(s); } catch(e){ window.location.href = 'index.html'; return; }
-  if(!u || u.role !== 'admin'){ window.location.href = 'index.html'; return; }
-
-  currentUser = u;
-
-  // Make view-admin visible (it starts as display:none via .view class)
-  const vAdmin = document.getElementById('view-admin');
-  if(vAdmin){
-    vAdmin.classList.add('active');
-    vAdmin.style.minHeight = '100vh';
-  }
-
-  // Init Firebase (non-blocking)
+  miraAuthNotice('Verificando tu sesión…');
   initFirebase();
-  loadSavedEstetics();
-
-  // Load admin panel immediately
-  loadAdminData();
-
-  // Sync from cloud in background
-  setTimeout(()=>{
-    if(window._miraAdminEditVersion)return;
-    if(_fbReady && _db){
+  const failed=()=>miraAuthNotice('No pudimos verificar tu sesión. Revisá tu conexión y volvé a intentar.',true);
+  if(!_fbReady||!_auth){failed();return;}
+  let initialized=false;
+  miraObserveSession(user=>{
+    if(!user?.emailVerified){currentUser=null;localStorage.removeItem(KS);clearUserLocalData();window.location.replace('index.html?admin=1');return;}
+    const u=miraSessionFromFirebase(user);currentUser=u;localStorage.setItem(KS,JSON.stringify(u));
+    if(u.role!=='admin'){window.location.replace('dashboard.html');return;}
+    document.getElementById('session-start-status')?.remove();
+    if(initialized)return;initialized=true;
+    const vAdmin=document.getElementById('view-admin');if(vAdmin){vAdmin.classList.add('active');vAdmin.style.minHeight='100vh';}
+    loadSavedEstetics();loadAdminData();
+    setTimeout(()=>{
+      if(window._miraAdminEditVersion||_auth.currentUser?.uid!==u.uid)return;
       _syncSiteFromCloud().then(()=>{
-        if(window._miraAdminEditVersion)return;
-        const active = document.querySelector('.adm-ni.active');
-        if(active && active.dataset.adm) admPage(active.dataset.adm);
+        if(window._miraAdminEditVersion||_auth.currentUser?.uid!==u.uid)return;
+        const active=document.querySelector('.adm-ni.active');if(active?.dataset.adm)admPage(active.dataset.adm);
       }).catch(()=>{});
-    }
-  }, 2000);
+    },2000);
+  },failed);
 });
 
 </script>

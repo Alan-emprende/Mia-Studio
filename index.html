@@ -296,7 +296,7 @@
 
 <!-- ══════════ DASHBOARD ══════════ -->
 
-<script src="shared.js?v=20260929r1"></script>
+<script src="shared.js?v=20261001"></script>
 <script src="payment-config.js"></script>
 <script src="payments.js"></script>
 <script src="digital-access.js?v=20260929b"></script>
@@ -317,28 +317,21 @@ function checkKey(){
   toast('Ingresá con la cuenta administradora verificada.');
 }
 
-function doLogout(){
-  currentUser = null;
-  localStorage.removeItem(KS);
-  clearUserLocalData();
-  if(_fbReady && _auth) _auth.signOut().catch(()=>{});
-}
+function doLogout(){return miraSignOutToHome();}
 
 document.addEventListener('DOMContentLoaded', ()=>{
-  // Redirect if already logged in
-  const s = localStorage.getItem(KS);
-  if(s){
-    try{
-      const u = JSON.parse(s);
-      if(u && u.role){
-        window.location.href = miraPostLoginDestination(u.role);
-        return;
-      }
-    }catch(e){ localStorage.removeItem(KS); }
-  }
-
-  // Init
   initFirebase();
+  if(_fbReady&&_auth){
+    let first=true;
+    miraObserveSession(user=>{
+      if(!first)return;first=false;
+      document.getElementById('session-start-status')?.remove();
+      if(!user?.emailVerified){currentUser=null;localStorage.removeItem(KS);clearUserLocalData();return;}
+      const u=miraSessionFromFirebase(user);currentUser=u;localStorage.setItem(KS,JSON.stringify(u));
+      window.location.replace(miraPostLoginDestination(u.role));
+    },()=>miraAuthNotice('No pudimos verificar tu sesión. Revisá tu conexión y volvé a intentar.',true));
+  }else miraAuthNotice('No pudimos cargar el inicio de sesión. Revisá tu conexión y volvé a intentar.',true);
+
   loadSavedEstetics();
   loadSavedTexts();
   applyHeroBg();
