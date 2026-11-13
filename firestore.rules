@@ -1,70 +1,120 @@
 rules_version = '2';
-
-// ═══════════════════════════════════════════════════════════════
-// Reglas de seguridad de Firestore — Mira Estudio
-//
-// CÓMO APLICARLAS (una sola vez, tarda 2 minutos):
-//   1. Entrá a https://console.firebase.google.com → proyecto "mira-estudio"
-//   2. Menú izquierdo: Firestore Database → pestaña "Reglas" (Rules)
-//   3. Borrá lo que haya, pegá TODO este archivo y tocá "Publicar" (Publish)
-//
-// IMPORTANTE: el email de abajo (isAdmin) debe ser el de TU cuenta:
-// estudiosmira@gmail.com — tenés que registrarte en la página con ese
-// email y verificarlo, y estar logueada con esa cuenta al usar el panel.
-// ═══════════════════════════════════════════════════════════════
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // La dueña del estudio. Cambiá el email si usás otra cuenta.
-    function isAdmin() {
-      return request.auth != null
-        && request.auth.token.email == 'estudiosmira@gmail.com'
-        && request.auth.token.email_verified;
-    }
-
-    // Contenido del sitio (cursos, ebooks, textos, config, estética...):
-    // cualquiera puede leerlo, solo la admin puede modificarlo.
+    function isAdmin() {return request.auth != null && request.auth.token.email == 'estudiosmira@gmail.com' && request.auth.token.email_verified == true;}
+    function own(uid) {return request.auth != null && request.auth.uid == uid;}
     match /site/{doc} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read: if !(doc in ['courses','ebooks']) || isAdmin() || resource.data.get('accessVersion',0) == 2;
+      allow write: if isAdmin() && !(doc in ['courses','ebooks','taken']);
+      allow create, update: if isAdmin() && doc in ['courses','ebooks'] && request.resource.data.accessVersion == 2;
     }
-
-    // Horarios ocupados ({fecha: [horas]}, sin datos personales):
-    // se escribe desde el formulario de reservas, incluso sin cuenta.
-    match /site/taken {
-      allow read, write: if true;
+    match /privateCatalog/{type} {
+      allow read, write: if isAdmin() && type in ['courses','ebooks'];
     }
-
-    // Datos de cada alumna (progreso, notas, ebooks comprados):
-    // solo ella y la admin. Nadie puede auto-asignarse rol de admin.
-    match /users/{uid} {
-      allow read: if isAdmin() || (request.auth != null && request.auth.uid == uid);
-      allow create: if request.auth != null && request.auth.uid == uid
-                    && request.resource.data.get('role', 'student') != 'admin';
-      allow update: if isAdmin() || (request.auth != null && request.auth.uid == uid
-                    && request.resource.data.get('role', 'student') != 'admin');
+    match /manualAccess/{uid}/products/{product} {
+      allow read: if isAdmin() || own(uid);
+      allow create, update: if isAdmin() && request.resource.data.active is bool
+        && request.resource.data.kind in ['course','ebook']
+        && request.resource.data.productId is string
+        && product == request.resource.data.kind + '_' + request.resource.data.productId;
       allow delete: if isAdmin();
     }
-
-    // Turnos: cualquiera puede solicitar uno (también visitas sin cuenta,
-    // desde la landing), pero solo la admin puede verlos, editarlos o borrarlos.
-    match /turnos/{id} {
-      allow create: if true;
-      allow read, update, delete: if isAdmin();
+    match /digitalContent/{product} {
+      allow get: if isAdmin() || (request.auth != null && request.auth.token.email_verified == true
+        && resource.data.product.get('locked',false) != true
+        && exists(/databases/$(database)/documents/manualAccess/$(request.auth.uid)/products/$(product))
+        && get(/databases/$(database)/documents/manualAccess/$(request.auth.uid)/products/$(product)).data.active == true);
+      allow list, write: if isAdmin();
     }
-
-    // Comunidad: chat compartido entre alumnas con cuenta.
-    // Cada una escribe a su nombre; nadie puede editar mensajes; la admin puede borrar.
+    match /site/taken {allow read: if true; allow write: if isAdmin();}
+    match /users/{uid} {
+      allow read: if own(uid) || isAdmin();
+      allow create: if own(uid) && request.resource.data.get('role','student') == 'student'
+        && !request.resource.data.keys().hasAny(['purchasedEbooks','purchasedCourses','entitlements']);
+      allow update: if isAdmin() || (own(uid) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role','purchasedEbooks','purchasedCourses','entitlements']));
+      allow delete: if isAdmin();
+    }
+    match /turnos/{id} {
+      allow read: if isAdmin() || (request.auth != null && resource.data.uid == request.auth.uid);
+      allow create, delete: if false;
+      // La dueña puede registrar la atención; los importes y pagos son inmutables para el navegador.
+      allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['atencion']);
+    }
+    match /orders/{id} {allow read: if isAdmin() || (request.auth != null && resource.data.uid == request.auth.uid); allow write: if false;}
+    match /entitlements/{id} {allow read: if isAdmin() || (request.auth != null && resource.data.uid == request.auth.uid); allow write: if false;}
     match /chat/{room}/msgs/{msg} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.text is string
-        && request.resource.data.text.size() > 0
-        && request.resource.data.text.size() <= 500;
-      allow update: if false;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500;
+      allow update: if false; allow delete: if isAdmin();
+    }
+    function reviewEligible(d) {
+      let manual = /databases/$(database)/documents/manualAccess/$(request.auth.uid)/products/$(d.targetKey);
+      let entitlement = /databases/$(database)/documents/entitlements/$(d.proofId);
+      let serviceRef = /databases/$(database)/documents/reviewServices/$(request.auth.uid)/items/$(d.targetKey);
+      let product = /databases/$(database)/documents/digitalContent/$(d.targetKey);
+      return d.kind == 'service'
+        ? (d.verification == 'service' && exists(serviceRef) && get(serviceRef).data.productId == d.productId && get(serviceRef).data.title == d.title)
+        : (exists(product) && get(product).data.product.title == d.title && get(product).data.product.get('locked',false) != true
+          && ((d.verification == 'access' && exists(manual) && get(manual).data.active == true)
+          || (d.proofId.size() > 0 && exists(entitlement) && get(entitlement).data.uid == request.auth.uid
+          && get(entitlement).data.active == true && get(entitlement).data.kind == d.kind && get(entitlement).data.productId == d.productId
+          && ((d.verification == 'access' && get(entitlement).data.get('source','') == 'admin')
+          || (d.verification == 'payment' && get(entitlement).data.get('source','') != 'admin' && get(entitlement).data.get('live',false) == true && get(entitlement).data.get('paymentId','').size() > 0)))));
+    }
+    function reviewValid(d,id) {
+      return request.auth != null && request.auth.token.email_verified == true && d.uid == request.auth.uid
+        && d.keys().hasOnly(['uid','targetKey','kind','productId','title','name','rating','text','photo','consent','verification','proofId','status','reply','featured','reason','createdAt','updatedAt'])
+        && d.kind in ['course','ebook','service'] && d.productId is string && d.productId.size() > 0 && d.productId.size() <= 500
+        && d.targetKey == d.kind + '_' + d.productId && id == d.uid + '_' + d.targetKey
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 200
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 60 && !d.name.matches('.*@.*')
+        && d.rating is int && d.rating >= 1 && d.rating <= 5 && d.text is string && d.text.size() >= 10 && d.text.size() <= 1500
+        && d.photo is string && d.photo.size() <= 220000 && (d.photo == '' || d.photo.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+'))
+        && d.consent == true && d.proofId is string && d.proofId.size() <= 150
+        && d.status == 'pending' && d.reply == '' && d.featured == false && d.reason == ''
+        && d.updatedAt == request.time && d.createdAt is timestamp && reviewEligible(d)
+        && !existsAfter(/databases/$(database)/documents/publicReviews/$(id));
+    }
+    match /reviewServices/{uid}/items/{id} {
+      allow read: if own(uid) || isAdmin();
+      allow create, update: if isAdmin() && request.resource.data.keys().hasOnly(['productId','title','performedOn'])
+        && request.resource.data.productId is string && id == 'service_' + request.resource.data.productId
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200
+        && request.resource.data.performedOn is string && request.resource.data.performedOn.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}');
       allow delete: if isAdmin();
     }
+    match /reviews/{id} {
+      allow get: if request.auth != null && !exists(/databases/$(database)/documents/reviews/$(id));
+      allow read: if isAdmin() || (request.auth != null && resource.data.uid == request.auth.uid);
+      allow create: if reviewValid(request.resource.data,id) && request.resource.data.createdAt == request.time;
+      allow update: if (reviewValid(request.resource.data,id) && resource.data.uid == request.auth.uid
+        && request.resource.data.createdAt == resource.data.createdAt)
+        || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reply','featured','reason'])
+        && request.resource.data.status in ['pending','published','hidden'] && request.resource.data.featured is bool
+        && request.resource.data.reply is string && request.resource.data.reply.size() <= 1000
+        && request.resource.data.reason is string && request.resource.data.reason.size() <= 250
+        && (request.resource.data.status != 'hidden' || request.resource.data.reason.size() > 0)
+        && (request.resource.data.status == 'published' || !existsAfter(/databases/$(database)/documents/publicReviews/$(id))));
+      allow delete: if false;
+    }
+    match /publicReviews/{id} {
+      function validPublication() {
+        let r = getAfter(/databases/$(database)/documents/reviews/$(id)).data;
+        let d = request.resource.data;
+        return r.status == 'published' && r.consent == true
+          && d.keys().hasOnly(['targetKey','kind','productId','title','name','rating','text','photo','verification','reply','featured','publishedAt'])
+          && d.targetKey == r.targetKey && d.kind == r.kind && d.productId == r.productId && d.title == r.title
+          && d.name == r.name && d.rating == r.rating && d.text == r.text && d.photo == r.photo && d.verification == r.verification
+          && d.reply == r.reply && d.featured == r.featured && d.publishedAt == request.time;
+      }
+      allow read: if true;
+      allow create, update: if isAdmin() && validPublication();
+      allow delete: if isAdmin() || (request.auth != null && getAfter(/databases/$(database)/documents/reviews/$(id)).data.uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/reviews/$(id)).data.status == 'pending');
+    }
+    // paymentConfig, payments, bookingDays, purchaseLocks,
+    // paymentRates y paymentIncidents: exclusivos del backend (Admin SDK).
+    match /{document=**} {allow read, write: if false;}
   }
 }

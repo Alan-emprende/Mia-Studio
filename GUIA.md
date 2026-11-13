@@ -1,3 +1,9 @@
+# Actualización de cobros — 13/11/2026
+
+La web actual se trabaja en `repositorio-actual/`, que coincide con GitHub. Para activar Mercado Pago seguí [PUBLICAR-PAGOS.md](PUBLICAR-PAGOS.md). Se conservan las reglas vigentes de Firebase, los accesos manuales y las reseñas. El backend se ejecuta en Cloudflare Workers; no requiere Cloud Functions.
+
+Las secciones históricas de julio/agosto que siguen describen etapas anteriores. Las instrucciones de pagos y de reglas de PUBLICAR-PAGOS.md tienen prioridad sobre esas indicaciones antiguas.
+
 # 📖 Guía de Mira Estudio — cómo funciona tu página y cómo mantenerla
 
 Esta guía está pensada para que puedas trabajar en tu página **con o sin Claude**.

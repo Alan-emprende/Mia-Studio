@@ -3,12 +3,28 @@
   'use strict';
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS'}).format(n/100);
-  const statuses={created:'Preparando pago',pending:'Pago pendiente',approved:'Pago confirmado',rejected:'Pago rechazado',refunded:'Pago devuelto',charged_back:'Pago en disputa',cancelled:'Cancelado',review:'Revisión de la dueña'};
+  const statuses={created:'Preparando pago',pending:'Pago pendiente',approved:'Pago confirmado',rejected:'Pago rechazado',refunded:'Pago devuelto',error:'No se pudo preparar el pago',charged_back:'Pago en disputa',cancelled:'Cancelado',review:'Revisión de la dueña'};
   async function user(){
     if(typeof firebase==='undefined')throw new Error('No se pudo cargar el inicio de sesión');
     const auth=firebase.auth();
     const u=await new Promise(resolve=>{let off=auth.onAuthStateChanged(x=>{off();resolve(x);});});
     if(!u)throw new Error('Iniciá sesión para continuar');if(!u.emailVerified)throw new Error('Verificá tu email para continuar');return u;
+  }
+  let backendCheck;
+  async function checkBackend(signal){
+    if(!backendCheck)backendCheck=(async()=>{
+      const response=await fetch(window.MIRA_PAYMENTS_API+'/health',{signal});
+      const data=await response.json();
+      if(!response.ok||!data.ready||data.apiVersion!=='digital-v2')throw Error('Falta actualizar el servidor de pagos. Contactá al estudio.');
+      if(data.mode==='test'&&!document.getElementById('payments-test-banner')){
+        const notice=document.createElement('p');notice.id='payments-test-banner';notice.setAttribute('role','status');
+        notice.style.cssText='padding:14px;margin:0;background:#fff1cc;color:#3b2100;text-align:center;font:16px Arial,sans-serif';
+        notice.textContent='Modo de prueba: usá únicamente la cuenta y las tarjetas de prueba de Mercado Pago.';
+        (document.querySelector('main')||document.body).prepend(notice);
+      }
+      return data;
+    })().catch(e=>{backendCheck=null;throw e;});
+    return backendCheck;
   }
   async function api(path,body){
     if(path==='/access'&&!window.MIRA_PAYMENTS_API&&window.miraDigitalAccess)return window.miraDigitalAccess.read(body.kind,body.productId);
@@ -16,6 +32,7 @@
     const u=await user(),token=await u.getIdToken();
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
     try{
+      await checkBackend(controller.signal);
       let response,data;
       try{response=await fetch(base+path,{signal:controller.signal,method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})});data=await response.json();}
       catch{throw new Error('No pudimos conectar con el servidor. Revisá tu conexión y volvé a intentar. Tu selección se conserva.');}
@@ -93,7 +110,7 @@
     try{const result=await api('/admin-bookings');localStorage.setItem('ms_turnos',JSON.stringify(result.items));
       let notice=document.getElementById('payments-agenda-environment');
       if(!notice){notice=document.createElement('p');notice.id='payments-agenda-environment';notice.setAttribute('role','status');const pane=document.getElementById('adm-turnos');pane?.prepend(notice);}
-      notice.textContent=result.environment==='test'?'Agenda de prueba · Estas reservas no ocupan la agenda real.':'Agenda de producción';return true;
+      notice.textContent=result.environment==='existing'?'Agenda existente del estudio':result.environment==='test'?'Agenda de prueba':'Agenda de producción';return true;
     }catch(e){localStorage.removeItem('ms_turnos');toast('No se pudo cargar la agenda: '+e.message);return false;}
   };
   window.changeTurnoStatus=async function(id,status,select){select.disabled=true;try{await api('/booking-status',{orderId:String(id),status});await loadTurnosCloud();admRenderTurnosList();toast(status==='cancelled'?'Turno cancelado. Revisá si corresponde devolver la seña.':'Estado guardado');}catch(e){toast(e.message);admRenderTurnosList();}finally{select.disabled=false;}};
@@ -136,44 +153,65 @@
   window.admRenderPayments=async function(){
     const box=document.getElementById('payments-editor');box.textContent='Cargando configuración…';
     try{
-      const {settings,environment}=await api('/settings');const s=settings||{enabled:false,deposit:{mode:'percent',fixedCents:1000000,percent:30,holdMinutes:20},serviceMinutes:{}};
-      const names=gSvcPage().cats.flatMap(c=>(c.items||[]).map(x=>({name:x.n,key:x.bookingKey||x.n}))); 
-      box.innerHTML='<p>Ambiente: <strong>'+esc(environment==='live'?'Producción':'Pruebas')+'</strong>. Las claves privadas se administran en Firebase.</p><form id="payment-settings-form"><label><input id="pay-enabled" type="checkbox" '+(s.enabled?'checked':'')+'> Habilitar compras</label><div class="pay-fields"><label>Método de seña<select id="pay-mode"><option value="fixed" '+(s.deposit.mode==='fixed'?'selected':'')+'>Monto fijo por turno</option><option value="percent" '+(s.deposit.mode==='percent'?'selected':'')+'>Porcentaje del total</option></select></label><label>Monto fijo en pesos<input id="pay-fixed" type="number" min="0.01" step="0.01" required value="'+s.deposit.fixedCents/100+'"></label><label>Porcentaje<input id="pay-percent" type="number" min="0.01" max="100" step="0.01" required value="'+s.deposit.percent+'"></label><label>Tiempo para pagar (minutos)<input id="pay-hold" type="number" min="10" max="60" required value="'+s.deposit.holdMinutes+'"></label></div><p>Se guardan ambos valores. Se aplica el método seleccionado y nunca se cobra más que el total del turno.</p><label>Total de ejemplo en pesos<input id="pay-example" type="number" min="1" value="30000"></label><p id="pay-preview" role="status"></p><h3>Duración de cada servicio</h3><p>Incluí el tiempo de preparación. Sin duración, ese servicio no se puede reservar con seña.</p><div class="pay-fields">'+names.map(n=>'<label>'+esc(n.name)+'<input class="pay-duration" data-name="'+esc(n.key)+'" type="number" min="15" max="480" step="15" placeholder="Minutos" value="'+esc(s.serviceMinutes?.[n.key]??s.serviceMinutes?.[n.name]??'')+'"></label>').join('')+'</div><button class="abtn" type="submit">Guardar configuración</button><p id="pay-settings-status" role="status"></p></form><h3>Últimas compras y señas</h3><div id="pay-orders"></div>';
-      const preview=()=>{const total=Math.round(Number(document.getElementById('pay-example').value)*100),fixed=Math.round(Number(document.getElementById('pay-fixed').value)*100),pct=Number(document.getElementById('pay-percent').value);const due=Math.min(total,document.getElementById('pay-mode').value==='fixed'?fixed:Math.max(1,Math.round(total*pct/100)));document.getElementById('pay-preview').textContent=Number.isFinite(due)&&due>0?'Seña: '+money(due)+' · Saldo: '+money(total-due):'Completá valores válidos.';};
-      document.getElementById('payment-settings-form').addEventListener('input',preview);preview();
-      document.getElementById('payment-settings-form').onsubmit=async e=>{e.preventDefault();const btn=e.target.querySelector('button[type=submit]'),msg=document.getElementById('pay-settings-status');btn.disabled=true;msg.textContent='Guardando…';try{const durations={};document.querySelectorAll('.pay-duration').forEach(x=>{if(x.value)durations[x.dataset.name]=Number(x.value);});await api('/settings',{enabled:document.getElementById('pay-enabled').checked,deposit:{mode:document.getElementById('pay-mode').value,fixedCents:Math.round(Number(document.getElementById('pay-fixed').value)*100),percent:Number(document.getElementById('pay-percent').value),holdMinutes:Number(document.getElementById('pay-hold').value)},serviceMinutes:durations});msg.textContent='Configuración guardada en el servidor.';}catch(err){msg.textContent=err.message;}finally{btn.disabled=false;}};
+      const result=await api('/settings'),s=result.settings||{enabled:false};
+      box.innerHTML='<h3>Pagos de cursos y ebooks</h3><p>Ambiente: <strong>'+esc(result.environment==='live'?'Producción':'Pruebas')+'</strong></p><form id="payment-settings-form"><label><input id="pay-enabled" type="checkbox" '+(s.enabled?'checked':'')+'> Habilitar compras de cursos y ebooks</label><p>El precio se toma del catálogo guardado y el acceso se habilita cuando Mercado Pago confirma el pago.</p><button class="abtn" type="submit">Guardar configuración</button><p id="pay-settings-status" role="status"></p></form><button class="abtn" id="pay-check-connection" type="button">Comprobar conexión</button><p id="pay-connection-status" role="status"></p><h3>Últimas compras</h3><div id="pay-orders"></div>';
+      document.getElementById('payment-settings-form').onsubmit=async e=>{
+        e.preventDefault();const btn=e.target.querySelector('button[type=submit]'),msg=document.getElementById('pay-settings-status');
+        btn.disabled=true;msg.textContent='Guardando…';
+        try{await api('/settings',{enabled:document.getElementById('pay-enabled').checked});msg.textContent='Configuración guardada.';}
+        catch(err){msg.textContent=err.message;}finally{btn.disabled=false;}
+      };
+      document.getElementById('pay-check-connection').onclick=async e=>{
+        const msg=document.getElementById('pay-connection-status');e.target.disabled=true;msg.textContent='Comprobando…';
+        try{
+          const d=await api('/diagnostics');
+          msg.textContent=d.firestore&&d.mercadopago?(d.catalogReady?'Conexión correcta con Firebase y Mercado Pago. Catálogo protegido.':'Conexión correcta. Falta proteger el catálogo desde Alumnas → Accesos.'):[d.firebaseError,d.mercadopagoError].filter(Boolean).join(' ')||'No se pudo comprobar la conexión.';
+        }catch(err){msg.textContent=err.message;}finally{e.target.disabled=false;}
+      };
       const orders=await api('/admin-orders');document.getElementById('pay-orders').innerHTML=orderCards(orders,true);
-      const notices=await api('/admin-notifications');
-      const summary=document.createElement('section');summary.id='pay-notifications';
-      const mailStatuses={queued:'Pendiente de envío',sending:'En proceso',sent:'Aceptado por Gmail',failed:'No enviado',review:'Requiere revisión'};
-      summary.innerHTML='<h3>Avisos de reservas</h3><p>Los avisos pendientes requieren que el envío esté activado. Aceptado por Gmail no confirma que el mensaje haya llegado a la bandeja de entrada. Los casos en revisión deben comprobarse antes de reenviarlos.</p>'+(Array.isArray(notices)&&notices.length?notices.map(n=>'<article class="pay-order"><strong>'+esc(n.subject)+'</strong><p>'+esc(n.to)+' · '+esc(mailStatuses[n.status]||n.status)+'</p><p>'+esc(n.live?'Producción':'Prueba')+(n.deliveredTo?' · Destino del envío: '+esc(n.deliveredTo):'')+'</p></article>').join(''):'<p>Todavía no hay avisos.</p>');box.appendChild(summary);
     }catch(e){box.textContent=e.message;}
   };
   function orderCards(orders,admin=false){return orders.length?orders.map(o=>'<article class="pay-order"><strong>'+esc(o.title)+'</strong><p>'+esc(statuses[o.status]||o.status)+' · '+money(o.amountCents)+'</p>'+(o.kind==='booking'?'<p>Saldo: '+money(o.balanceCents)+' · '+esc(o.booking.date)+' '+esc(o.booking.time)+'</p>':'')+(admin?'<p><strong>'+esc(o.live===true?'Producción':o.live===false?'Prueba':'Ambiente sin identificar')+'</strong></p><p>'+esc(o.email)+' · '+esc(o.issue||'')+'</p>':'<a href="pagos.html?order='+encodeURIComponent(o.id)+'">Ver detalle</a>')+'</article>').join(''):'<p>Todavía no hay compras.</p>';}
-  async function paymentPage(){
+  async function paymentPage(forceVerify=false){
     const box=document.getElementById('payment-content');if(!box)return;
     let u;try{u=await user();}catch(e){const params=new URLSearchParams(location.search),order=params.get('order');sessionStorage.setItem('mira_checkout_return','pagos.html'+(order?'?order='+encodeURIComponent(order):params.has('historial')?'?historial=1':''));box.innerHTML='<p>'+esc(e.message)+'</p><a class="btn-g" href="index.html?comprar=1">Iniciar sesión o crear cuenta</a><p>Al iniciar sesión vas a volver a esta compra.</p>';return;}
     try{
-      const orderId=new URLSearchParams(location.search).get('order');
+      const params=new URLSearchParams(location.search),orderId=params.get('order');
       if(orderId){
-        const o=await api('/order?id='+encodeURIComponent(orderId));
-        box.innerHTML='<h2>'+esc(o.title)+'</h2><p role="status">'+esc(statuses[o.status]||o.status)+'</p><p>Importe: '+money(o.amountCents)+'</p>'+(o.kind==='booking'?'<p>Saldo en el estudio: '+money(o.balanceCents)+'</p>':'')+(o.status==='review'?'<p>El estudio debe revisar esta operación antes de confirmar el acceso o el horario. No vuelvas a pagar.</p>':'')+(o.checkoutUrl&&['created','pending'].includes(o.status)&&o.expiresAt>Date.now()?'<a class="btn-g" href="'+esc(o.checkoutUrl)+'">Continuar pago</a>':'')+'<button id="pay-refresh" class="btn-g">Actualizar estado</button><p><a href="pagos.html?historial=1">Mis compras</a> · <a href="dashboard.html">Ir al portal</a></p>';
-        document.getElementById('pay-refresh').onclick=paymentPage;
-        if(o.status==='approved'&&o.kind!=='booking'){const btn=document.createElement('button');btn.className='btn-g';btn.textContent='Acceder al producto';btn.onclick=()=>accessProduct(o.kind,o.productId,box);box.append(btn);}return;
+        let issue='',o;
+        const paymentId=params.get('payment_id')||params.get('collection_id');
+        if(forceVerify===true||/^\d{1,30}$/.test(paymentId||'')){
+          try{o=(await api('/verify-order',{orderId,...(/^\d{1,30}$/.test(paymentId||'')?{paymentId}:{})})).order;}
+          catch(e){issue=e.message;}
+        }
+        if(!o)o=await api('/order?id='+encodeURIComponent(orderId));
+        box.innerHTML='<h2>'+esc(o.title)+'</h2><p role="status">'+esc(statuses[o.status]||o.status)+'</p><p>Importe: '+money(o.amountCents)+'</p>'+(o.live===false?'<p><strong>Compra de prueba.</strong></p>':'')+(issue?'<p role="alert">'+esc(issue)+'</p>':'')+(o.status==='review'?'<p>El estudio debe revisar esta operación antes de confirmar el acceso. No vuelvas a pagar.</p>':'')+(o.checkoutUrl&&['created','pending'].includes(o.status)&&o.expiresAt>Date.now()?'<a class="btn-g" href="'+esc(o.checkoutUrl)+'">Continuar pago</a>':'')+'<button id="pay-refresh" class="btn-g">Actualizar estado</button><p><a href="pagos.html?historial=1">Mis compras</a> · <a href="dashboard.html">Ir al portal</a></p>';
+        document.getElementById('pay-refresh').onclick=e=>{e.target.disabled=true;paymentPage(true);};
+        if(o.status==='approved'&&['course','ebook'].includes(o.kind)){const btn=document.createElement('button');btn.className='btn-g';btn.textContent='Acceder al producto';btn.onclick=()=>accessProduct(o.kind,o.productId,box);box.append(btn);}return;
       }
       let draft;try{draft=JSON.parse(sessionStorage.getItem('mira_checkout')||'null');}catch{}
-      if(new URLSearchParams(location.search).has('historial')||!draft){const orders=await api('/orders');box.innerHTML='<h2>Mis compras y señas</h2>'+orderCards(orders)+(draft?'<a class="btn-g" href="pagos.html">Continuar selección</a>':'');return;}
-      if(draft.kind!=='booking'){
-        try{const product=await api('/access',{kind:draft.kind,productId:draft.productId});box.innerHTML='<h2>'+esc(product.title)+'</h2><p>Ya tenés acceso a este producto.</p><button class="btn-g" id="pay-access">Acceder</button>';document.getElementById('pay-access').onclick=()=>accessProduct(draft.kind,draft.productId,box);return;}catch{}
-      }
-      const q=await api('/quote',draft);box.innerHTML='<h2>'+esc(q.title)+'</h2><p>Total: '+money(q.totalCents)+'</p><p><strong>A pagar ahora: '+money(q.amountCents)+'</strong></p>'+(q.kind==='booking'?'<p>Saldo en el estudio: '+money(q.balanceCents)+'</p><p>'+esc(draft.date)+' · '+esc(draft.time)+'</p><p>El horario se reserva temporalmente al continuar. Se confirma cuando recibimos la aprobación del pago dentro de ese plazo.</p>':'')+'<button class="btn-g" id="pay-now">Pagar con Mercado Pago</button><p id="pay-message" role="status"></p>';
-      document.getElementById('pay-now').onclick=async e=>{e.target.disabled=true;try{draft.requestId=draft.requestId||crypto.randomUUID();sessionStorage.setItem('mira_checkout',JSON.stringify(draft));const order=await api('/checkout',{...draft,acceptedAmountCents:q.amountCents,acceptedTotalCents:q.totalCents});location.href=order.checkoutUrl;}catch(err){document.getElementById('pay-message').textContent=err.message;e.target.disabled=false;}};
-    }catch(e){box.innerHTML='<p role="alert">'+esc(e.message)+'</p><button class="btn-g" data-pay-retry>Volver a intentar</button>';box.querySelector('[data-pay-retry]').onclick=paymentPage;}
+      if(params.has('historial')||!draft){const orders=await api('/orders');box.innerHTML='<h2>Mis compras</h2>'+orderCards(orders)+(draft?'<a class="btn-g" href="pagos.html">Continuar selección</a>':'');return;}
+      if(!['course','ebook'].includes(draft.kind))throw Error('Las reservas con seña todavía no están habilitadas. Contactá al estudio.');
+      try{const product=await api('/access',{kind:draft.kind,productId:draft.productId});box.innerHTML='<h2>'+esc(product.title)+'</h2><p>Ya tenés acceso a este producto.</p><button class="btn-g" id="pay-access">Acceder</button>';document.getElementById('pay-access').onclick=()=>accessProduct(draft.kind,draft.productId,box);return;}catch{}
+      const q=await api('/quote',draft);box.innerHTML='<h2>'+esc(q.title)+'</h2><p>Total: '+money(q.totalCents)+'</p><p><strong>A pagar ahora: '+money(q.amountCents)+'</strong></p><button class="btn-g" id="pay-now">Pagar con Mercado Pago</button><p id="pay-message" role="status"></p>';
+      document.getElementById('pay-now').onclick=async e=>{
+        e.target.disabled=true;
+        try{
+          draft.requestId=draft.requestId||crypto.randomUUID();sessionStorage.setItem('mira_checkout',JSON.stringify(draft));
+          const order=await api('/checkout',{...draft,acceptedAmountCents:q.amountCents,acceptedTotalCents:q.totalCents});
+          location.href=order.checkoutUrl;
+        }catch(err){
+          document.getElementById('pay-message').textContent=err.message;
+          if(/referencia ya se utilizó/.test(err.message))delete draft.requestId;
+          sessionStorage.setItem('mira_checkout',JSON.stringify(draft));e.target.disabled=false;
+        }
+      };
+    }catch(e){box.innerHTML='<p role="alert">'+esc(e.message)+'</p><button class="btn-g" data-pay-retry>Volver a intentar</button>';box.querySelector('[data-pay-retry]').onclick=()=>paymentPage();}
   }
   async function accessProduct(kind,id,box){try{const u=await user();const p=await api('/access',{kind,productId:String(id)});if(firebase.auth().currentUser?.uid!==u.uid)throw Error('La sesión cambió. Volvé a intentar.');if(kind==='course'){sessionStorage.setItem('mira_open_course',String(id));location.href='dashboard.html';return;}const url=p.downloadLink||p.link;const parsed=new URL(url);if(parsed.protocol!=='https:')throw new Error('Enlace de descarga no disponible');location.href=parsed.href;}catch(e){toast(e.message);}}
   document.addEventListener('DOMContentLoaded',()=>{
     const oldPage=window.admPage;if(oldPage)window.admPage=function(name){oldPage(name);if(name==='pagos')admRenderPayments();};
-    if(document.getElementById('nav-salir')){const a=document.createElement('a');a.className='sb-item';a.href='pagos.html?historial=1';a.textContent='Mis compras y señas';document.getElementById('nav-salir').before(a);}
+    if(document.getElementById('nav-salir')){const a=document.createElement('a');a.className='sb-item';a.href='pagos.html?historial=1';a.textContent='Mis compras';document.getElementById('nav-salir').before(a);}
     if(new URLSearchParams(location.search).has('comprar')&&typeof openAuth==='function')openAuth('l');
     paymentPage();
     if(location.pathname.includes('dashboard')){const id=sessionStorage.getItem('mira_open_course');if(id)openViewer(Number(id));}

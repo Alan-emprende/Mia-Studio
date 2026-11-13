@@ -1,0 +1,14 @@
+{
+  "name": "mira-pagos",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-11-11",
+  "workers_dev": true,
+  "vars": {
+    "SITE_ORIGIN": "https://mirastudiotb.com",
+    "EXTRA_ORIGIN": "https://www.mirastudiotb.com",
+    "WORKER_ORIGIN": "https://mira-pagos.estudiosmira.workers.dev",
+    "FIREBASE_PROJECT_ID": "mira-estudio",
+    "FIREBASE_API_KEY": "AIzaSyC-8ZrZjzooLkBFt-thbzRVbKpPd1nMj1E",
+    "MP_ENV": "test"
+  }
+}

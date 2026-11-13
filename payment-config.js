@@ -1,3 +1,2 @@
-// URL pública del servidor de cobros. Nunca colocar Access Token ni claves privadas aquí.
-// Completar tras desplegar paymentsApi y terminar las pruebas.
-window.MIRA_PAYMENTS_API = '';
+// Dirección pública del servidor de pagos. Las claves privadas se guardan en Cloudflare.
+window.MIRA_PAYMENTS_API = 'https://mira-pagos.estudiosmira.workers.dev';
