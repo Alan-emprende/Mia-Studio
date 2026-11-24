@@ -127,3 +127,9 @@ Estos tres pasos completan las mejoras de julio 2026. Sin ellos la página funci
 - **Firestore** = la base de datos de Firebase. **Colección** = como una carpeta de datos; **documento** = una ficha dentro de ella.
 - **Repositorio (repo)** = la carpeta de tu proyecto en GitHub. **Commit** = guardar una versión. **Deploy/publicar** = poner la página online.
 - **Consola del navegador** = apretá `F12` en Chrome → pestaña "Console": ahí aparecen los errores si algo falla (copiáselos a Claude).
+
+
+## Correcciones de acceso, archivos y señas — 24/11/2026
+
+Seña inicial editable del 30%, confirmación de turnos desde el servidor, comprobación de permisos de alumnas, corrección del precio cero residual y enlaces descargables. Publicación y validación en [PUBLICAR-CORRECCIONES.md](PUBLICAR-CORRECCIONES.md). Esta actualización conserva el ambiente de producción ya configurado; no requiere cambiar las reglas de Firestore. Los recursos sin archivo ni enlace real quedan pendientes de carga.
+

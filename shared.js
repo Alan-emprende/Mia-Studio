@@ -797,12 +797,7 @@ function selLesson(flat){
   updateDoneUI(isDone);
   updateViewerProgress();
   const rl=document.getElementById('lcres-list');
-  const hasRes=(l.resources&&l.resources.length)||(l.attachments&&l.attachments.length);
-  if(hasRes){
-    const resHtml=(l.resources||[]).map(r=>`<div class="ritem"><div class="rico">${r.icon}</div><div><div class="rname">${r.name}</div><div class="rtype">${r.type}</div></div></div>`).join('');
-    const attHtml=(l.attachments||[]).map(a=>`<div class="attach-item" onclick="downloadAttachment('${a.name}','${a.data||''}')"><div class="attach-icon">${fileIcon(a.type)}</div><div><div class="attach-name">${a.name}</div><div class="attach-size">${a.size||''}</div></div><div class="attach-dl">⬇ Descargar</div></div>`).join('');
-    rl.innerHTML=resHtml+attHtml;rl.closest('.lcres').style.display='';
-  }else{rl.innerHTML='';rl.closest('.lcres').style.display='none';}
+  renderLessonResources(rl,l);
   document.getElementById('btn-prev').style.display=lessonIdx>0?'':'none';
   document.getElementById('btn-next').textContent=lessonIdx<lessonFlat.length-1?'Siguiente →':'✓ Completar curso';
 }
@@ -1268,6 +1263,8 @@ function admRenderModsInline(c){
                   <div class="lv-hint">Ej: https://youtu.be/abc123</div>
                 </div>
                 <div class="fg">
+                  <label>Archivos y enlaces de la clase</label>
+                  ${(l.resources||[]).map((r,ri)=>'<div class="fg"><label>'+_escHtml(r.name||'Recurso')+'</label><input type="url" id="lr-'+m.id+'-'+l.id+'-'+ri+'" value="'+_escHtml(r.url||r.link||r.href||r.downloadUrl||r.downloadLink||r.fileUrl||'')+'" placeholder="https://..."><small>Pegá el enlace del archivo. Sin enlace se muestra como pendiente.</small></div>').join('')}
                   <label>📎 Archivos adjuntos</label>
                   <div class="les-attach-list" id="lattach-${m.id}-${l.id}">
                     ${(l.attachments||[]).map((a,ai)=>`
@@ -1324,6 +1321,7 @@ function admFlushEdits(){
       const lt=document.getElementById('lt-'+m.id+'-'+l.id);const ld=document.getElementById('ld-'+m.id+'-'+l.id);const ldesc=document.getElementById('ldesc-'+m.id+'-'+l.id);
       const lv=document.getElementById('lv-'+m.id+'-'+l.id);
       if(lt)l.title=lt.value;if(ld)l.duration=ld.value;if(ldesc)l.desc=ldesc.value;if(lv)l.videoUrl=lv.value.trim();
+      (l.resources||[]).forEach((r,ri)=>{const input=document.getElementById('lr-'+m.id+'-'+l.id+'-'+ri);if(input){r.url=input.value.trim();for(const key of ['link','href','downloadUrl','downloadLink','fileUrl'])delete r[key];}});
       // attachments are saved directly, no flush needed
     });
   });
@@ -1355,7 +1353,7 @@ async function admSaveCurso(isNew){
   c.levelLabel=document.getElementById('ce-levlbl').value||'';
   c.locked=document.getElementById('ce-locked').value==='1';
   c.color=document.getElementById('ce-color').value;
-  const priceEl=document.getElementById('ce-price');if(priceEl)c.price=priceEl.value.trim();
+  const priceEl=document.getElementById('ce-price');if(priceEl){c.price=priceEl.value.trim();delete c.priceArs;}
   const payEl=document.getElementById('ce-paylink');if(payEl)c.payLink=payEl.value.trim();
   const covEl=document.getElementById('ce-cover-data');if(covEl)c.coverImg=covEl.value||'';
   admCurEditId=c.id;
@@ -1367,6 +1365,7 @@ async function admSaveCurso(isNew){
       const lt=document.getElementById('lt-'+m.id+'-'+l.id);const ld=document.getElementById('ld-'+m.id+'-'+l.id);const ldesc=document.getElementById('ldesc-'+m.id+'-'+l.id);
       if(lt)l.title=lt.value;if(ld)l.duration=ld.value;if(ldesc)l.desc=ldesc.value;
       const lv=document.getElementById('lv-'+m.id+'-'+l.id);if(lv)l.videoUrl=lv.value.trim();
+      (l.resources||[]).forEach((r,ri)=>{const input=document.getElementById('lr-'+m.id+'-'+l.id+'-'+ri);if(input){r.url=input.value.trim();for(const key of ['link','href','downloadUrl','downloadLink','fileUrl'])delete r[key];}});
     });
   });
   if(!await _admConfirmCatalogSave(()=>sc(courses)))return;
@@ -1484,6 +1483,7 @@ async function admSaveEbook(idx){
   ebs[idx].desc=document.getElementById('eb-desc-'+idx).value;
   ebs[idx].price=document.getElementById('eb-price-'+idx).value;
   ebs[idx].paid=document.getElementById('eb-paid-'+idx).value==='1';
+  delete ebs[idx].priceArs;
   ebs[idx].downloadLink=document.getElementById('eb-download-'+idx)?.value.trim()||'';
   ebs[idx].payLink=document.getElementById('eb-paylink-'+idx)?.value.trim()||'';
   ebs[idx].link=ebs[idx].downloadLink; // backward compat
@@ -2598,10 +2598,45 @@ async function admDelAttach(modId,lesId,idx){
   if(listEl)listEl.innerHTML=(l.attachments||[]).map((a,ai)=>`<div class="les-attach-item"><span style="font-size:17px;">${fileIcon(a.type)}</span><span class="les-attach-name" title="${a.name}">${a.name}</span><span class="les-attach-size">${a.size||''}</span><button class="les-attach-del" onclick="admDelAttach('${modId}','${lesId}',${ai})" title="Eliminar">✕</button></div>`).join('');
   toast('Archivo eliminado');
 }
-function downloadAttachment(name,data){
-  if(!data){toast('Sin archivo disponible');return;}
-  const a=document.createElement('a');a.href=data;a.download=name;a.click();
+function resourceTarget(resource){
+  const raw=resource.data||resource.url||resource.link||resource.href||resource.downloadUrl||resource.downloadLink||resource.fileUrl||'';
+  if(typeof raw!=='string'||!raw.trim())return null;
+  const value=raw.trim();
+  if(/^data:(?:application\/(?:pdf|zip|octet-stream|msword|vnd\.[a-z0-9.+-]+)|image\/(?:jpeg|png|gif|webp)|video\/(?:mp4|webm));base64,[a-z0-9+/=\s]+$/i.test(value))return {url:value,inline:true};
+  try{const u=new URL(value);if(u.protocol==='https:'&&!u.username&&!u.password)return {url:u.href,inline:false};}catch{}
+  return null;
 }
+async function openLessonResource(resource){
+  const target=resourceTarget(resource);if(!target){toast('Este archivo todavía no tiene un enlace cargado. Avisale al estudio.');return;}
+  const tab=!target.inline?window.open('about:blank','_blank'):null;
+  if(tab)tab.opener=null;
+  try{
+    if(!window.miraDigitalAccess)throw Error('No se pudo verificar el acceso al curso.');
+    const courseId=currentCourseId,product=await window.miraDigitalAccess.read('course',String(courseId));
+    if(String(product.id)!==String(courseId)||currentCourseId!==courseId)throw Error('La clase cambió. Volvé a abrir el archivo.');
+    if(!target.inline){if(!tab)throw Error('Permití abrir una nueva pestaña y volvé a tocar el archivo.');tab.location.replace(target.url);return;}
+    const comma=target.url.indexOf(','),bytes=Uint8Array.from(atob(target.url.slice(comma+1).replace(/\s/g,'')),c=>c.charCodeAt(0));
+    const blob=new Blob([bytes],{type:target.url.slice(5,target.url.indexOf(';'))}),href=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=href;a.download=String(resource.name||'archivo').replace(/[\\/:*?"<>|]/g,'_');document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(href),60000);
+  }catch(e){tab?.close();toast(e.message);}
+}
+function renderLessonResources(host,lesson){
+  if(!host)return;host.replaceChildren();
+  const items=[...(lesson.resources||[]),...(lesson.attachments||[])];
+  const section=host.closest('.lcres');if(section)section.style.display=items.length?'':'none';
+  for(const resource of items){
+    const available=!!resourceTarget(resource),button=document.createElement('button');
+    button.type='button';button.className='attach-item';button.style.cssText='width:100%;text-align:left;font:inherit;color:inherit';
+    const icon=document.createElement('span');icon.className='attach-icon';icon.textContent=resource.icon||fileIcon(resource.type);
+    const labels=document.createElement('span'),name=document.createElement('span'),detail=document.createElement('span');
+    name.className='attach-name';name.textContent=resource.name||'Archivo de la clase';detail.className='attach-size';detail.textContent=available?(resource.size||resource.type||'Abrir archivo'):'Archivo pendiente de carga';
+    name.style.display='block';detail.style.display='block';labels.append(name,detail);
+    const action=document.createElement('span');action.className='attach-dl';action.textContent=available?'Abrir / descargar':'Pendiente';
+    button.append(icon,labels,action);button.onclick=()=>openLessonResource(resource);host.append(button);
+  }
+}
+function downloadAttachment(name,data){return openLessonResource({name,data});}
+
 
 // ═══ COURSE COVER in openViewer ═══
 function applyCourseThumbToViewer(c){
@@ -5848,3 +5883,4 @@ function promoReservar(pi){
   window._promoElegida=p.nombre;
   turnoOpenModal(elegidos);
 }
+
