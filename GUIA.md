@@ -133,3 +133,14 @@ Estos tres pasos completan las mejoras de julio 2026. Sin ellos la página funci
 
 Seña inicial editable del 30%, confirmación de turnos desde el servidor, comprobación de permisos de alumnas, corrección del precio cero residual y enlaces descargables. Publicación y validación en [PUBLICAR-CORRECCIONES.md](PUBLICAR-CORRECCIONES.md). Esta actualización conserva el ambiente de producción ya configurado; no requiere cambiar las reglas de Firestore. Los recursos sin archivo ni enlace real quedan pendientes de carga.
 
+
+
+## Revisión de seguridad y funcionamiento — 24/11/2026
+
+El portal usa Firebase para cambiar contraseñas. Desde **Mi perfil → Cambiar contraseña**, ingresá una nueva de al menos 12 caracteres. Si Firebase pide un inicio de sesión reciente, volvé a ingresar o usá **Olvidé mi contraseña**.
+
+La comunidad conserva las tres salas comunes. Las salas antiguas de cada curso se dejan fuera del portal hasta poder comprobar la compra de cada participante también en Firestore. Los mensajes existentes se conservan. Las fichas del estudio quedan reservadas a administración; las clientas siguen viendo sus pagos y reservas en **Mis compras**.
+
+Si un cobro de seña falla antes de devolver el enlace o es rechazado, el horario vuelve a quedar disponible. La seña sigue en el porcentaje elegido en el panel. Una compra digital en curso se retoma desde **Mis compras**.
+
+[Publicación y comprobaciones](PUBLICAR-SEGURIDAD.md).

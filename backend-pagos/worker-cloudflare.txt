@@ -290,7 +290,7 @@ async function createCheckout(request,env) {
     if(kind==='booking'&&!sameBooking(old.data.booking,{...body,name:String(body.name||'').trim(),tel:String(body.tel||'').trim(),msg:String(body.msg||'').trim()}))fail(409,'La selección cambió. Elegí nuevamente el turno.');
     if (old.data.mode !== env.MP_ENV) fail(409,'La referencia pertenece a otro ambiente. Elegí nuevamente el producto.');
     if (old.data.status === 'approved') fail(409,'Esta compra ya está confirmada. Ingresá desde tu portal.');
-    if (old.data.checkoutUrl && old.data.expiresAt > Date.now())
+    if (old.data.checkoutUrl && ['created','pending'].includes(old.data.status) && old.data.expiresAt > Date.now())
       return {id:requestId,orderId:requestId,checkoutUrl:checkoutUrl(old.data.checkoutUrl)};
     fail(409,'Esta referencia ya se utilizó. Revisá Mis compras y elegí nuevamente el producto si el pago no se inició.');
   }
@@ -309,9 +309,9 @@ async function createCheckout(request,env) {
   const order = {...q,id:requestId,uid:user.uid,email:user.email,productType:kind,status:'created',
     createdAt:now,expiresAt:now+(kind==='booking'?q.holdMinutes:30)*60*1000,mode:env.MP_ENV,live:isProduction(env),collectorId:collector};
   if(kind==='booking')await reserveBooking(env,order);
-  else{const saved=await commit(env,[writeDoc(env,'orders/'+requestId,order,null)]);if(!saved.response.ok)fail(409,'La compra ya se está preparando. Revisá Mis compras.');}
+  else await reserveDigitalCheckout(env,order);
   const returnUrl = new URL('/pagos.html',env.SITE_ORIGIN);returnUrl.searchParams.set('order',requestId);
-  let preference;
+  let preference,target;
   try {
     preference = await mpRequest(env,'/checkout/preferences',{method:'POST',body:JSON.stringify({
       items:[{id:keyOf(kind,id),title:order.title,quantity:1,currency_id:'ARS',unit_price:q.amountCents/100}],
@@ -323,15 +323,57 @@ async function createCheckout(request,env) {
       ...(kind==='booking'?{payment_methods:{excluded_payment_types:[{id:'ticket'},{id:'atm'}]}}:{}),
       statement_descriptor:'MIRA ESTUDIO'
     })});
+    target=checkoutUrl(preference.init_point);
   } catch (error) {
-    const patch = writeDoc(env,'orders/'+requestId,{status:'error',issue:'No se pudo preparar el checkout. No se confirmó ningún pago.'});
-    patch.updateMask = {fieldPaths:['status','issue']};await commit(env,[patch]);throw error;
+    try{await abandonCheckout(env,order);}catch(cleanupError){console.error('mira-pagos: no se pudo liberar el checkout',cleanupError.name);}
+    throw error;
   }
-  const target = checkoutUrl(preference.init_point);
   const patch = writeDoc(env,'orders/'+requestId,{preferenceId:preference.id,checkoutUrl:target});
   patch.updateMask = {fieldPaths:['preferenceId','checkoutUrl']};
-  if (!(await commit(env,[patch])).response.ok) fail(503,'Se creó el checkout, pero no se pudo guardar. Revisá Mis compras.');
+  if (!(await commit(env,[patch])).response.ok){
+    try{await abandonCheckout(env,order);}catch(cleanupError){console.error('mira-pagos: no se pudo liberar el checkout',cleanupError.name);}
+    fail(503,'No se pudo preparar el enlace. Revisá Mis compras antes de volver a intentar.');
+  }
   return {id:requestId,orderId:requestId,checkoutUrl:target};
+}
+const purchaseLockPath=order=>'purchaseLocks/'+order.mode+'_'+order.uid+'_'+keyOf(order.kind,order.productId);
+const bookingLimitPath=order=>'bookingLimits/'+order.mode+'_'+order.uid;
+const writeConflict=r=>[409,412].includes(r.response.status)||['ABORTED','ALREADY_EXISTS','FAILED_PRECONDITION'].includes(r.body.error?.status);
+async function reserveDigitalCheckout(env,order){
+  const path=purchaseLockPath(order);
+  for(let attempt=0;attempt<4;attempt++){
+    const lock=await dbGet(env,path);
+    if(lock){
+      const before=await dbGet(env,'orders/'+lock.data.orderId);
+      if(before&&(['pending','in_process','authorized','in_mediation'].includes(before.data.status)||
+        (before.data.status==='created'&&before.data.expiresAt>Date.now())))
+        fail(409,'Ya tenés una compra en curso. Revisá Mis compras antes de pagar de nuevo.');
+      // Cubre una aprobación que llegue entre la cotización y la reserva de la nueva orden.
+      if(before?.data.status==='approved'&&await hasAccess(env,{uid:order.uid,email:order.email},order.kind,order.productId))
+        fail(409,'Ya tenés acceso a este producto. Ingresá desde tu portal.');
+    }
+    const result=await commit(env,[writeDoc(env,'orders/'+order.id,order,null),writeDoc(env,path,{orderId:order.id},lock)]);
+    if(result.response.ok)return;
+    if(!writeConflict(result))fail(503,'No se pudo preparar la compra. Volvé a intentar.');
+  }
+  fail(409,'La compra ya se está preparando. Revisá Mis compras.');
+}
+async function abandonCheckout(env,order){
+  // Solo se usa al fallar antes de entregar el enlace al navegador.
+  for(let attempt=0;attempt<4;attempt++){
+    const doc=await dbGet(env,'orders/'+order.id);
+    if(!doc||doc.data.status!=='created'||doc.data.checkoutUrl)return;
+    const writes=[writeDoc(env,'orders/'+order.id,{...doc.data,status:'error',issue:'No se pudo preparar el checkout.'},doc)];
+    if(order.kind==='booking'){
+      const path=bookingDayPath(env,order.booking.date),limitPath=bookingLimitPath(order);
+      const [day,limit]=await Promise.all([dbGet(env,path),dbGet(env,limitPath)]);
+      if(day)writes.push(writeDoc(env,path,{reservations:activeReservations(day).filter(x=>x.orderId!==order.id)},day));
+      if(limit?.data.holdId===order.id)writes.push(writeDoc(env,limitPath,{recent:limit.data.recent||[]},limit));
+    }
+    const result=await commit(env,writes);
+    if(result.response.ok)return;
+    if(!writeConflict(result))throw Error('No se pudo guardar la liberación.');
+  }
 }
 async function verifyWebhookSignature(request,secret) {
   const url = new URL(request.url);
@@ -579,9 +621,9 @@ async function reconcilePayment(env,paymentId,expectedOrder,ctx) {
     const approved = new Set(order.approvedPaymentIds || []);
     if (grant) approved.add(String(paymentId));else approved.delete(String(paymentId));
     next.approvedPaymentIds = [...approved];
-    if (!order.paymentUpdated || updated >= order.paymentUpdated) {
+    if (!order.paymentUpdated || updated >= order.paymentUpdated || (!approved.size && previous?.data.grant === true)) {
       next.status = Number(payment.transaction_amount_refunded || 0)>0 ? 'refunded':payment.status;
-      next.paymentId = String(paymentId);next.paymentUpdated = updated;
+      next.paymentId = String(paymentId);next.paymentUpdated = Math.max(order.paymentUpdated||0,updated);
     }
     if (approved.size) next.status = 'approved';
     next.updatedAt = Date.now();
@@ -861,17 +903,22 @@ function sameBooking(a,b) {
 }
 async function reserveBooking(env,order) {
   for(let attempt=0;attempt<4;attempt++){
-    const path=bookingDayPath(env,order.booking.date),limitPath='bookingLimits/'+env.MP_ENV+'_'+order.uid;
+    const path=bookingDayPath(env,order.booking.date),limitPath=bookingLimitPath(order);
     const [day,limit,legacy]=await Promise.all([dbGet(env,path),dbGet(env,limitPath),legacyReservations(env,order.booking.date)]);
     const holds=activeReservations(day),recent=(limit?.data.recent||[]).filter(t=>t>Date.now()-60000);
     if(recent.length>=3)fail(429,'Esperá un minuto antes de iniciar otra reserva.');
     if(holds.length>=150||[...holds,...legacy].some(r=>r.orderId!==order.id&&overlaps(order.booking,r)))
-      fail(409,'Otra persona tomó ese horario. Elegí otro antes de pagar.');
+      fail(409,'Ese horario ya no está disponible. Elegí otro antes de pagar.');
+    if(limit?.data.holdUntil>Date.now()){
+      const other=await dbGet(env,'orders/'+limit.data.holdId);
+      if(other&&['created','pending','in_process','authorized','in_mediation'].includes(other.data.status))
+        fail(409,'Ya tenés una reserva en curso. Revisá Mis compras antes de iniciar otra.');
+    }
     holds.push({orderId:order.id,start:order.booking.start,end:order.booking.end,status:'held',expiresAt:order.expiresAt});
     const result=await commit(env,[
       writeDoc(env,'orders/'+order.id,order,null),
       writeDoc(env,path,{reservations:holds},day),
-      writeDoc(env,limitPath,{recent:[...recent,Date.now()]},limit)
+      writeDoc(env,limitPath,{recent:[...recent,Date.now()],holdId:order.id,holdUntil:order.expiresAt},limit)
     ]);
     if(result.response.ok)return;
     if(!['ABORTED','ALREADY_EXISTS','FAILED_PRECONDITION'].includes(result.body.error?.status))fail(503,'No se pudo reservar el horario. Volvé a intentar.');
@@ -883,13 +930,18 @@ async function bookingPaymentWrites(env,order,next,approved,previouslyApproved) 
     dbGet(env,path),dbGet(env,'turnos/'+order.id),legacyReservations(env,order.booking.date)]);
   const holds=activeReservations(day).filter(r=>r.orderId!==order.id);
   if(approved){
+    // Una actualización del proveedor no deshace un turno ya confirmado o atendido.
+    if(previouslyApproved&&!order.bookingCancelledAt&&['confirmed','done'].includes(turno?.data.status)){
+      next.bookingStatus=turno.data.status;
+      return [];
+    }
     const conflict=[...holds,...legacy].some(r=>r.orderId!==order.id&&overlaps(order.booking,r));
     const late=Date.parse(order.booking.date+'T00:00:00-03:00')+order.booking.start*60000<=Date.now();
-    if(order.bookingCancelledAt||conflict||late){
+    if(order.bookingCancelledAt||order.bookingStatus==='review'||conflict||late){
       next.status='review';next.bookingStatus='review';next.issue='Pago recibido; el horario requiere revisión del estudio. No vuelvas a pagar.';
       return [writeDoc(env,path,{reservations:holds},day)];
     }
-    next.bookingStatus='confirmed';
+    next.bookingStatus=turno?.data.status==='done'?'done':'confirmed';
     holds.push({orderId:order.id,start:order.booking.start,end:order.booking.end,status:'confirmed',expiresAt:order.expiresAt});
     const b=order.booking;
     return [writeDoc(env,path,{reservations:holds},day),writeDoc(env,'turnos/'+order.id,{
@@ -905,6 +957,9 @@ async function bookingPaymentWrites(env,order,next,approved,previouslyApproved) 
     return [writeDoc(env,path,{reservations:holds},day),...(turno?[writeDoc(env,'turnos/'+order.id,{
       ...turno.data,status:turno.data.status==='done'?'done':'cancelled',paymentStatus:next.status,updatedAt:Date.now()
     },turno)]:[])];
+  }
+  if(['rejected','cancelled','refunded','charged_back'].includes(next.status)){
+    return day?[writeDoc(env,path,{reservations:holds},day)]:[];
   }
   return [];
 }
@@ -980,7 +1035,7 @@ export default {
         'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type'}});
       if (url.pathname === '/health' && request.method === 'GET')
         return json({service:'mira-pagos',ready:configurationReady(env),mode:env.MP_ENV || 'unconfigured',
-          apiVersion:API_VERSION,scope:'digital-bookings',revision:'20261124-access-bookings',bookings:true});
+          apiVersion:API_VERSION,scope:'digital-bookings',revision:'20261124-defensive-hardening',bookings:true});
       if (!configurationReady(env)) fail(503,'Los pagos todavía no están configurados.');
       if (url.pathname === '/webhooks/mercadopago' && request.method === 'POST') return json(await webhook(request,env,ctx));
       if (url.pathname === '/sale-email/settings' && ['GET','POST'].includes(request.method)) return json(await saleEmailSettingsApi(request,env));

@@ -252,7 +252,7 @@
     <div class="pc" id="page-comunidad" style="display:none;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
         <div class="sec-heading" style="margin:0;" id="com-tit">Comunidad</div>
-        <div style="font-size:13px;color:var(--muted);" id="com-txt">Chateá con alumnas de cada curso</div>
+        <div style="font-size:13px;color:var(--muted);" id="com-txt">Conversá con la comunidad de Mira Estudio</div>
       </div>
       <div class="chat-layout">
         <!-- sidebar de salas -->
@@ -317,8 +317,8 @@
         <div class="fg" style="margin-bottom:14px;">
           <label>Cambiar contraseña</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <input type="password" id="prof-newpass" placeholder="Nueva contraseña" style="flex:1;">
-            <button class="btn-crimson" onclick="profileChangePass()">Cambiar</button>
+            <input type="password" id="prof-newpass" autocomplete="new-password" minlength="12" placeholder="Nueva contraseña" style="flex:1;">
+            <button class="btn-crimson" onclick="profileChangePass(this)">Cambiar</button>
           </div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -402,9 +402,9 @@
   </div>
 </div>
 
-<script src="shared.js?v=20261124fix1"></script>
+<script src="shared.js?v=20261124security1"></script>
 <script src="payment-config.js?v=20261113mp2"></script>
-<script src="payments.js?v=20261124fix1"></script>
+<script src="payments.js?v=20261124security1"></script>
 <script src="digital-access.js?v=20261124fix1"></script>
 <script src="reviews.js?v=20260929r1"></script>
 <script>
