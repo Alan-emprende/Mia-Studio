@@ -186,14 +186,15 @@
         }
         if(!o)o=await api('/order?id='+encodeURIComponent(orderId));
         box.innerHTML='<h2>'+esc(o.title)+'</h2><p role="status">'+esc(statuses[o.status]||o.status)+'</p><p>Importe: '+money(o.amountCents)+'</p>'+(o.live===false?'<p><strong>Compra de prueba.</strong></p>':'')+(issue?'<p role="alert">'+esc(issue)+'</p>':'')+(o.status==='review'?'<p>El estudio debe revisar esta operación antes de confirmar el acceso. No vuelvas a pagar.</p>':'')+(o.checkoutUrl&&['created','pending'].includes(o.status)&&o.expiresAt>Date.now()?'<a class="btn-g" href="'+esc(o.checkoutUrl)+'">Continuar pago</a>':'')+'<button id="pay-refresh" class="btn-g">Actualizar estado</button><p><a href="pagos.html?historial=1">Mis compras</a> · <a href="dashboard.html">Ir al portal</a></p>';
+        if(o.kind==='booking'&&o.booking){const info=document.createElement('p');info.textContent='Turno: '+o.booking.date+' a las '+o.booking.time+' · Saldo: '+money(o.balanceCents)+(o.bookingCancelledAt?' · Cancelado':o.bookingStatus==='confirmed'?' · Reserva confirmada':'');box.append(info);}
         document.getElementById('pay-refresh').onclick=e=>{e.target.disabled=true;paymentPage(true);};
         if(o.status==='approved'&&['course','ebook'].includes(o.kind)){const btn=document.createElement('button');btn.className='btn-g';btn.textContent='Acceder al producto';btn.onclick=()=>accessProduct(o.kind,o.productId,box);box.append(btn);}return;
       }
       let draft;try{draft=JSON.parse(sessionStorage.getItem('mira_checkout')||'null');}catch{}
       if(params.has('historial')||!draft){const orders=await api('/orders');box.innerHTML='<h2>Mis compras</h2>'+orderCards(orders)+(draft?'<a class="btn-g" href="pagos.html">Continuar selección</a>':'');return;}
-      if(!['course','ebook'].includes(draft.kind))throw Error('Las reservas con seña todavía no están habilitadas. Contactá al estudio.');
-      try{const product=await api('/access',{kind:draft.kind,productId:draft.productId});box.innerHTML='<h2>'+esc(product.title)+'</h2><p>Ya tenés acceso a este producto.</p><button class="btn-g" id="pay-access">Acceder</button>';document.getElementById('pay-access').onclick=()=>accessProduct(draft.kind,draft.productId,box);return;}catch{}
-      const q=await api('/quote',draft);box.innerHTML='<h2>'+esc(q.title)+'</h2><p>Total: '+money(q.totalCents)+'</p><p><strong>A pagar ahora: '+money(q.amountCents)+'</strong></p><button class="btn-g" id="pay-now">Pagar con Mercado Pago</button><p id="pay-message" role="status"></p>';
+      if(!['course','ebook','booking'].includes(draft.kind))throw Error('Selección no válida.');
+      if(draft.kind!=='booking')try{const product=await api('/access',{kind:draft.kind,productId:draft.productId});box.innerHTML='<h2>'+esc(product.title)+'</h2><p>Ya tenés acceso a este producto.</p><button class="btn-g" id="pay-access">Acceder</button>';document.getElementById('pay-access').onclick=()=>accessProduct(draft.kind,draft.productId,box);return;}catch{}
+      const q=await api('/quote',draft);box.innerHTML='<h2>'+esc(q.title)+'</h2>'+(q.kind==='booking'?'<p>Turno: '+esc(q.booking.date)+' a las '+esc(q.booking.time)+'</p><p>Seña: '+esc(q.depositPercent)+'%. El horario se confirma cuando se aprueba el pago.</p>':'')+'<p>Total: '+money(q.totalCents)+'</p><p><strong>A pagar ahora: '+money(q.amountCents)+'</strong></p>'+(q.kind==='booking'?'<p>Saldo a abonar en el estudio: '+money(q.balanceCents)+'</p><p><a href="dashboard.html">Elegir otro turno</a></p>':'')+'<button class="btn-g" id="pay-now">Pagar con Mercado Pago</button><p id="pay-message" role="status"></p>';
       document.getElementById('pay-now').onclick=async e=>{
         e.target.disabled=true;
         try{
@@ -202,7 +203,7 @@
           location.href=order.checkoutUrl;
         }catch(err){
           document.getElementById('pay-message').textContent=err.message;
-          if(/referencia ya se utilizó/.test(err.message))delete draft.requestId;
+          if(/referencia ya se utilizó|selección cambió/i.test(err.message))delete draft.requestId;
           sessionStorage.setItem('mira_checkout',JSON.stringify(draft));e.target.disabled=false;
         }
       };
@@ -217,3 +218,4 @@
     if(location.pathname.includes('dashboard')){const id=sessionStorage.getItem('mira_open_course');if(id)openViewer(Number(id));}
   });
 })();
+

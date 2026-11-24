@@ -39,6 +39,19 @@ function setup(responder){
   return {ctx,nodes,calls,toasts,viewerCalls,setUser:u=>{person=u;}};
 }
 const ok=(data,status=200)=>new Response(JSON.stringify(data),{status});
+test('reserva muestra seña y saldo del servidor y no consulta acceso a un curso',async()=>{
+  const t=setup(c=>{
+    if(c.path==='/quote')return ok({kind:'booking',title:'Clásicas',totalCents:6000000,amountCents:1800000,balanceCents:4200000,depositPercent:30,booking:{date:'2026-12-01',time:'09:00'}});
+    if(c.path==='/checkout')return ok({checkoutUrl:'https://www.mercadopago.com.ar/checkout'});
+    throw Error('No se esperaba '+c.path);
+  });
+  t.ctx.sessionStorage.setItem('mira_checkout',JSON.stringify({kind:'booking',services:['Clásicas'],date:'2026-12-01',time:'09:00',name:'Alumna',tel:'1122334455'}));
+  await t.ctx.__paymentPage();
+  assert.match(t.nodes.get('payment-content').innerHTML,/Seña: 30%/);assert.match(t.nodes.get('payment-content').innerHTML,/42\.000/);
+  await t.nodes.get('pay-now').onclick({target:t.nodes.get('pay-now')});
+  assert.equal(t.calls.some(c=>c.path==='/access'),false);
+  assert.equal(t.calls.find(c=>c.path==='/checkout').body.acceptedAmountCents,1800000);
+});
 test('cliente usa la API compatible y adjunta el token de Firebase',async()=>{
   const t=setup(()=>ok([]));await t.ctx.miraPayments.api('/orders');
   assert.equal(t.calls[0].path,'/health');assert.equal(t.calls[0].headers,undefined);
@@ -129,9 +142,53 @@ test('panel de pagos guarda solo la habilitación digital y permite comprobar la
 test('los seis HTML activos cargan los scripts actualizados y su JavaScript inline compila',async()=>{
   for(const file of ['index.html','admin.html','cursos.html','dashboard.html','servicios.html','pagos.html']){
     const html=await readFile(new URL('../'+file,import.meta.url),'utf8');
-    assert.match(html,/payment-config\.js\?v=20261113mp2/);assert.match(html,/payments\.js\?v=20261113mp2/);
+    assert.match(html,/payment-config\.js\?v=20261113mp2/);assert.match(html,/payments\.js\?v=20261124fix1/);
     for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))
       if(!/\bsrc\s*=|\btype\s*=\s*["'](?:application\/ld\+json|text\/plain)/i.test(match[1]))
         assert.doesNotThrow(()=>new vm.Script(match[2],{filename:file}));
   }
+});
+
+
+const saleUi=await readFile(new URL('../avisos.js',import.meta.url),'utf8');
+function mailPanelResponder(call){
+  if(call.path==='/settings')return ok({settings:{enabled:false},environment:'live'});
+  if(call.path==='/admin-orders')return ok([]);
+  if(call.path==='/sale-email/settings')return ok({enabled:false,includeTests:false,configured:true,
+    from:'Mira <ventas@example.test>',recipient:'estudiosmira@gmail.com',environment:'production',testDomain:false});
+  if(call.path==='/sale-email/notices')return ok([]);
+  throw Error('Ruta no esperada: '+call.path);
+}
+test('el panel de avisos guarda solo preferencias y mantiene el destino como información',async()=>{
+  const t=setup(mailPanelResponder);vm.runInContext(saleUi,t.ctx);await t.ctx.admRenderPayments();
+  assert.match(t.nodes.get('sale-email-panel').innerHTML,/estudiosmira@gmail\.com/);
+  t.nodes.get('sale-email-enabled').checked=true;
+  await t.nodes.get('sale-email-form').onsubmit({preventDefault(){},target:t.nodes.get('sale-email-form')});
+  const save=t.calls.find(c=>c.path==='/sale-email/settings'&&c.method==='POST');
+  assert.deepEqual(save.body,{enabled:true,includeTests:false});
+  assert.equal(JSON.stringify(save.body).includes('RESEND'),false);
+});
+test('reintentar el correo de prueba conserva la misma referencia hasta su aceptación',async()=>{
+  let attempts=0;
+  const t=setup(c=>c.path==='/sale-email/test'?ok({status:++attempts===1?'failed':'sent',errorCode:attempts===1?'transport':''}):mailPanelResponder(c));
+  vm.runInContext(saleUi,t.ctx);await t.ctx.admRenderPayments();
+  const click=()=>t.nodes.get('sale-email-test').onclick({target:t.nodes.get('sale-email-test')});
+  await click();await click();
+  const sent=t.calls.filter(c=>c.path==='/sale-email/test');
+  assert.equal(sent[0].body.requestId,sent[1].body.requestId);
+  assert.match(t.nodes.get('sale-email-message').textContent,/aceptado por Resend/);
+  await click();
+  assert.notEqual(t.calls.filter(c=>c.path==='/sale-email/test')[2].body.requestId,sent[0].body.requestId);
+});
+test('el historial de avisos escapa contenido del catálogo antes de mostrarlo',async()=>{
+  const t=setup(c=>c.path==='/sale-email/notices'?ok([{id:'sale_'+orderId,title:'<img src=x onerror=alert(1)>',
+    status:'failed',category:'sale',mode:'production',errorCode:'transport'}]):mailPanelResponder(c));
+  vm.runInContext(saleUi,t.ctx);await t.ctx.admRenderPayments();
+  const html=t.nodes.get('sale-email-history').innerHTML;
+  assert.match(html,/&lt;img/);assert.doesNotMatch(html,/<img/);
+});
+test('admin carga la extensión de avisos después de la API de pagos',async()=>{
+  const html=await readFile(new URL('../admin.html',import.meta.url),'utf8');
+  assert.ok(html.indexOf('avisos.js?v=20261116mail1')>html.indexOf('payments.js?v=20261113mp2'));
+  assert.doesNotThrow(()=>new vm.Script(saleUi));
 });

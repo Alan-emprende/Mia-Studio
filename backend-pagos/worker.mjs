@@ -125,8 +125,8 @@ async function mpRequest(env,path,options = {}) {
   if (!result.response.ok) fail(503,'No se pudo consultar Mercado Pago. Intentá nuevamente.');
   return result.body;
 }
-async function sellerId(env) {
-  if (sellerCache?.token === env.MP_ACCESS_TOKEN && sellerCache.mode === env.MP_ENV) return sellerCache.id;
+async function verifiedSeller(env) {
+  if (sellerCache?.token === env.MP_ACCESS_TOKEN && sellerCache.mode === env.MP_ENV) return sellerCache;
   const account = await mpRequest(env,'/users/me');
   if (!account.id) fail(503,'La cuenta de cobro no está configurada.');
   const testAccount = Array.isArray(account.tags) && account.tags.includes('test_user');
@@ -135,9 +135,10 @@ async function sellerId(env) {
   if (isProduction(env) && (testAccount || /^TEST-/i.test(env.MP_ACCESS_TOKEN)))
     fail(503,'Para cobrar en producción necesitás las credenciales de tu cuenta real de Mercado Pago.');
   if (account.site_id && account.site_id !== 'MLA') fail(503,'La cuenta vendedora debe ser de Argentina.');
-  sellerCache = {token:env.MP_ACCESS_TOKEN,mode:env.MP_ENV,id:String(account.id)};
-  return sellerCache.id;
+  sellerCache = {token:env.MP_ACCESS_TOKEN,mode:env.MP_ENV,id:String(account.id),testAccount};
+  return sellerCache;
 }
+async function sellerId(env) { return (await verifiedSeller(env)).id; }
 
 function checkoutUrl(value) {
   let u; try { u = new URL(value); } catch { fail(503,'Mercado Pago no devolvió un enlace de pago válido.'); }
@@ -172,7 +173,14 @@ async function queryDocs(env,collection,field,value,limit=500,parent='') {
 }
 function catalogPrice(product,kind) {
   if (kind === 'ebook' && product.paid === false) return 0;
-  if (product.priceArs === 0) return 0;
+  // Un precio visible positivo no se vuelve gratuito por un cero numérico residual.
+  const visible=String(product.price||'').trim();
+  if(product.priceArs===0&&visible&&!/^gratis$/i.test(visible)){
+    const paid=visible.match(/^(?:(?:ARS|\$)\s*)?((?:\d{1,3}(?:\.\d{3})+|\d+))(?:,(\d{1,2}))?\s*(?:ARS)?$/i);
+    if(!paid)fail(422,'Revisá el precio del producto: sus valores guardados no coinciden.');
+    return amountCents(Number(paid[1].replace(/\./g,''))+Number((paid[2]||'').padEnd(2,'0'))/100);
+  }
+  if(product.priceArs===0)return 0;
   if (product.priceArs !== undefined && product.priceArs !== null && product.priceArs !== '')
     return amountCents(product.priceArs);
   // Compatibilidad con precios argentinos ya guardados por la administradora.
@@ -242,9 +250,10 @@ async function quoteFor(env,user,kind,id) {
 function publicOrder(order,admin=false) {
   const kind = order.kind || order.productType;
   const result = {id:order.id,kind,productType:kind,productId:order.productId,title:order.title,
-    amountCents:order.amountCents,totalCents:order.totalCents || order.amountCents,balanceCents:0,
+    amountCents:order.amountCents,totalCents:order.totalCents || order.amountCents,balanceCents:order.balanceCents || 0,
     currency:order.currency,status:order.status,createdAt:order.createdAt,mode:order.mode,live:order.mode === 'production',
     expiresAt:order.expiresAt || 0};
+  if(kind==='booking'){result.booking=order.booking;result.depositPercent=order.depositPercent;result.bookingStatus=order.bookingStatus||'pending';result.bookingCancelledAt=order.bookingCancelledAt||0;}
   if (order.checkoutUrl && ['created','pending'].includes(order.status) && order.expiresAt > Date.now())
     result.checkoutUrl = checkoutUrl(order.checkoutUrl);
   if (admin) { result.email = order.email;result.issue = order.issue || ''; }
@@ -271,27 +280,36 @@ async function readJson(request,maxBytes=12000) {
 }
 async function createCheckout(request,env) {
   const user = await signedUser(request,env);
-  const body = await readJson(request),kind = body.kind || body.productType,id = String(body.productId),requestId = body.requestId;
-  checkProduct(kind,body.productId);
+  const body = await readJson(request),kind = body.kind || body.productType,id = kind==='booking'?'appointment':String(body.productId),requestId = body.requestId;
+  if(kind!=='booking')checkProduct(kind,body.productId);
   if (!validOrder(requestId || '')) fail(400,'Referencia de compra no válida.');
   const old = await dbGet(env,'orders/'+requestId);
   if (old) {
     if (old.data.uid !== user.uid || (old.data.kind || old.data.productType) !== kind || old.data.productId !== id)
       fail(403,'La compra pertenece a otra cuenta o producto.');
+    if(kind==='booking'&&!sameBooking(old.data.booking,{...body,name:String(body.name||'').trim(),tel:String(body.tel||'').trim(),msg:String(body.msg||'').trim()}))fail(409,'La selección cambió. Elegí nuevamente el turno.');
     if (old.data.mode !== env.MP_ENV) fail(409,'La referencia pertenece a otro ambiente. Elegí nuevamente el producto.');
     if (old.data.status === 'approved') fail(409,'Esta compra ya está confirmada. Ingresá desde tu portal.');
     if (old.data.checkoutUrl && old.data.expiresAt > Date.now())
       return {id:requestId,orderId:requestId,checkoutUrl:checkoutUrl(old.data.checkoutUrl)};
     fail(409,'Esta referencia ya se utilizó. Revisá Mis compras y elegí nuevamente el producto si el pago no se inició.');
   }
-  const q = await quoteFor(env,user,kind,id);
+  const q=kind==='booking'?await bookingQuote(env,user,body):await quoteFor(env,user,kind,id);
+  if(kind==='booking'){
+    for(const [field,max] of [['name',100],['tel',40],['msg',1000]]){
+      const value=body[field]===undefined?'':body[field];
+      if(typeof value!=='string'||value.trim().length>max||(field!=='msg'&&!value.trim()))fail(400,'Completá nombre y teléfono para reservar.');
+      q.booking[field]=value.trim();
+    }
+    delete q.times;delete q.durationMinutes;
+  }
   if (body.acceptedAmountCents !== q.amountCents || body.acceptedTotalCents !== q.totalCents)
     fail(409,'El precio cambió. Volvé a abrir esta compra para confirmar el importe actual.');
   const collector = await sellerId(env),now = Date.now();
   const order = {...q,id:requestId,uid:user.uid,email:user.email,productType:kind,status:'created',
-    createdAt:now,expiresAt:now+30*60*1000,mode:env.MP_ENV,live:isProduction(env),collectorId:collector};
-  const saved = await commit(env,[writeDoc(env,'orders/'+requestId,order,null)]);
-  if (!saved.response.ok) fail(409,'La compra ya se está preparando. Revisá Mis compras.');
+    createdAt:now,expiresAt:now+(kind==='booking'?q.holdMinutes:30)*60*1000,mode:env.MP_ENV,live:isProduction(env),collectorId:collector};
+  if(kind==='booking')await reserveBooking(env,order);
+  else{const saved=await commit(env,[writeDoc(env,'orders/'+requestId,order,null)]);if(!saved.response.ok)fail(409,'La compra ya se está preparando. Revisá Mis compras.');}
   const returnUrl = new URL('/pagos.html',env.SITE_ORIGIN);returnUrl.searchParams.set('order',requestId);
   let preference;
   try {
@@ -302,6 +320,7 @@ async function createCheckout(request,env) {
       back_urls:{success:returnUrl.href,pending:returnUrl.href,failure:returnUrl.href},auto_return:'approved',
       notification_url:new URL('/webhooks/mercadopago',env.WORKER_ORIGIN).href,
       expires:true,expiration_date_from:new Date(now).toISOString(),expiration_date_to:new Date(order.expiresAt).toISOString(),
+      ...(kind==='booking'?{payment_methods:{excluded_payment_types:[{id:'ticket'},{id:'atm'}]}}:{}),
       statement_descriptor:'MIRA ESTUDIO'
     })});
   } catch (error) {
@@ -332,38 +351,230 @@ async function verifyWebhookSignature(request,secret) {
   return false;
 }
 
-function validatePayment(payment,order,env,collector) {
-  if (String(payment.external_reference) !== order.id || String(payment.collector_id) !== String(collector) ||
-      String(payment.collector_id) !== order.collectorId || payment.currency_id !== order.currency ||
-      Math.round(Number(payment.transaction_amount)*100) !== order.amountCents ||
-      !Number.isFinite(Number(payment.transaction_amount)) || payment.live_mode !== isProduction(env) || order.mode !== env.MP_ENV)
-    fail(422,'El pago no coincide con esta compra.');
-  if (payment.metadata?.mira_uid !== order.uid || payment.metadata?.mira_order_id !== order.id ||
-      payment.metadata?.product_type !== order.productType || String(payment.metadata?.product_id) !== order.productId)
-    fail(422,'El pago no está asociado correctamente a la compra.');
-  if (!Number.isFinite(Date.parse(payment.date_last_updated))) fail(422,'El pago no tiene una fecha válida.');
+// PAYMENT_VALIDATION_DIAGNOSTICS: no cambia las condiciones de acreditación.
+function validatePayment(payment,order,env,collector,seller) {
+  const expectedLive = isProduction(env);
+  // La identidad del vendedor se consulta a Mercado Pago, nunca al navegador.
+  // Algunas compras entre cuentas de prueba llegan con live_mode=true.
+  const verifiedTestAccount = env.MP_ENV === 'test' && order.mode === 'test' &&
+    seller?.testAccount === true && seller.mode === 'test' && seller.id === String(collector);
+  const environmentMatches = payment.live_mode === expectedLive ||
+    (verifiedTestAccount && payment.live_mode === true);
+  const flag = typeof payment.live_mode === 'boolean' ? String(payment.live_mode) : 'ausente o inválido';
+  const checks = [
+    ['referencia de compra',String(payment.external_reference) === order.id],
+    ['cuenta vendedora actual',String(payment.collector_id) === String(collector)],
+    ['cuenta vendedora guardada en la orden',String(payment.collector_id) === order.collectorId],
+    ['moneda',payment.currency_id === order.currency],
+    ['importe',Number.isFinite(Number(payment.transaction_amount)) && Math.round(Number(payment.transaction_amount)*100) === order.amountCents],
+    ['ambiente de Mercado Pago (live_mode=' + flag + '; esperado=' + expectedLive + ')',environmentMatches],
+    ['ambiente guardado en la orden',order.mode === env.MP_ENV],
+    ['asociación de la cuenta',payment.metadata?.mira_uid === order.uid],
+    ['asociación de la orden',payment.metadata?.mira_order_id === order.id],
+    ['tipo de producto',payment.metadata?.product_type === order.productType],
+    ['identificador del producto',String(payment.metadata?.product_id) === order.productId],
+    ['fecha del pago',Number.isFinite(Date.parse(payment.date_last_updated))]
+  ];
+  const differences = checks.filter(([,valid])=>!valid).map(([label])=>label);
+  if (differences.length)
+    fail(422,'El pago no coincide con esta compra. Diferencias: ' + differences.join('; ') + '.');
   return payment.status === 'approved' && Number(payment.transaction_amount_refunded || 0) === 0;
 }
 
 
-async function reconcilePayment(env,paymentId,expectedOrder) {
+// Avisos de ventas: cola persistente, envío independiente del acceso y destino fijo.
+const SALE_EMAIL_WINDOW = 23*60*60*1000;
+const SALE_EMAIL_LEASE = 2*60*1000;
+const saleEmailCollection = env => 'saleEmailOutbox_'+env.MP_ENV;
+const saleEmailSettingsPath = env => 'paymentConfig/saleEmails_'+env.MP_ENV;
+function saleEmailSender(env) {
+  const from = String(env.SALE_EMAIL_FROM || 'Mira Estudio <onboarding@resend.dev>').trim();
+  const match = from.match(/^(?:[^<>\r\n]{1,80}<([^<>\r\n]+)>|([^<>\r\n]+))$/);
+  const address = (match?.[1] || match?.[2] || '').trim();
+  if (from.length>200 || !/^[^\s@<>,;:]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(address))
+    fail(422,'El remitente de los avisos no tiene un formato válido.');
+  return {from,address,testDomain:address.toLowerCase().endsWith('@resend.dev')};
+}
+async function saleEmailSettings(env) {
+  const doc = await dbGet(env,saleEmailSettingsPath(env));
+  return {enabled:doc?.data.enabled === true,includeTests:doc?.data.includeTests === true};
+}
+async function saleEmailSettingsApi(request,env) {
+  await requireAdmin(request,env);
+  const sender = saleEmailSender(env);
+  if (request.method === 'POST') {
+    const body = await readJson(request);
+    if (typeof body.enabled !== 'boolean' || typeof body.includeTests !== 'boolean')
+      fail(400,'La configuración de avisos no es válida.');
+    if (body.enabled && !env.RESEND_API_KEY) fail(422,'Primero cargá RESEND_API_KEY como secreto en Cloudflare.');
+    if (body.enabled && isProduction(env) && sender.testDomain)
+      fail(422,'Para avisos de ventas reales, verificá tu dominio en Resend y completá SALE_EMAIL_FROM.');
+    await saveDoc(env,saleEmailSettingsPath(env),{enabled:body.enabled,includeTests:body.includeTests,updatedAt:Date.now()});
+  }
+  return {...await saleEmailSettings(env),configured:!!env.RESEND_API_KEY,from:sender.from,recipient:ADMIN_EMAIL,
+    testDomain:sender.testDomain,environment:env.MP_ENV};
+}
+function saleMailPayload(env,order,paymentId) {
+  const clean = value => String(value || '').replace(/[\r\n]+/g,' ').trim();
+  const title = clean(order.title).slice(0,180);
+  const test = !isProduction(env);
+  const amount = new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS'}).format(order.amountCents/100);
+  return {from:saleEmailSender(env).from,to:[ADMIN_EMAIL],
+    subject:(test?'[PRUEBA] ':'')+'Nueva compra: '+title,
+    text:[
+      test?'COMPRA DE PRUEBA — no representa una venta real.':'Se confirmó una nueva compra en Mira Estudio.',
+      '', 'Producto: '+title,'Tipo: '+(order.productType==='course'?'Curso':order.productType==='booking'?'Seña de turno':'Ebook'),
+      'Importe: '+amount,'Email de la compradora: '+clean(order.email),
+      'Orden: '+order.id,'Pago de Mercado Pago: '+paymentId,
+      '', order.productType==='booking'?'Turno confirmado: '+order.booking.date+' a las '+order.booking.time+'. Saldo en el estudio: '+new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS'}).format(order.balanceCents/100):'El acceso al producto quedó habilitado al confirmarse el pago.',
+      'Panel de ventas: '+new URL('/admin',env.SITE_ORIGIN).href
+    ].join('\n')};
+}
+async function planSaleEmail(env,order,paymentId) {
+  if (!env.RESEND_API_KEY) return null;
+  const settings = await saleEmailSettings(env);
+  if (!settings.enabled || (!isProduction(env) && !settings.includeTests)) return null;
+  const sender = saleEmailSender(env);
+  if (isProduction(env) && sender.testDomain) return null;
+  const now = Date.now(),id = 'sale_'+order.id;
+  return {id,data:{category:'sale',orderId:order.id,paymentId:String(paymentId),mode:env.MP_ENV,
+    title:order.title,amountCents:order.amountCents,email:order.email,createdAt:now,
+    status:'queued',attempts:0,firstAttemptAt:0,nextAttemptAt:now,payload:saleMailPayload(env,order,paymentId)}};
+}
+function publicSaleEmail(id,data) {
+  return {id,category:data.category,orderId:data.orderId || '',title:data.title || '',amountCents:data.amountCents || 0,
+    status:data.status,attempts:data.attempts || 0,createdAt:data.createdAt,acceptedAt:data.acceptedAt || 0,
+    errorCode:data.errorCode || '',mode:data.mode};
+}
+async function updateSaleEmail(env,id,previous,changes,lease) {
+  const path = saleEmailCollection(env)+'/'+id;
+  const current = lease ? await dbGet(env,path) : previous;
+  if (!current || (lease && current.data.lease !== lease)) return null;
+  const data = {...current.data,...changes};
+  if (['sent','review','cancelled'].includes(data.status)) delete data.nextAttemptAt;
+  delete data.lease;delete data.leaseUntil;
+  const r = await commit(env,[writeDoc(env,path,data,current)]);
+  if (!r.response.ok) return null;
+  return data;
+}
+async function sendSaleEmail(env,id,force=false) {
+  if (!/^(?:sale|test)_[0-9a-f-]{36}$/i.test(id)) fail(400,'Aviso no válido.');
+  const path = saleEmailCollection(env)+'/'+id,doc = await dbGet(env,path);
+  if (!doc) fail(404,'No encontramos ese aviso.');
+  const data = doc.data,now = Date.now();
+  if (data.mode !== env.MP_ENV) fail(409,'El aviso pertenece a otro ambiente.');
+  if (['sent','review','cancelled'].includes(data.status)) return publicSaleEmail(id,data);
+  if (data.leaseUntil>now || (!force && data.nextAttemptAt>now)) return publicSaleEmail(id,data);
+  if (!env.RESEND_API_KEY) return publicSaleEmail(id,data);
+  if (!data.payload || data.payload.to?.length !== 1 || data.payload.to[0] !== ADMIN_EMAIL)
+    fail(422,'El destino del aviso no es válido.');
+  if (data.category === 'sale') {
+    const settings = await saleEmailSettings(env);
+    if (!settings.enabled || (!isProduction(env) && !settings.includeTests)) {
+      const paused = await updateSaleEmail(env,id,doc,{nextAttemptAt:now+60*60*1000});
+      return publicSaleEmail(id,paused || data);
+    }
+    if (isProduction(env) && /@resend\.dev>?$/i.test(data.payload.from))
+      fail(422,'El aviso de venta necesita un remitente del dominio verificado.');
+    const order = await dbGet(env,'orders/'+data.orderId);
+    if (!order || order.data.status !== 'approved' || order.data.bookingCancelledAt) {
+      const cancelled = await updateSaleEmail(env,id,doc,{status:'cancelled',errorCode:'purchase_not_approved'});
+      return publicSaleEmail(id,cancelled || data);
+    }
+  }
+  if ((data.firstAttemptAt && now-data.firstAttemptAt >= SALE_EMAIL_WINDOW) || data.attempts>=10) {
+    const review = await updateSaleEmail(env,id,doc,{status:'review',errorCode:'retry_window'});
+    return publicSaleEmail(id,review || data);
+  }
+  const lease = crypto.randomUUID(),firstAttemptAt = data.firstAttemptAt || now;
+  const sending = {...data,status:'sending',attempts:(data.attempts || 0)+1,firstAttemptAt,lastAttemptAt:now,
+    lease,leaseUntil:now+SALE_EMAIL_LEASE,nextAttemptAt:now+SALE_EMAIL_LEASE};
+  const claimed = await commit(env,[writeDoc(env,path,sending,doc)]);
+  if (!claimed.response.ok) return publicSaleEmail(id,data);
+  let provider;
+  try {
+    provider = await jsonFetch('https://api.resend.com/emails',{method:'POST',
+      headers:{Authorization:'Bearer '+env.RESEND_API_KEY,'Content-Type':'application/json',
+        'Idempotency-Key':'mira-sale-email/'+env.MP_ENV+'/'+id},body:JSON.stringify(sending.payload)});
+  } catch {
+    provider = {response:{ok:false,status:0},body:{}};
+  }
+  const accepted = provider.response.ok && typeof provider.body.id === 'string' && provider.body.id.length>0;
+  const changes = accepted ? {status:'sent',providerId:provider.body.id,acceptedAt:Date.now(),errorCode:''} :
+    {status:'failed',errorCode:provider.response.status?'resend_'+provider.response.status:'transport',
+      nextAttemptAt:Date.now()+Math.min(60*60*1000,60000*2**Math.min(sending.attempts,6))};
+  const result = await updateSaleEmail(env,id,doc,changes,lease);
+  return publicSaleEmail(id,result || sending);
+}
+async function dispatchSaleEmail(env,order,ctx) {
+  if (!order?.saleNotificationId) return;
+  const task = sendSaleEmail(env,order.saleNotificationId).catch(error=>{
+    console.error('mira-pagos: aviso pendiente',error.name);
+  });
+  if (ctx?.waitUntil) ctx.waitUntil(task);else await task;
+}
+async function processSaleEmails(env) {
+  if (!env.RESEND_API_KEY) return [];
+  const result = await dbRequest(env,':runQuery',{method:'POST',body:JSON.stringify({structuredQuery:{
+    from:[{collectionId:saleEmailCollection(env)}],
+    where:{fieldFilter:{field:{fieldPath:'nextAttemptAt'},op:'LESS_THAN_OR_EQUAL',value:encodeValue(Date.now())}},limit:3
+  }})});
+  if (!result.response.ok || !Array.isArray(result.body)) fail(503,'No se pudieron consultar los avisos pendientes.');
+  const processed = [];
+  for (const row of result.body.filter(x=>x.document)) {
+    const id = row.document.name.split('/').pop();
+    try { processed.push(await sendSaleEmail(env,id)); }
+    catch(error) { console.error('mira-pagos: reintento de aviso pendiente',error.name); }
+  }
+  return processed;
+}
+async function listSaleEmails(request,env) {
+  await requireAdmin(request,env);
+  const result = await dbRequest(env,':runQuery',{method:'POST',body:JSON.stringify({structuredQuery:{
+    from:[{collectionId:saleEmailCollection(env)}],orderBy:[{field:{fieldPath:'createdAt'},direction:'DESCENDING'}],limit:25
+  }})});
+  if (!result.response.ok || !Array.isArray(result.body)) fail(503,'No se pudo cargar el historial de avisos.');
+  return result.body.filter(x=>x.document).map(x=>publicSaleEmail(x.document.name.split('/').pop(),decodeFields(x.document.fields || {})));
+}
+async function testSaleEmail(request,env) {
+  await requireAdmin(request,env);
+  if (!env.RESEND_API_KEY) fail(422,'Primero cargá RESEND_API_KEY como secreto en Cloudflare.');
+  const sender = saleEmailSender(env),body = await readJson(request);
+  if (!validOrder(body.requestId || '')) fail(400,'Referencia de prueba no válida.');
+  const id = 'test_'+body.requestId,path = saleEmailCollection(env)+'/'+id;
+  const previous = await dbGet(env,path);
+  if (!previous) {
+    const data = {category:'test',title:'Prueba del correo de avisos',mode:env.MP_ENV,createdAt:Date.now(),status:'queued',
+      attempts:0,firstAttemptAt:0,nextAttemptAt:Date.now(),payload:{from:sender.from,to:[ADMIN_EMAIL],
+        subject:'Mira Estudio — prueba del correo de avisos',
+        text:'Este es un correo de prueba de Mira Estudio. No representa una compra ni un cobro.\n\nLos próximos avisos de ventas incluirán el producto, el importe y el email de la compradora.\n\nPanel: '+new URL('/admin',env.SITE_ORIGIN).href}};
+    const r = await commit(env,[writeDoc(env,path,data,null)]);
+    if (!r.response.ok && !['ALREADY_EXISTS','FAILED_PRECONDITION'].includes(r.body.error?.status))
+      fail(503,'No se pudo preparar el correo de prueba.');
+  }
+  return sendSaleEmail(env,id,true);
+}
+
+async function reconcilePayment(env,paymentId,expectedOrder,ctx) {
   if (!/^\d{1,30}$/.test(String(paymentId))) fail(400,'Identificador de pago no válido.');
   const payment = await mpRequest(env,'/v1/payments/'+paymentId);
   const orderId = String(payment.external_reference || '');
   if (!validOrder(orderId)) return null;
   if (expectedOrder && expectedOrder !== orderId) fail(403,'El pago pertenece a otra compra.');
-  const collector = await sellerId(env);
+  const seller = await verifiedSeller(env),collector = seller.id;
   for (let attempt=0;attempt<4;attempt++) {
     const [orderDoc,previous] = await Promise.all([dbGet(env,'orders/'+orderId),dbGet(env,'payments/'+paymentId)]);
     if (!orderDoc) return null;
-    const order = orderDoc.data,grant = validatePayment(payment,order,env,collector);
+    const order = orderDoc.data,grant = validatePayment(payment,order,env,collector,seller);
     const updated = Date.parse(payment.date_last_updated);
-    if (previous && previous.data.updated >= updated) return order;
+    if (previous && previous.data.updated >= updated) { await dispatchSaleEmail(env,order,ctx);return order; }
     const kind = order.kind || order.productType;
     const record = {id:String(paymentId),orderId,uid:order.uid,kind,productType:kind,
-      productId:order.productId,status:payment.status,grant,updated,mode:env.MP_ENV};
+      productId:order.productId,status:payment.status,grant,updated,mode:env.MP_ENV,
+      live:isProduction(env),providerLiveMode:payment.live_mode,sellerTestAccount:seller.testAccount};
     const entitlement = {uid:order.uid,kind,productId:order.productId,title:order.title,active:grant,
-      source:'mercadopago',live:payment.live_mode,paymentId:String(paymentId),orderId,updatedAt:Date.now()};
+      source:'mercadopago',live:isProduction(env),providerLiveMode:payment.live_mode,
+      sellerTestAccount:seller.testAccount,paymentId:String(paymentId),orderId,updatedAt:Date.now()};
     const next = {...order};
     const approved = new Set(order.approvedPaymentIds || []);
     if (grant) approved.add(String(paymentId));else approved.delete(String(paymentId));
@@ -374,43 +585,56 @@ async function reconcilePayment(env,paymentId,expectedOrder) {
     }
     if (approved.size) next.status = 'approved';
     next.updatedAt = Date.now();
+    let emailPlan = null;
+    const bookingWrites=kind==='booking'?await bookingPaymentWrites(env,order,next,approved.size>0,(order.approvedPaymentIds||[]).length>0):[];
+    if(grant&&!order.firstApprovedAt&&order.status!=='approved'&&(kind!=='booking'||next.bookingStatus==='confirmed')){
+      next.firstApprovedAt = updated;
+      try {
+        emailPlan = await planSaleEmail(env,order,paymentId);
+        if (emailPlan) next.saleNotificationId = emailPlan.id;
+      } catch(error) {
+        next.saleEmailPreparationError = 'config_unavailable';
+        console.error('mira-pagos: aviso sin preparar',error.name);
+      }
+    }
     const r = await commit(env,[writeDoc(env,'payments/'+paymentId,record,previous),
-      writeDoc(env,'entitlements/'+orderId+'_'+paymentId,entitlement),
-      writeDoc(env,'orders/'+orderId,next,orderDoc)]);
-    if (r.response.ok) return next;
+      ...(kind==='booking'?bookingWrites:[writeDoc(env,'entitlements/'+orderId+'_'+paymentId,entitlement)]),
+      writeDoc(env,'orders/'+orderId,next,orderDoc),
+      ...(emailPlan ? [writeDoc(env,saleEmailCollection(env)+'/'+emailPlan.id,emailPlan.data,null)]:[])]);
+    if (r.response.ok) { await dispatchSaleEmail(env,next,ctx);return next; }
     if (![409,412].includes(r.response.status) && !['ABORTED','FAILED_PRECONDITION','ALREADY_EXISTS'].includes(r.body.error?.status))
       fail(503,'No se pudo confirmar la compra. Se reintentará.');
   }
   fail(503,'La compra está siendo actualizada. Intentá nuevamente.');
 }
-async function webhook(request,env) {
+async function webhook(request,env,ctx) {
   if (!await verifyWebhookSignature(request,env.MP_WEBHOOK_SECRET)) fail(401,'Firma de notificación no válida.');
   const body = await readJson(request),url = new URL(request.url);
   if (body.type !== 'payment') return {received:true};
   const id = url.searchParams.get('data.id');
   if (String(body.data?.id) !== id) fail(400,'La notificación no coincide con su firma.');
-  await reconcilePayment(env,id);return {received:true};
+  await reconcilePayment(env,id,undefined,ctx);return {received:true};
 }
-async function userOrder(request,env,id,verify=false,paymentId) {
+async function userOrder(request,env,id,verify=false,paymentId,ctx) {
   if (!validOrder(id || '')) fail(400,'Referencia de compra no válida.');
   const user = await signedUser(request,env),doc = await dbGet(env,'orders/'+id);
   if (!doc || doc.data.uid !== user.uid) fail(404,'No encontramos esta compra en tu cuenta.');
   if (doc.data.mode !== env.MP_ENV) fail(409,'Esta compra pertenece a otro ambiente.');
   if (verify) {
-    if (paymentId) await reconcilePayment(env,String(paymentId),id);
+    if (paymentId) await reconcilePayment(env,String(paymentId),id,ctx);
     else {
       const found = await mpRequest(env,'/v1/payments/search?external_reference='+id+'&sort=date_created&criteria=desc&limit=3');
-      for (const p of (found.results || []).slice(0,3)) await reconcilePayment(env,String(p.id),id);
+      for (const p of (found.results || []).slice(0,3)) await reconcilePayment(env,String(p.id),id,ctx);
     }
   }
   const latest = verify ? await dbGet(env,'orders/'+id) : doc;
-  return {order:publicOrder(latest.data),hasAccess:await hasAccess(env,user,latest.data.kind || latest.data.productType,latest.data.productId)};
+  return {order:publicOrder(latest.data),hasAccess:latest.data.kind==='booking'?false:await hasAccess(env,user,latest.data.kind || latest.data.productType,latest.data.productId)};
 }
 function publicItem(p,type) {
   const out = {_public:true};
   for (const k of ['id','title','subtitle','description','desc','level','levelLabel','locked','color','coverImg','cover','emoji','price','paid'])
     if (p[k] !== undefined) out[k] = p[k];
-  if (typeof p.priceArs === 'number' && Number.isFinite(p.priceArs) && p.priceArs >= 0)
+  if (!String(p.price||'').trim() && typeof p.priceArs === 'number' && Number.isFinite(p.priceArs) && p.priceArs >= 0)
     out.price = p.priceArs === 0 ? 'Gratis':new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS'}).format(p.priceArs);
   if (type === 'courses') out.modules = (p.modules || []).map(m=>({id:m.id,title:m.title,
     lessons:(m.lessons || []).map(l=>({id:l.id,title:l.title,duration:l.duration}))}));
@@ -490,9 +714,8 @@ async function diagnostics(request,env) {
 }
 async function adminBookings(request,env) {
   await requireAdmin(request,env);
-  // La agenda existente sigue visible. Este Worker no crea ni cobra reservas.
-  const rows = await queryDocs(env,'turnos',null,null,500);
-  return {items:rows.map(x=>({...x.data,id:x.id})),environment:'existing',paymentsEnabled:false};
+  const rows=await queryDocs(env,'turnos',null,null,500);
+  return {items:rows.filter(x=>x.data.mode?x.data.mode===env.MP_ENV:isProduction(env)).map(x=>({...x.data,id:x.id})),environment:env.MP_ENV,paymentsEnabled:(await bookingSettings(env)).enabled===true};
 }
 async function bookingNote(request,env) {
   await requireAdmin(request,env);
@@ -506,13 +729,245 @@ async function bookingNote(request,env) {
   if (!(await commit(env,[patch])).response.ok) fail(409,'El turno cambió. Volvé a cargarlo.');
   return {saved:true};
 }
+// Reservas con seña: precios del catálogo, agenda privada y escrituras condicionales.
+const bookingSettingsPath = env => 'paymentConfig/bookings_'+env.MP_ENV;
+const bookingDayPath = (env,date) => 'bookingDays/'+env.MP_ENV+'_'+date;
+const bookingDefaults = () => ({enabled:false,percent:30,holdMinutes:20,serviceMinutes:{}});
+const clockMinutes = time => /^([01]\d|2[0-3]):[0-5]\d$/.test(time) ? Number(time.slice(0,2))*60+Number(time.slice(3)) : -1;
+const overlaps = (a,b) => a.start < b.end && b.start < a.end;
+async function bookingSettings(env) {
+  return {...bookingDefaults(),...(await dbGet(env,bookingSettingsPath(env)))?.data};
+}
+function durationMinutes(value) {
+  if (Number.isInteger(value) && value>=15 && value<=480) return value;
+  const s=String(value||'').trim().toLowerCase().replace(',','.');
+  const h=s.match(/^(\d+(?:\.\d+)?)\s*(?:h|hs|horas?)(?:\s*(\d+)\s*(?:min|m))?$/);
+  const m=s.match(/^(\d+)\s*(?:min|minutos?|m)$/);
+  const n=h?Number(h[1])*60+Number(h[2]||0):m?Number(m[1]):0;
+  return Number.isInteger(n)&&n>=15&&n<=480?n:0;
+}
+async function bookingServices(env,config) {
+  const [home,full]=await Promise.all([dbGet(env,'site/services'),dbGet(env,'site/services_page')]);
+  const services=new Map();
+  const add=(name,price,duration,aliases=[])=>{
+    if(typeof name!=='string'||!name.trim()||name.length>160)return;
+    let cents=0;try{cents=catalogPrice({price},'service');}catch{}
+    const existing=services.get(name);
+    const row={name,priceCents:cents,durationMinutes:durationMinutes(config.serviceMinutes?.[name])||durationMinutes(duration)||existing?.durationMinutes||0,aliases};
+    if(existing&&existing.priceCents!==cents)row.ambiguous=true;
+    services.set(name,{...existing,...row});
+  };
+  for(const s of home?.data.v||[])add(s.name,s.price,s.dur);
+  for(const c of full?.data.v?.cats||[])for(const s of c.items||[]) {
+    // El nombre actual es el que envían los chips. bookingKey solo conserva la duración al renombrar.
+    const duration=config.serviceMinutes?.[s.bookingKey]||s.durationMinutes||s.dur;
+    add(s.n,s.p,duration,s.bookingKey?[s.bookingKey]:[]);
+  }
+  return [...services.values()];
+}
+async function bookingSettingsApi(request,env) {
+  await requireAdmin(request,env);
+  let config=await bookingSettings(env);
+  if(request.method==='POST'){
+    const b=await readJson(request,30000);
+    if(typeof b.enabled!=='boolean'||!Number.isInteger(b.percent)||b.percent<1||b.percent>100||
+       !b.serviceMinutes||typeof b.serviceMinutes!=='object'||Array.isArray(b.serviceMinutes))
+      fail(400,'Elegí un porcentaje entre 1 y 100 y las duraciones de los servicios.');
+    const minutes={};
+    for(const [name,value] of Object.entries(b.serviceMinutes)){
+      if(name.length>160||!durationMinutes(value))fail(400,'Cada duración debe estar entre 15 y 480 minutos.');
+      minutes[name]=value;
+    }
+    config={...config,enabled:b.enabled,percent:b.percent,serviceMinutes:minutes,updatedAt:Date.now()};
+    const services=await bookingServices(env,config);
+    if(config.enabled&&!services.some(s=>s.priceCents>0&&s.durationMinutes&&!s.ambiguous))
+      fail(422,'Completá el precio y la duración de al menos un servicio antes de habilitar las señas.');
+    await saveDoc(env,bookingSettingsPath(env),config);
+  }
+  return {settings:config,services:await bookingServices(env,config),environment:env.MP_ENV};
+}
+const bookingScheduleDefaults=[
+  {day:'Lunes',times:['09:00','10:30','12:00','15:00','16:30']},
+  {day:'Martes',times:['09:00','10:30','14:00','15:30']},
+  {day:'Miércoles',times:['09:00','11:00','14:00','16:00']},
+  {day:'Jueves',times:['10:00','11:30','15:00','16:30']},
+  {day:'Viernes',times:['09:00','10:30','12:00','14:00']},
+  {day:'Sábado',times:['09:00','10:30','12:00']}
+];
+function bookingDate(date) {
+  if(typeof date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(date))fail(400,'Elegí una fecha válida.');
+  const stamp=Date.parse(date+'T00:00:00-03:00');
+  if(!Number.isFinite(stamp)||new Date(stamp).toISOString().slice(0,10)!==date||
+     stamp<Date.now()-86400000||stamp>Date.now()+180*86400000)fail(422,'Elegí una fecha próxima, dentro de los próximos seis meses.');
+  return stamp;
+}
+async function bookingQuote(env,user,body,requireTime=true) {
+  const config=await bookingSettings(env);
+  if(config.enabled!==true)fail(409,'Las reservas con seña todavía no están habilitadas. Contactá al estudio.');
+  const names=body.services;
+  if(!Array.isArray(names)||!names.length||names.length>8||names.some(x=>typeof x!=='string')||new Set(names).size!==names.length)
+    fail(400,'Elegí entre uno y ocho servicios diferentes.');
+  const catalog=await bookingServices(env,config);
+  let total=0,duration=0;
+  for(const name of names){
+    const service=catalog.find(s=>s.name===name);
+    if(!service||!service.priceCents||!service.durationMinutes||service.ambiguous)
+      fail(422,'El servicio '+String(name).slice(0,160)+' necesita un precio y una duración confirmados. Contactá al estudio.');
+    total+=service.priceCents;duration+=service.durationMinutes;
+  }
+  if(duration>480||total>1000000000)fail(422,'Esta combinación requiere coordinar el turno con el estudio.');
+  const date=body.date,stamp=bookingDate(date);
+  const scheduleDoc=await dbGet(env,'site/slots');
+  const schedule=scheduleDoc? (Array.isArray(scheduleDoc.data.v)?scheduleDoc.data.v:[]) : bookingScheduleDefaults;
+  const day=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][new Date(stamp).getUTCDay()];
+  const times=[...new Set(schedule.find(s=>s.day===day)?.times||[])].filter(t=>clockMinutes(t)>=0);
+  const start=clockMinutes(body.time||'');
+  if(requireTime&&(!times.includes(body.time)||stamp+start*60000<=Date.now()||start+duration>1440))
+    fail(422,'Ese horario no está disponible. Volvé a consultar la agenda.');
+  const deposit=Math.max(1,Math.round(total*config.percent/100));
+  return {kind:'booking',productId:'appointment',title:names.join(' + ').slice(0,200),
+    amountCents:deposit,totalCents:total,balanceCents:total-deposit,currency:'ARS',depositPercent:config.percent,
+    holdMinutes:config.holdMinutes,times,durationMinutes:duration,
+    booking:{date,time:body.time||'',services:names,start,end:start+duration,durationMinutes:duration}};
+}
+const activeReservations=(doc,now=Date.now())=>(doc?.data.reservations||[]).filter(r=>r.status==='confirmed'||r.expiresAt>now);
+async function legacyReservations(env,date) {
+  const [rows,taken,config]=await Promise.all([
+    queryDocs(env,'turnos','date',date),
+    isProduction(env)?dbGet(env,'site/taken'):null,bookingSettings(env)
+  ]);
+  const catalog=await bookingServices(env,config);
+  return [
+    ...rows.filter(x=>x.data.status!=='cancelled'&&(x.data.mode?x.data.mode===env.MP_ENV:isProduction(env)))
+      .map(x=>{const start=clockMinutes(x.data.time||'');const names=String(x.data.serv||'').split(' + ');
+        const inferred=names.every(n=>catalog.find(s=>s.name===n)?.durationMinutes)?names.reduce((sum,n)=>sum+catalog.find(s=>s.name===n).durationMinutes,0):0;
+        return {orderId:x.data.orderId||x.id,start,end:start+(durationMinutes(x.data.durationMinutes)||inferred||1440)};}),
+    ...(taken?.data.v?.[date]||[]).map(t=>({start:clockMinutes(t),end:clockMinutes(t)+1}))
+  ].filter(x=>x.start>=0);
+}
+async function availability(request,env) {
+  const user=await signedUser(request,env),body=await readJson(request);
+  const q=await bookingQuote(env,user,body,false),[day,legacy]=await Promise.all([
+    dbGet(env,bookingDayPath(env,q.booking.date)),legacyReservations(env,q.booking.date)]);
+  const busy=[...activeReservations(day),...legacy],stamp=bookingDate(q.booking.date);
+  return {times:q.times.filter(time=>{
+    const start=clockMinutes(time);return start+q.durationMinutes<=1440&&stamp+start*60000>Date.now()&&
+      !busy.some(r=>overlaps({start,end:start+q.durationMinutes},r));
+  }),durationMinutes:q.durationMinutes,depositPercent:q.depositPercent};
+}
+function sameBooking(a,b) {
+  return a.date===b.date&&a.time===b.time&&JSON.stringify(a.services)===JSON.stringify(b.services)&&
+    a.name===b.name&&a.tel===b.tel&&a.msg===b.msg;
+}
+async function reserveBooking(env,order) {
+  for(let attempt=0;attempt<4;attempt++){
+    const path=bookingDayPath(env,order.booking.date),limitPath='bookingLimits/'+env.MP_ENV+'_'+order.uid;
+    const [day,limit,legacy]=await Promise.all([dbGet(env,path),dbGet(env,limitPath),legacyReservations(env,order.booking.date)]);
+    const holds=activeReservations(day),recent=(limit?.data.recent||[]).filter(t=>t>Date.now()-60000);
+    if(recent.length>=3)fail(429,'Esperá un minuto antes de iniciar otra reserva.');
+    if(holds.length>=150||[...holds,...legacy].some(r=>r.orderId!==order.id&&overlaps(order.booking,r)))
+      fail(409,'Otra persona tomó ese horario. Elegí otro antes de pagar.');
+    holds.push({orderId:order.id,start:order.booking.start,end:order.booking.end,status:'held',expiresAt:order.expiresAt});
+    const result=await commit(env,[
+      writeDoc(env,'orders/'+order.id,order,null),
+      writeDoc(env,path,{reservations:holds},day),
+      writeDoc(env,limitPath,{recent:[...recent,Date.now()]},limit)
+    ]);
+    if(result.response.ok)return;
+    if(!['ABORTED','ALREADY_EXISTS','FAILED_PRECONDITION'].includes(result.body.error?.status))fail(503,'No se pudo reservar el horario. Volvé a intentar.');
+  }
+  fail(409,'La agenda está cambiando. Consultá nuevamente los horarios.');
+}
+async function bookingPaymentWrites(env,order,next,approved,previouslyApproved) {
+  const path=bookingDayPath(env,order.booking.date),[day,turno,legacy]=await Promise.all([
+    dbGet(env,path),dbGet(env,'turnos/'+order.id),legacyReservations(env,order.booking.date)]);
+  const holds=activeReservations(day).filter(r=>r.orderId!==order.id);
+  if(approved){
+    const conflict=[...holds,...legacy].some(r=>r.orderId!==order.id&&overlaps(order.booking,r));
+    const late=Date.parse(order.booking.date+'T00:00:00-03:00')+order.booking.start*60000<=Date.now();
+    if(order.bookingCancelledAt||conflict||late){
+      next.status='review';next.bookingStatus='review';next.issue='Pago recibido; el horario requiere revisión del estudio. No vuelvas a pagar.';
+      return [writeDoc(env,path,{reservations:holds},day)];
+    }
+    next.bookingStatus='confirmed';
+    holds.push({orderId:order.id,start:order.booking.start,end:order.booking.end,status:'confirmed',expiresAt:order.expiresAt});
+    const b=order.booking;
+    return [writeDoc(env,path,{reservations:holds},day),writeDoc(env,'turnos/'+order.id,{
+      ...(turno?.data||{}),id:order.id,orderId:order.id,uid:order.uid,email:order.email,name:b.name,tel:b.tel,msg:b.msg,
+      serv:b.services.join(' + '),date:b.date,time:b.time,durationMinutes:b.durationMinutes,
+      status:turno?.data.status==='done'?'done':'confirmed',paymentStatus:'approved',amountCents:order.amountCents,
+      totalCents:order.totalCents,balanceCents:order.balanceCents,mode:env.MP_ENV,
+      createdAt:turno?.data.createdAt||Date.now(),ts:new Date().toISOString(),updatedAt:Date.now()
+    },turno)];
+  }
+  if(previouslyApproved){
+    next.bookingStatus='cancelled';
+    return [writeDoc(env,path,{reservations:holds},day),...(turno?[writeDoc(env,'turnos/'+order.id,{
+      ...turno.data,status:turno.data.status==='done'?'done':'cancelled',paymentStatus:next.status,updatedAt:Date.now()
+    },turno)]:[])];
+  }
+  return [];
+}
+async function bookingStatus(request,env) {
+  await requireAdmin(request,env);
+  const {orderId,status}=await readJson(request);
+  if(!/^[A-Za-z0-9_-]{1,128}$/.test(String(orderId))||!['confirmed','done','cancelled'].includes(status))
+    fail(400,'Estado de turno no válido.');
+  for(let i=0;i<4;i++){
+    const doc=await dbGet(env,'turnos/'+orderId);
+    if(!doc|| (doc.data.mode&&doc.data.mode!==env.MP_ENV))fail(404,'No encontramos ese turno en este ambiente.');
+    if(doc.data.orderId){
+      const order=await dbGet(env,'orders/'+doc.data.orderId);
+      if(!order||order.data.mode!==env.MP_ENV)fail(404,'No encontramos la reserva.');
+      if(status!=='cancelled'&&(doc.data.status==='cancelled'||order.data.status!=='approved'||!order.data.approvedPaymentIds?.length))
+        fail(409,'Solo se puede confirmar o atender un turno con seña aprobada. Una cancelación no se reactiva automáticamente.');
+      const path=bookingDayPath(env,doc.data.date),day=await dbGet(env,path);
+      const nextOrder={...order.data,bookingStatus:status,...(status==='cancelled'?{bookingCancelledAt:Date.now()}: {})};
+      const reservations=status==='cancelled'?activeReservations(day).filter(r=>r.orderId!==order.data.id):activeReservations(day);
+      const result=await commit(env,[writeDoc(env,'turnos/'+orderId,{...doc.data,status,updatedAt:Date.now()},doc),
+        writeDoc(env,'orders/'+order.data.id,nextOrder,order),writeDoc(env,path,{reservations},day)]);
+      if(result.response.ok)return {saved:true};
+    }else{
+      const result=await commit(env,[writeDoc(env,'turnos/'+orderId,{...doc.data,status},doc)]);
+      if(result.response.ok)return {saved:true};
+    }
+  }
+  fail(409,'El turno cambió. Volvé a cargarlo.');
+}
+
+
+
+async function accessAudit(request,env){
+  await requireAdmin(request,env);
+  const {email}=await readJson(request);
+  if(typeof email!=='string'||email.length>254||!email.includes('@'))fail(400,'Ingresá el email de la alumna.');
+  const users=await queryDocs(env,'users','email',email.trim()),accounts=[];
+  for(const u of users.slice(0,5)){
+    const [manual,paid,catalog]=await Promise.all([queryDocs(env,'products',null,null,500,'/manualAccess/'+u.id),queryDocs(env,'entitlements','uid',u.id),dbGet(env,'privateCatalog/courses')]);
+    accounts.push({email:u.data.email,courses:await Promise.all((catalog?.data.v||[]).map(async p=>{
+      const content=await dbGet(env,'digitalContent/'+keyOf('course',p.id));
+      const product=content?.data.product;
+      let cents=null;try{cents=catalogPrice(product||p,'course');}catch{}
+      const granted=manual.some(m=>m.data.active===true&&m.data.kind==='course'&&String(m.data.productId)===String(p.id));
+      const purchases=paid.filter(x=>x.data.active===true&&x.data.kind==='course'&&String(x.data.productId)===String(p.id));
+      return {id:String(p.id),title:p.title,priceCents:cents,reason:!product||product.locked?'locked':granted?'manual':purchases.some(x=>x.data.live===isProduction(env))?'purchase':cents===0?'free':'denied',testPurchases:purchases.filter(x=>x.data.live===false).length};
+    }))});
+  }
+  return {accounts,environment:env.MP_ENV};
+}
+
 function configurationReady(env) {
   return ['FIREBASE_PROJECT_ID','FIREBASE_API_KEY','FIREBASE_CLIENT_EMAIL','FIREBASE_PRIVATE_KEY',
     'MP_ACCESS_TOKEN','MP_WEBHOOK_SECRET','SITE_ORIGIN','WORKER_ORIGIN'].every(k=>!!env[k]) &&
     ['test','production'].includes(env.MP_ENV);
 }
 export default {
-  async fetch(request,env) {
+  async scheduled(_event,env,ctx) {
+    if (!configurationReady(env)) return;
+    const task = processSaleEmails(env).catch(error=>console.error('mira-pagos: revisión de avisos pendiente',error.name));
+    if (ctx?.waitUntil) ctx.waitUntil(task);else await task;
+  },
+  async fetch(request,env,ctx) {
     const url = new URL(request.url),origin = request.headers.get('Origin');
     const allowed = [env.SITE_ORIGIN,env.EXTRA_ORIGIN,env.DEV_ORIGIN].filter(Boolean);
     const headers = {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Vary':'Origin',
@@ -525,16 +980,24 @@ export default {
         'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type'}});
       if (url.pathname === '/health' && request.method === 'GET')
         return json({service:'mira-pagos',ready:configurationReady(env),mode:env.MP_ENV || 'unconfigured',
-          apiVersion:API_VERSION,scope:'digital'});
+          apiVersion:API_VERSION,scope:'digital-bookings',revision:'20261124-access-bookings',bookings:true});
       if (!configurationReady(env)) fail(503,'Los pagos todavía no están configurados.');
-      if (url.pathname === '/webhooks/mercadopago' && request.method === 'POST') return json(await webhook(request,env));
+      if (url.pathname === '/webhooks/mercadopago' && request.method === 'POST') return json(await webhook(request,env,ctx));
+      if (url.pathname === '/sale-email/settings' && ['GET','POST'].includes(request.method)) return json(await saleEmailSettingsApi(request,env));
+      if (url.pathname === '/sale-email/notices' && request.method === 'GET') return json(await listSaleEmails(request,env));
+      if (url.pathname === '/sale-email/test' && request.method === 'POST') return json(await testSaleEmail(request,env));
+      if (url.pathname === '/sale-email/retry' && request.method === 'POST') {
+        await requireAdmin(request,env);
+        const body = await readJson(request);
+        return json(body.id ? await sendSaleEmail(env,String(body.id),true) : await processSaleEmails(env));
+      }
       if (url.pathname === '/diagnostics' && request.method === 'GET') return json(await diagnostics(request,env));
       if (url.pathname === '/settings' && ['GET','POST'].includes(request.method)) return json(await settingsApi(request,env));
       if (url.pathname === '/catalog' && ['GET','POST'].includes(request.method)) return json(await catalogApi(request,env,url));
       if (url.pathname === '/checkout' && request.method === 'POST') return json(await createCheckout(request,env));
       if (url.pathname === '/quote' && request.method === 'POST') {
         const user = await signedUser(request,env),body = await readJson(request);
-        return json(await quoteFor(env,user,body.kind,body.productId));
+        return json(body.kind==='booking'?await bookingQuote(env,user,body):await quoteFor(env,user,body.kind,body.productId));
       }
       if (url.pathname === '/access' && request.method === 'POST') return json(await accessProduct(request,env));
       if (url.pathname === '/my-access' && request.method === 'GET') return json(await accessList(request,env));
@@ -546,14 +1009,18 @@ export default {
         return json((await userOrder(request,env,url.searchParams.get('id'))).order);
       if (url.pathname === '/verify-order' && request.method === 'POST') {
         const body = await readJson(request);
-        return json(await userOrder(request,env,body.orderId,true,body.paymentId));
+        return json(await userOrder(request,env,body.orderId,true,body.paymentId,ctx));
       }
       const match = url.pathname.match(/^\/orders\/([0-9a-f-]+)(\/verify)?$/i);
       if (match && validOrder(match[1]) && request.method === (match[2] ? 'POST':'GET')) {
         const body = match[2] ? await readJson(request) : {};
-        return json(await userOrder(request,env,match[1],!!match[2],body.paymentId));
+        return json(await userOrder(request,env,match[1],!!match[2],body.paymentId,ctx));
       }
-      if (['/availability','/booking-status','/grant'].includes(url.pathname)) {
+      if(url.pathname==='/booking-settings'&&['GET','POST'].includes(request.method))return json(await bookingSettingsApi(request,env));
+      if(url.pathname==='/availability'&&request.method==='POST')return json(await availability(request,env));
+      if(url.pathname==='/booking-status'&&request.method==='POST')return json(await bookingStatus(request,env));
+      if(url.pathname==='/access-audit'&&request.method==='POST')return json(await accessAudit(request,env));
+      if (['/grant'].includes(url.pathname)) {
         await signedUser(request,env);
         fail(422,url.pathname === '/grant' ? 'Asigná el acceso desde Alumnas → Accesos.':'Las reservas con seña todavía no están habilitadas. Contactá al estudio.');
       }

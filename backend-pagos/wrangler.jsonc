@@ -9,6 +9,12 @@
     "WORKER_ORIGIN": "https://mira-pagos.estudiosmira.workers.dev",
     "FIREBASE_PROJECT_ID": "mira-estudio",
     "FIREBASE_API_KEY": "AIzaSyC-8ZrZjzooLkBFt-thbzRVbKpPd1nMj1E",
-    "MP_ENV": "test"
+    "MP_ENV": "production",
+    "SALE_EMAIL_FROM": "Mira Estudio <ventas@avisos.mirastudiotb.com>"
+  },
+  "triggers": {
+    "crons": [
+      "*/10 * * * *"
+    ]
   }
 }

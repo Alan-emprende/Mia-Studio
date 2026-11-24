@@ -1,33 +1,26 @@
-# Backend de pagos digitales
+# Pagos y reservas de Mira Estudio
 
-Entrada de Cloudflare: worker.mjs. Para pegar en el editor del dashboard, worker-cloudflare.txt es una copia idéntica.
+Worker único de Cloudflare, compatible con la web estática de GitHub Pages. Se conservan Firebase Auth, Firestore y los avisos por Resend.
 
-Este servidor usa el contrato de la web vigente: /quote, /checkout, /access, /my-access, /order, /orders, /verify-order, /catalog, /settings y endpoints de administración. Confirma pagos firmados por /webhooks/mercadopago y acredita documentos planos en entitlements, compatibles con las reglas y las reseñas.
+- Cursos y ebooks: precios obtenidos en el servidor, órdenes verificadas contra Mercado Pago y permisos separados entre pruebas y producción.
+- Reservas: seña inicial del 30% editable desde el panel; horarios apartados durante 20 minutos; confirmación del turno y saldo tras verificar el pago.
+- Agenda: validación de duración y escrituras con precondición para impedir superposiciones. Pagos tardíos que encuentran un horario ocupado quedan en revisión.
+- Archivos: autorización del curso antes de abrir o descargar; el administrador puede cargar los enlaces que faltan.
+- Avisos: cola persistente de Resend, destino de administración fijo y cron cada diez minutos. Los fallos de correo no impiden acreditar el pago.
 
-Las credenciales se cargan en Cloudflare, nunca en archivos públicos:
+## Publicación
 
-Variables: SITE_ORIGIN, EXTRA_ORIGIN, WORKER_ORIGIN, FIREBASE_PROJECT_ID, FIREBASE_API_KEY, MP_ENV.
+Seguir [PUBLICAR-CORRECCIONES.md](../PUBLICAR-CORRECCIONES.md). Actualizar primero Cloudflare con worker-cloudflare.txt y después incorporar los cambios de la web.
 
-Secretos: MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY.
+La revisión esperada de /health es `20261124-access-bookings`. El valor ready comprueba la presencia de configuración; las conexiones reales se revisan desde el panel.
 
-La autenticación administrativa usa el email verificado estudiosmira@gmail.com. Los roles del perfil y localStorage no autorizan pagos ni contenido.
+Se conservan los secretos existentes: MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY y RESEND_API_KEY. Nunca deben incluirse en GitHub.
 
-MP_ENV acepta test o production. Checkout Pro actual usa init_point con una cuenta vendedora de prueba para probar. El servidor comprueba la etiqueta test_user de la cuenta consultada en /users/me antes de crear un checkout en test.
+Las reglas actuales de Firestore mantienen las órdenes, pagos, reservas y la agenda privada con escritura exclusiva del backend. No hace falta abrir permisos del navegador.
 
-No se implementan cobros de turnos ni envío de emails. Se conserva la lectura de la agenda existente y la edición de notas de atención.
+## Validación
 
-La configuración habilitada/deshabilitada se guarda separada por ambiente en paymentConfig/digital_test y paymentConfig/digital_production. Comienza deshabilitada.
+    node --test backend-pagos/worker.test.mjs backend-pagos/client.test.mjs backend-pagos/resources.test.mjs
 
-Sigue ../PUBLICAR-PAGOS.md para publicar y comprobar una compra completa. Ejecutá node --test backend-pagos/worker.test.mjs backend-pagos/client.test.mjs desde la raíz para las pruebas locales.
+Las pruebas usan servicios simulados y no crean cobros ni correos reales. Después de publicar se debe comprobar la cuenta afectada, un recurso real y el flujo de reserva con un ambiente de prueba o una operación real expresamente acordada.
 
-No desplegar las reglas antiguas del historial de GitHub. firestore.rules en esta actualización replica las reglas que ya estaban publicadas y fueron proporcionadas por la dueña el 13/11/2026.
-
-## Límites actuales
-
-El historial devuelve hasta 100 órdenes de una consulta acotada a 500 por cuenta (o 500 globales para administración). Los permisos por usuaria y la agenda también se consultan con límite 500. Ante una cuenta que supere ese volumen se debe agregar paginación.
-
-La verificación manual consulta hasta tres pagos por orden. El webhook procesa cada pago por su identificador y guarda con precondiciones para evitar actualizaciones atrasadas.
-
-Los accesos digitales confirmados se devuelven solo por la API autenticada. Las reglas de lectura directa de digitalContent continúan habilitando exclusivamente a administradora o alumnas con autorización manual. Las reglas no deben abrirse para el Worker.
-
-Los enlaces de archivos y videos autorizados son visibles para quien compró; este cambio no añade DRM ni alojamiento de archivos con firma temporal.

@@ -7,7 +7,7 @@ const {default:worker,catalogPrice,encodeValue,decodeValue,validatePayment,verif
 const base='https://mira-pagos.example.workers.dev',site='https://mirastudiotb.com';
 const orderId='a25c7ecf-27ae-4658-813b-2c3eac277b82';
 const user={uid:'alumna-1',email:'alumna@example.test'},admin={uid:'duena-1',email:'estudiosmira@gmail.com'};
-let env,docs,version,payments,preferenceBody,accountVerified,conflictOnce,failCommit,unknownFetches,preferenceCount,accountIsTest,tokenSeq=0;
+let env,docs,version,payments,preferenceBody,accountVerified,conflictOnce,failCommit,unknownFetches,preferenceCount,accountIsTest,tokenSeq=0,mailRequests,mailMode,acceptedMail,mailFinalizeFailure,mailGate;
 const realFetch=globalThis.fetch;
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
 const fields=o=>encodeValue(o).mapValue.fields;
@@ -56,16 +56,30 @@ before(async()=>{
       const id=url.pathname.match(/^\/v1\/payments\/(\d+)$/)?.[1];
       if(id)return payments.has(id)?json(payments.get(id)):json({error:'not found'},404);
     }
+
+    if(url.hostname==='api.resend.com'&&url.pathname==='/emails'){
+      const key=options.headers['Idempotency-Key'];mailRequests.push({key,body:structuredClone(body)});
+      if(mailGate)await mailGate;
+      if(mailMode==='503')return json({message:'temporary'},503);
+      if(mailMode==='403')return json({message:'not verified'},403);
+      if(!acceptedMail.has(key))acceptedMail.set(key,{id:'mail-'+(acceptedMail.size+1),body:structuredClone(body)});
+      else if(JSON.stringify(acceptedMail.get(key).body)!==JSON.stringify(body))return json({message:'payload changed'},409);
+      if(mailMode==='timeoutAfterAccept')throw Error('Timeout simulado');
+      return json({id:acceptedMail.get(key).id});
+    }
+
     if(url.hostname==='firestore.googleapis.com'){
       const suffix=decodeURIComponent(url.pathname).split('/documents')[1];
       if(suffix.endsWith(':runQuery')){
         const parent=suffix.slice(0,-9).replace(/^\//,''),q=body.structuredQuery;
         const collection=(parent?parent+'/':'')+q.from[0].collectionId+'/';
         let rows=[...docs.entries()].filter(([path])=>path.startsWith(collection)&&!path.slice(collection.length).includes('/'));
-        if(q.where){const f=q.where.fieldFilter;rows=rows.filter(([,doc])=>doc.data[f.field.fieldPath]===decodeValue(f.value));}
+        if(q.where){const f=q.where.fieldFilter;rows=rows.filter(([,doc])=>f.op==='LESS_THAN_OR_EQUAL'?typeof doc.data[f.field.fieldPath]==='number'&&doc.data[f.field.fieldPath]<=decodeValue(f.value):doc.data[f.field.fieldPath]===decodeValue(f.value));}
+        if(q.orderBy){const f=q.orderBy[0].field.fieldPath;rows.sort((a,b)=>(b[1].data[f]||0)-(a[1].data[f]||0));}
         return json(rows.slice(0,q.limit||500).map(([path,doc])=>({document:{name:name(path),fields:fields(doc.data),updateTime:doc.updateTime}})));
       }
       if(suffix===':commit'){
+        if(mailFinalizeFailure&&body.writes.length===1&&body.writes[0].update?.name.includes('/saleEmailOutbox_')&&plain(body.writes[0].update.fields).status==='sent'){mailFinalizeFailure=false;return json({error:{status:'UNAVAILABLE'}},503);}
         if(failCommit)return json({error:{status:'UNAVAILABLE'}},503);
         if(conflictOnce){conflictOnce=false;return json({error:{status:'FAILED_PRECONDITION'}},400);}
         for(const w of body.writes){
@@ -89,6 +103,7 @@ before(async()=>{
 });
 after(()=>{globalThis.fetch=realFetch;});
 beforeEach(()=>{
+  mailRequests=[];mailMode='ok';acceptedMail=new Map();mailFinalizeFailure=false;mailGate=null;delete env.RESEND_API_KEY;delete env.SALE_EMAIL_FROM;
   docs=new Map();payments=new Map();version=0;preferenceBody=null;preferenceCount=0;accountVerified=true;conflictOnce=false;failCommit=false;unknownFetches=[];env.MP_ENV='test';accountIsTest=true;env.MP_ACCESS_TOKEN='APP_USR_fake_'+(++tokenSeq);
   const course={id:1,title:'Curso de prueba',price:'$19.900',locked:false,modules:[{id:1,title:'Módulo',lessons:[{id:1,title:'Clase',videoUrl:'https://private.test/video'}]}]};
   const ebook={id:'eb1',title:'Ebook',price:'$9.900',paid:true,downloadLink:'https://private.test/ebook.pdf'};
@@ -289,13 +304,14 @@ test('guardado concurrente o incompleto no publica un catálogo distinto del pri
   assert.equal(docs.get('site/courses').data.v[0].id,1);
   assert.equal((await call('/catalog',{type:'courses',items:[{id:1,_public:true}]},'admin-token')).status,400);
 });
-test('agenda conserva la ficha de atención y no acepta cobrar señas',async()=>{
+test('agenda conserva la ficha de atención anterior y exige habilitar las señas',async()=>{
+  env.MP_ENV='production';
   put('turnos/123',{nombre:'Clienta',fecha:'2026-11-20',atencion:'Antes'});
   assert.equal((await call('/admin-bookings',undefined,'admin-token')).data.items.length,1);
   assert.equal((await call('/booking-note',{orderId:'123',note:'Después'},'admin-token')).status,200);
   assert.equal(docs.get('turnos/123').data.atencion,'Después');
-  assert.equal((await call('/availability',{date:'2026-11-20',services:['x']})).status,422);
-  assert.equal((await call('/quote',{kind:'booking',productId:'x'})).status,400);
+  assert.equal((await call('/availability',{date:'2026-11-20',services:['x']})).status,409);
+  assert.equal((await call('/quote',{kind:'booking',productId:'x'})).status,409);
 });
 test('solo acepta dominios oficiales de checkout y el origen configurado',async()=>{
   for(const host of ['www.mercadopago.com.ar','sandbox.mercadopago.com.ar','www.mercadopago.com','sandbox.mercadopago.com'])
@@ -336,3 +352,357 @@ test('rechaza identificadores faltantes y rutas ajenas',async()=>{
   assert.equal((await call('/quote',{kind:'course'})).status,400);
   assert.equal((await call('/catalog',{type:'courses',items:[null]},'admin-token')).status,400);
 });
+
+
+test('un pago rechazado por validación indica todas las diferencias sin exponer identidades',()=>{
+  assert.throws(()=>validatePayment(payment({
+    transaction_amount:1,currency_id:'USD',live_mode:true,collector_id:9999,
+    metadata:{mira_uid:'cuenta-privada-ajena',mira_order_id:orderId,product_type:'course',product_id:'1'}
+  }),order(),env,'1234'),error=>{
+    assert.equal(error.status,422);
+    for(const label of ['importe','moneda','cuenta vendedora actual','asociación de la cuenta','live_mode=true; esperado=false'])
+      assert.ok(error.message.includes(label),label);
+    assert.equal(error.message.includes('cuenta-privada-ajena'),false);
+    assert.equal(error.message.includes('fake-test-secret'),false);
+    return true;
+  });
+});
+
+test('una cuenta real no acredita una compra de prueba aunque el navegador diga que es de prueba',async()=>{
+  accountIsTest=false;
+  put('orders/'+orderId,order());payments.set('9876',payment({live_mode:true}));
+  const result=await call('/verify-order',{orderId,paymentId:'9876',testAccount:true,seller:{testAccount:true,id:'1234'}});
+  assert.equal(result.status,503);
+  assert.equal(docs.has(entPath()),false);
+  assert.equal(docs.get('orders/'+orderId).data.status,'created');
+});
+test('recupera el pago con saldo de cuenta de prueba y live_mode true sin crear otro checkout',async()=>{
+  put('orders/'+orderId,order());
+  payments.set('9876',payment({live_mode:true,payment_method_id:'account_money',payment_type_id:'account_money'}));
+  const result=await call('/verify-order',{orderId,paymentId:'9876'});
+  assert.equal(result.status,200);assert.equal(result.data.order.status,'approved');assert.equal(result.data.hasAccess,true);
+  assert.equal(preferenceCount,0);
+  const entitlement=docs.get(entPath()).data;
+  assert.equal(entitlement.active,true);assert.equal(entitlement.live,false);
+  assert.equal(entitlement.providerLiveMode,true);assert.equal(entitlement.sellerTestAccount,true);
+  assert.equal(docs.get('payments/9876').data.live,false);
+  assert.equal((await call('/access',{kind:'course',productId:'1'})).status,200);
+  assert.equal((await worker.fetch(await signedWebhook(payment()),env)).status,200);
+  assert.equal([...docs.keys()].filter(k=>k.startsWith('entitlements/')).length,1);
+  env.MP_ENV='production';
+  assert.equal((await call('/access',{kind:'course',productId:'1'})).status,403);
+  assert.deepEqual((await call('/my-access')).data,[]);
+});
+test('live_mode true sin evidencia de cuenta de prueba no flexibiliza la validación',()=>{
+  const p=payment({live_mode:true});
+  for(const seller of [undefined,{id:'1234',mode:'test',testAccount:false},{id:'9999',mode:'test',testAccount:true},
+    {id:'1234',mode:'production',testAccount:true}])
+    assert.throws(()=>validatePayment(p,order(),env,'1234',seller));
+  assert.equal(validatePayment(p,order(),env,'1234',{id:'1234',mode:'test',testAccount:true}),true);
+});
+test('una cuenta de prueba verificada sigue requiriendo importe, moneda, vendedor e identidad correctos',async()=>{
+  put('orders/'+orderId,order());
+  for(const patch of [{transaction_amount:1},{currency_id:'USD'},{collector_id:9999},{metadata:{}},{live_mode:'true'}]){
+    payments.set('9876',payment({live_mode:true,...patch}));
+    assert.equal((await call('/verify-order',{orderId,paymentId:'9876'})).status,422);
+    assert.equal(docs.has(entPath()),false);
+  }
+});
+test('devolver un pago de cuenta de prueba con live_mode true revoca el acceso y no lo reactiva un evento viejo',async()=>{
+  put('orders/'+orderId,order());payments.set('9876',payment({live_mode:true}));
+  await call('/verify-order',{orderId,paymentId:'9876'});
+  payments.set('9876',payment({live_mode:true,status:'refunded',transaction_amount_refunded:19900,date_last_updated:'2026-11-16T18:00:00Z'}));
+  assert.equal((await worker.fetch(await signedWebhook(payment()),env)).status,200);
+  assert.equal(docs.get(entPath()).data.active,false);assert.equal(docs.get(entPath()).data.live,false);
+  payments.set('9876',payment({live_mode:true}));
+  await worker.fetch(await signedWebhook(payment()),env);
+  assert.equal(docs.get(entPath()).data.active,false);
+});
+test('producción no acepta un indicador de sandbox ni una cuenta vendedora de prueba',async()=>{
+  env.MP_ENV='production';accountIsTest=false;
+  put('orders/'+orderId,order({mode:'production'}));payments.set('9876',payment({live_mode:false}));
+  assert.equal((await call('/verify-order',{orderId,paymentId:'9876'})).status,422);
+  accountIsTest=true;env.MP_ACCESS_TOKEN='APP_USR_otra_cuenta_de_prueba';
+  payments.set('9876',payment({live_mode:true}));
+  assert.equal((await call('/verify-order',{orderId,paymentId:'9876'})).status,503);
+  assert.equal(docs.has(entPath()),false);
+});
+
+
+function configureSaleEmails(mode='test',includeTests=true){
+  env.MP_ENV=mode;accountIsTest=mode==='test';
+  env.RESEND_API_KEY='re_fake_mail_key';
+  env.SALE_EMAIL_FROM='Mira Estudio <ventas@avisos.example.test>';
+  put('paymentConfig/saleEmails_'+mode,{enabled:true,includeTests});
+}
+const noticePath=()=> 'saleEmailOutbox_'+env.MP_ENV+'/sale_'+orderId;
+
+test('un pago confirmado crea un solo aviso para la dueña, con precio e identidad del servidor',async()=>{
+  configureSaleEmails();put('orders/'+orderId,order());payments.set('9876',payment());
+  const verified=await call('/verify-order',{orderId,paymentId:'9876',to:'ajena@example.test'});
+  assert.equal(verified.status,200);assert.equal(verified.data.hasAccess,true);
+  assert.equal(mailRequests.length,1);
+  const message=mailRequests[0];
+  assert.deepEqual(message.body.to,[admin.email]);
+  assert.match(message.body.text,/Curso de prueba/);assert.match(message.body.text,/19\.900/);
+  assert.match(message.body.text,/alumna@example\.test/);assert.match(message.body.subject,/\[PRUEBA\]/);
+  assert.equal(message.body.cc,undefined);assert.equal(message.body.bcc,undefined);
+  assert.equal(docs.get(noticePath()).data.status,'sent');
+  await worker.fetch(await signedWebhook(payment()),env);
+  await call('/verify-order',{orderId,paymentId:'9876'});
+  assert.equal(mailRequests.length,1);
+});
+test('producción envía el aviso sin etiqueta de prueba y no mezcla las colas',async()=>{
+  configureSaleEmails('production',false);
+  put('orders/'+orderId,order({mode:'production'}));payments.set('9876',payment({live_mode:true}));
+  assert.equal((await call('/verify-order',{orderId,paymentId:'9876'})).status,200);
+  assert.equal(mailRequests.length,1);assert.doesNotMatch(mailRequests[0].body.subject,/\[PRUEBA\]/);
+  assert.equal(docs.has('saleEmailOutbox_test/sale_'+orderId),false);
+  const listed=await call('/sale-email/notices',undefined,'admin-token');
+  assert.equal(listed.data.length,1);assert.equal(listed.data[0].status,'sent');
+  assert.equal(JSON.stringify(listed.data).includes('re_fake_mail_key'),false);
+  assert.equal(JSON.stringify(listed.data).includes('payload'),false);
+});
+test('no avisa pagos pendientes, rechazados ni pagos que no coinciden',async()=>{
+  configureSaleEmails();
+  for(const patch of [{status:'pending'},{status:'rejected'},{transaction_amount:1}]){
+    put('orders/'+orderId,order());payments.set('9876',payment(patch));
+    await call('/verify-order',{orderId,paymentId:'9876'});
+  }
+  assert.equal(mailRequests.length,0);
+});
+test('avisos apagados o compras de prueba excluidas no envían correos',async()=>{
+  configureSaleEmails('test',false);put('orders/'+orderId,order());payments.set('9876',payment());
+  await call('/verify-order',{orderId,paymentId:'9876'});
+  assert.equal(mailRequests.length,0);
+  assert.equal(docs.has(noticePath()),false);
+  put('paymentConfig/saleEmails_test',{enabled:true,includeTests:true});
+  await call('/verify-order',{orderId,paymentId:'9876'});
+  assert.equal(mailRequests.length,0); // No manda avisos retroactivos al habilitar.
+});
+test('una falla de Resend deja el aviso pendiente y conserva el acceso de la compradora',async()=>{
+  configureSaleEmails();mailMode='503';put('orders/'+orderId,order());payments.set('9876',payment());
+  const result=await call('/verify-order',{orderId,paymentId:'9876'});
+  assert.equal(result.status,200);assert.equal(result.data.hasAccess,true);
+  assert.equal(docs.get(noticePath()).data.status,'failed');
+  assert.equal((await call('/access',{kind:'course',productId:'1'})).status,200);
+  mailMode='ok';
+  const retried=await call('/sale-email/retry',{id:'sale_'+orderId},'admin-token');
+  assert.equal(retried.data.status,'sent');assert.equal(mailRequests.length,2);
+  assert.equal(mailRequests[0].key,mailRequests[1].key);
+  assert.deepEqual(mailRequests[0].body,mailRequests[1].body);
+});
+test('timeout después de aceptar no duplica el correo y conserva su contenido al reintentar',async()=>{
+  configureSaleEmails();mailMode='timeoutAfterAccept';put('orders/'+orderId,order());payments.set('9876',payment());
+  await call('/verify-order',{orderId,paymentId:'9876'});
+  assert.equal(acceptedMail.size,1);assert.equal(docs.get(noticePath()).data.status,'failed');
+  mailMode='ok';env.SALE_EMAIL_FROM='Otro nombre <otro@avisos.example.test>';
+  await call('/sale-email/retry',{id:'sale_'+orderId},'admin-token');
+  assert.equal(acceptedMail.size,1);assert.deepEqual(mailRequests[0].body,mailRequests[1].body);
+  assert.equal(docs.get(noticePath()).data.status,'sent');
+});
+test('un envío aceptado cuyo guardado falló se recupera sin repetir el correo',async()=>{
+  configureSaleEmails();mailFinalizeFailure=true;put('orders/'+orderId,order());payments.set('9876',payment());
+  await call('/verify-order',{orderId,paymentId:'9876'});
+  assert.equal(docs.get(noticePath()).data.status,'sending');assert.equal(acceptedMail.size,1);
+  const pending=docs.get(noticePath()).data;
+  put(noticePath(),{...pending,leaseUntil:Date.now()-1,nextAttemptAt:Date.now()-1});
+  await call('/sale-email/retry',{id:'sale_'+orderId},'admin-token');
+  assert.equal(acceptedMail.size,1);assert.equal(docs.get(noticePath()).data.status,'sent');
+});
+test('no reenvía automáticamente fuera de la ventana de idempotencia',async()=>{
+  configureSaleEmails();mailMode='timeoutAfterAccept';put('orders/'+orderId,order());payments.set('9876',payment());
+  await call('/verify-order',{orderId,paymentId:'9876'});
+  put(noticePath(),{...docs.get(noticePath()).data,firstAttemptAt:Date.now()-24*60*60*1000,nextAttemptAt:Date.now()-1});
+  mailMode='ok';const result=await call('/sale-email/retry',{id:'sale_'+orderId},'admin-token');
+  assert.equal(result.data.status,'review');assert.equal(mailRequests.length,1);
+  await worker.scheduled({},env);
+  assert.equal(mailRequests.length,1);
+});
+test('una devolución antes del reintento cancela el aviso pendiente',async()=>{
+  configureSaleEmails();mailMode='503';put('orders/'+orderId,order());payments.set('9876',payment());
+  await call('/verify-order',{orderId,paymentId:'9876'});
+  mailMode='ok';payments.set('9876',payment({status:'refunded',transaction_amount_refunded:19900,date_last_updated:'2026-11-16T20:00:00Z'}));
+  await call('/verify-order',{orderId,paymentId:'9876'});
+  const result=await call('/sale-email/retry',{id:'sale_'+orderId},'admin-token');
+  assert.equal(result.data.status,'cancelled');assert.equal(mailRequests.length,1);
+  assert.equal(docs.get(entPath()).data.active,false);
+});
+test('el evento programado recupera avisos vencidos y no procesa la cola de otro ambiente',async()=>{
+  configureSaleEmails();mailMode='503';put('orders/'+orderId,order());payments.set('9876',payment());
+  await call('/verify-order',{orderId,paymentId:'9876'});
+  const queued=docs.get(noticePath()).data;
+  put(noticePath(),{...queued,nextAttemptAt:Date.now()-1});
+  put('saleEmailOutbox_production/sale_'+orderId,{...queued,mode:'production',nextAttemptAt:Date.now()-1});
+  mailMode='ok';await worker.scheduled({},env);
+  assert.equal(docs.get(noticePath()).data.status,'sent');
+  assert.equal(docs.get('saleEmailOutbox_production/sale_'+orderId).data.status,'failed');
+  assert.equal(mailRequests.length,2);
+});
+test('los reintentos concurrentes usan una sola reserva de envío',async()=>{
+  configureSaleEmails();mailMode='503';put('orders/'+orderId,order());payments.set('9876',payment());
+  await call('/verify-order',{orderId,paymentId:'9876'});
+  mailMode='ok';const before=mailRequests.length;
+  await Promise.all([call('/sale-email/retry',{id:'sale_'+orderId},'admin-token'),call('/sale-email/retry',{id:'sale_'+orderId},'admin-token')]);
+  assert.equal(mailRequests.length,before+1);
+  assert.equal(docs.get(noticePath()).data.status,'sent');
+});
+test('solo la administradora verificada configura, prueba o reintenta avisos',async()=>{
+  configureSaleEmails();
+  for(const [path,body] of [['/sale-email/settings',undefined],['/sale-email/settings',{enabled:true,includeTests:true}],
+    ['/sale-email/notices',undefined],['/sale-email/test',{requestId:orderId}],['/sale-email/retry',{}]])
+    assert.equal((await call(path,body)).status,403);
+  assert.equal(mailRequests.length,0);
+  accountVerified=false;
+  assert.equal((await call('/sale-email/test',{requestId:orderId},'admin-token')).status,403);
+});
+test('el correo de prueba usa un destino fijo y puede probarse sin habilitar ventas',async()=>{
+  env.MP_ENV='production';env.RESEND_API_KEY='re_fake_mail_key';
+  const a=await call('/sale-email/test',{requestId:orderId,to:'ajena@example.test',from:'otra@example.test'},'admin-token');
+  const b=await call('/sale-email/test',{requestId:orderId},'admin-token');
+  assert.equal(a.data.status,'sent');assert.equal(b.data.status,'sent');assert.equal(mailRequests.length,1);
+  assert.deepEqual(mailRequests[0].body.to,[admin.email]);
+  assert.match(mailRequests[0].body.from,/@resend\.dev>/);assert.match(mailRequests[0].body.text,/No representa una compra/);
+  assert.equal(docs.has('orders/'+orderId),false);
+  assert.equal((await call('/sale-email/settings',{enabled:true,includeTests:false},'admin-token')).status,422);
+});
+test('la configuración no revela la clave y exige remitente válido para activar ventas reales',async()=>{
+  env.MP_ENV='production';
+  assert.equal((await call('/sale-email/settings',{enabled:true,includeTests:false},'admin-token')).status,422);
+  env.RESEND_API_KEY='re_fake_mail_key';env.SALE_EMAIL_FROM='Mira <ventas@avisos.example.test>';
+  const result=await call('/sale-email/settings',{enabled:true,includeTests:false},'admin-token');
+  assert.equal(result.data.enabled,true);assert.equal(JSON.stringify(result.data).includes('re_fake_mail_key'),false);
+  env.SALE_EMAIL_FROM='Mira\r\nBcc: otra@example.test';
+  assert.equal((await call('/sale-email/settings',undefined,'admin-token')).status,422);
+});
+test('la confirmación de pago responde aunque el envío de correo siga en segundo plano',async()=>{
+  configureSaleEmails();put('orders/'+orderId,order());payments.set('9876',payment());
+  let release;mailGate=new Promise(resolve=>{release=resolve;});
+  const pending=[];
+  try{
+    const response=await worker.fetch(request('/verify-order',{orderId,paymentId:'9876'}),env,{waitUntil:task=>pending.push(task)});
+    assert.equal(response.status,200);assert.equal(docs.get(entPath()).data.active,true);
+    assert.equal(pending.length,1);
+  }finally{release();}
+  await Promise.all(pending);
+  assert.equal(docs.get(noticePath()).data.status,'sent');
+});
+
+function bookingFixture(){
+  const date=new Date(Date.now()+3*86400000).toISOString().slice(0,10);
+  const day=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][new Date(date+'T00:00:00-03:00').getUTCDay()];
+  put('site/services',{v:[{name:'Clásicas',price:'$60.000',dur:'2 h'}]});
+  put('site/services_page',{v:{cats:[]}});
+  put('site/slots',{v:[{day,times:['09:00','10:00','11:00','12:00']}]});
+  put('paymentConfig/bookings_test',{enabled:true,percent:30,holdMinutes:20,serviceMinutes:{}});
+  return {kind:'booking',services:['Clásicas'],date,time:'09:00',name:'Alumna',tel:'+541122334455',msg:'',
+    requestId:orderId,acceptedAmountCents:1800000,acceptedTotalCents:6000000};
+}
+const bookingPayment=patch=>payment({transaction_amount:18000,metadata:{mira_uid:user.uid,mira_order_id:orderId,product_type:'booking',product_id:'appointment'},...patch});
+
+test('un precio visible de 60.000 no queda gratis por un priceArs cero residual',async()=>{
+  const p=docs.get('digitalContent/course_1').data.product;p.price='$60.000';p.priceArs=0;
+  assert.equal(catalogPrice(p,'course'),6000000);
+  const access=await call('/access',{kind:'course',productId:'1'});assert.equal(access.status,403);
+  assert.deepEqual((await call('/my-access')).data,[]);
+  assert.equal(publicItem(p,'courses').price,'$60.000');
+  put('privateCatalog/courses',{v:[p]});const audit=await call('/access-audit',{email:user.email},'admin-token');
+  assert.equal(audit.data.accounts[0].courses[0].reason,'denied');
+});
+test('auditoría de accesos es exclusiva de administración y distingue pruebas y autorizaciones',async()=>{
+  put('entitlements/prueba',{uid:user.uid,kind:'course',productId:'1',active:true,live:false});
+  env.MP_ENV='production';
+  assert.equal((await call('/access-audit',{email:user.email})).status,403);
+  let audit=await call('/access-audit',{email:user.email},'admin-token');
+  assert.equal(audit.data.accounts[0].courses[0].reason,'denied');assert.equal(audit.data.accounts[0].courses[0].testPurchases,1);
+  put('manualAccess/'+user.uid+'/products/course_1',{kind:'course',productId:'1',active:true});
+  audit=await call('/access-audit',{email:user.email},'admin-token');assert.equal(audit.data.accounts[0].courses[0].reason,'manual');
+});
+test('señas deshabilitadas por defecto y configuración exclusiva de la dueña',async()=>{
+  const b=bookingFixture();docs.delete('paymentConfig/bookings_test');
+  assert.equal((await call('/quote',b)).status,409);
+  assert.equal((await call('/booking-settings')).status,403);
+  assert.equal((await call('/booking-settings',{enabled:true,percent:0,serviceMinutes:{}},'admin-token')).status,400);
+  const configured=await call('/booking-settings',{enabled:true,percent:30,serviceMinutes:{Clásicas:120}},'admin-token');
+  assert.equal(configured.status,200);assert.equal(configured.data.settings.percent,30);
+  assert.equal(configured.data.services[0].durationMinutes,120);
+});
+test('seña 30%, total y saldo salen del catálogo; cambios posteriores no alteran una orden iniciada',async()=>{
+  const b=bookingFixture();const q=await call('/quote',{...b,amountCents:1,totalCents:1});
+  assert.equal(q.data.amountCents,1800000);assert.equal(q.data.totalCents,6000000);assert.equal(q.data.balanceCents,4200000);
+  assert.equal((await call('/checkout',{...b,acceptedAmountCents:1})).status,409);
+  assert.equal((await call('/checkout',b)).status,200);
+  await call('/booking-settings',{enabled:true,percent:50,serviceMinutes:{Clásicas:120}},'admin-token');
+  assert.equal(docs.get('orders/'+orderId).data.amountCents,1800000);
+  assert.equal((await call('/quote',b)).data.amountCents,3000000);
+  assert.equal(preferenceBody.items[0].unit_price,18000);
+  assert.ok(preferenceBody.payment_methods.excluded_payment_types.some(x=>x.id==='ticket'));
+});
+test('checkout de seña retiene el horario sin crear turno ni acceso y reutiliza su referencia',async()=>{
+  const b=bookingFixture();assert.equal((await call('/checkout',b)).status,200);assert.equal((await call('/checkout',b)).status,200);
+  assert.equal(preferenceCount,1);assert.equal([...docs.keys()].some(x=>x.startsWith('turnos/')),false);
+  assert.equal([...docs.keys()].some(x=>x.startsWith('entitlements/')),false);
+  assert.equal((await call('/checkout',{...b,time:'11:00'})).status,409);
+  const available=await call('/availability',b);assert.deepEqual(available.data.times,['11:00','12:00']);
+});
+test('dos reservas concurrentes o superpuestas no pueden tomar la misma franja',async()=>{
+  const b=bookingFixture(),second=crypto.randomUUID();
+  const results=await Promise.all([call('/checkout',b),call('/checkout',{...b,requestId:second,time:'10:00'})]);
+  assert.deepEqual(results.map(x=>x.status).sort(),[200,409]);assert.equal(preferenceCount,1);
+  const holds=docs.get('bookingDays/test_'+b.date).data.reservations;assert.equal(holds.length,1);
+});
+test('reserva aprobada crea el turno una vez sin otorgar un curso y conserva saldo y correo',async()=>{
+  const b=bookingFixture();configureSaleEmails();await call('/checkout',b);payments.set('9876',bookingPayment());
+  assert.equal((await call('/verify-order',{orderId,paymentId:'9876'})).status,200);
+  assert.equal((await call('/verify-order',{orderId,paymentId:'9876'})).status,200);
+  const turno=docs.get('turnos/'+orderId).data;assert.equal(turno.status,'confirmed');assert.equal(turno.balanceCents,4200000);
+  assert.equal([...docs.keys()].filter(x=>x.startsWith('turnos/')).length,1);
+  assert.equal([...docs.keys()].some(x=>x.startsWith('entitlements/')),false);
+  assert.equal(mailRequests.length,1);assert.match(mailRequests[0].body.text,/Seña de turno/);assert.match(mailRequests[0].body.text,/42.000/);
+});
+test('pagos pendientes o rechazados no confirman una reserva',async()=>{
+  const b=bookingFixture();await call('/checkout',b);payments.set('9876',bookingPayment({status:'pending'}));
+  await call('/verify-order',{orderId,paymentId:'9876'});
+  assert.equal(docs.has('turnos/'+orderId),false);
+  payments.set('9876',bookingPayment({status:'rejected',date_last_updated:'2026-11-14T15:00:00Z'}));
+  await call('/verify-order',{orderId,paymentId:'9876'});assert.equal(docs.has('turnos/'+orderId),false);
+});
+test('un pago tardío de un horario tomado queda para revisión y no duplica el turno',async()=>{
+  const b=bookingFixture();await call('/checkout',b);
+  const key='bookingDays/test_'+b.date;const hold=docs.get(key).data.reservations[0];hold.expiresAt=Date.now()-1;
+  const second=crypto.randomUUID();assert.equal((await call('/checkout',{...b,requestId:second})).status,200);
+  payments.set('9876',bookingPayment());const verify=await call('/verify-order',{orderId,paymentId:'9876'});
+  assert.equal(verify.data.order.status,'review');assert.equal(docs.has('turnos/'+orderId),false);
+  assert.equal(docs.get(key).data.reservations.some(r=>r.orderId===second),true);
+});
+test('la devolución de la seña libera la franja sin reactivarla por un evento viejo',async()=>{
+  const b=bookingFixture();await call('/checkout',b);payments.set('9876',bookingPayment());await call('/verify-order',{orderId,paymentId:'9876'});
+  payments.set('9876',bookingPayment({status:'refunded',transaction_amount_refunded:18000,date_last_updated:'2026-11-15T15:00:00Z'}));
+  await call('/verify-order',{orderId,paymentId:'9876'});
+  assert.equal(docs.get('turnos/'+orderId).data.status,'cancelled');
+  assert.ok((await call('/availability',b)).data.times.includes('09:00'));
+  payments.set('9876',bookingPayment());await call('/verify-order',{orderId,paymentId:'9876'});
+  assert.equal(docs.get('turnos/'+orderId).data.status,'cancelled');
+});
+test('solo la dueña cancela o registra atención y la cancelación no se reactiva',async()=>{
+  const b=bookingFixture();await call('/checkout',b);payments.set('9876',bookingPayment());await call('/verify-order',{orderId,paymentId:'9876'});
+  assert.equal((await call('/booking-status',{orderId,status:'done'})).status,403);
+  assert.equal((await call('/booking-status',{orderId,status:'done'},'admin-token')).status,200);
+  assert.equal((await call('/booking-status',{orderId,status:'cancelled'},'admin-token')).status,200);
+  assert.equal((await call('/booking-status',{orderId,status:'confirmed'},'admin-token')).status,409);
+  assert.ok((await call('/availability',b)).data.times.includes('09:00'));
+});
+test('agenda valida fechas, servicios, duraciones y horarios antes de cobrar',async()=>{
+  const b=bookingFixture();
+  for(const patch of [{services:['Inexistente']},{services:['Clásicas','Clásicas']},{date:'2026-99-99'},{time:'25:00'},{time:'08:00'}])
+    assert.ok((await call('/quote',{...b,...patch})).status>=400);
+  put('site/services',{v:[{name:'Clásicas',price:'Consultar',dur:'2 h'}]});assert.equal((await call('/quote',b)).status,422);
+  put('site/services',{v:[{name:'Clásicas',price:'$60.000',dur:''}]});assert.equal((await call('/quote',b)).status,422);
+  assert.equal(preferenceCount,0);
+});
+test('agenda cerrada explícitamente no recupera horarios de fábrica y respeta turnos anteriores',async()=>{
+  const b=bookingFixture();put('turnos/anterior',{mode:'test',date:b.date,time:'09:00',durationMinutes:120,status:'confirmed'});
+  assert.deepEqual((await call('/availability',b)).data.times,['11:00','12:00']);
+  put('site/slots',{v:[]});assert.deepEqual((await call('/availability',b)).data.times,[]);
+});
+
