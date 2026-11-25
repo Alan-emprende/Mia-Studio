@@ -82,7 +82,7 @@
     const grid=document.getElementById(prefix+'-slots-grid');if(!grid)return;
     const revision=(slotRequests[prefix]||0)+1;slotRequests[prefix]=revision;
     const date=document.getElementById(prefix+'-date')?.value;
-    const services=[...(prefix==='ict'?(window._selServs||[]):_dashServs[prefix])];
+    const services=[...(prefix==='ict'?window._selServs:_dashServs[prefix])||[]];
     if(prefix==='ict')window._selSlot='';else _dashSlot[prefix]='';
     const selected=document.getElementById(prefix==='ict'?'ict-slot-selected':prefix+'-slot-sel');if(selected)selected.style.display='none';
     if(!date||!services.length){grid.textContent='Elegí los servicios y la fecha para ver los horarios.';return;}
@@ -107,11 +107,11 @@
   }
   window.icarSaveTurno=()=>draftBooking('ict');window.saveTurno=()=>draftBooking('t');window.saveTurno2=()=>draftBooking('t2');
   window.loadTurnosCloud=async function(){
-    try{const result=await api('/admin-bookings');localStorage.setItem('ms_turnos',JSON.stringify(result.items));
+    try{const uid=firebase.auth().currentUser?.uid;const result=await api('/admin-bookings');if(uid!==firebase.auth().currentUser?.uid)return false;sT(result.items);
       let notice=document.getElementById('payments-agenda-environment');
       if(!notice){notice=document.createElement('p');notice.id='payments-agenda-environment';notice.setAttribute('role','status');const pane=document.getElementById('adm-turnos');pane?.prepend(notice);}
       notice.textContent=result.environment==='existing'?'Agenda existente del estudio':result.environment==='test'?'Agenda de prueba':'Agenda de producción';return true;
-    }catch(e){localStorage.removeItem('ms_turnos');toast('No se pudo cargar la agenda: '+e.message);return false;}
+    }catch(e){sT([]);toast('No se pudo cargar la agenda: '+e.message);return false;}
   };
   window.changeTurnoStatus=async function(id,status,select){select.disabled=true;try{await api('/booking-status',{orderId:String(id),status});await loadTurnosCloud();admRenderTurnosList();toast(status==='cancelled'?'Turno cancelado. Revisá si corresponde devolver la seña.':'Estado guardado');}catch(e){toast(e.message);admRenderTurnosList();}finally{select.disabled=false;}};
   window.admDeleteTurno=async id=>{const t=gT().find(x=>String(x.id)===String(id));if(!t)return;toast('Para conservar el historial de pagos, cancelá el turno desde su estado.');};
@@ -202,14 +202,15 @@
           const order=await api('/checkout',{...draft,acceptedAmountCents:q.amountCents,acceptedTotalCents:q.totalCents});
           location.href=order.checkoutUrl;
         }catch(err){
-          document.getElementById('pay-message').textContent=err.message;
+          const message=document.getElementById('pay-message');message.textContent=err.message;
+          if(/Mis compras/.test(err.message)){const history=document.createElement('a');history.href='pagos.html?historial=1';history.textContent=' Abrir Mis compras';message.append(history);}
           if(/referencia ya se utilizó|selección cambió/i.test(err.message))delete draft.requestId;
           sessionStorage.setItem('mira_checkout',JSON.stringify(draft));e.target.disabled=false;
         }
       };
     }catch(e){box.innerHTML='<p role="alert">'+esc(e.message)+'</p><button class="btn-g" data-pay-retry>Volver a intentar</button>';box.querySelector('[data-pay-retry]').onclick=()=>paymentPage();}
   }
-  async function accessProduct(kind,id,box){try{const u=await user();const p=await api('/access',{kind,productId:String(id)});if(firebase.auth().currentUser?.uid!==u.uid)throw Error('La sesión cambió. Volvé a intentar.');if(kind==='course'){sessionStorage.setItem('mira_open_course',String(id));location.href='dashboard.html';return;}const url=p.downloadLink||p.link;const parsed=new URL(url);if(parsed.protocol!=='https:')throw new Error('Enlace de descarga no disponible');location.href=parsed.href;}catch(e){toast(e.message);}}
+  async function accessProduct(kind,id,box){try{const u=await user();const p=await api('/access',{kind,productId:String(id)});if(firebase.auth().currentUser?.uid!==u.uid)throw Error('La sesión cambió. Volvé a intentar.');if(kind==='course'){sessionStorage.setItem('mira_open_course',String(id));location.href='dashboard.html';return;}const url=p.downloadLink||p.link;let parsed;try{parsed=new URL(url);}catch{}if(parsed?.protocol!=='https:'||parsed.username||parsed.password)throw new Error('El ebook todavía no tiene un enlace de descarga válido.');location.href=parsed.href;}catch(e){toast(e.message);}}
   document.addEventListener('DOMContentLoaded',()=>{
     const oldPage=window.admPage;if(oldPage)window.admPage=function(name){oldPage(name);if(name==='pagos')admRenderPayments();};
     if(document.getElementById('nav-salir')){const a=document.createElement('a');a.className='sb-item';a.href='pagos.html?historial=1';a.textContent='Mis compras';document.getElementById('nav-salir').before(a);}

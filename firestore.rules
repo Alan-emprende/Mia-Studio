@@ -3,6 +3,8 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function isAdmin() {return request.auth != null && request.auth.token.email == 'estudiosmira@gmail.com' && request.auth.token.email_verified == true;}
     function own(uid) {return request.auth != null && request.auth.uid == uid;}
+    function verified() {return request.auth != null && request.auth.token.email_verified == true;}
+    function validProfileIdentity(d,uid) {return d.get('email',request.auth.token.email) == request.auth.token.email && d.get('uid',uid) == uid;}
     match /site/{doc} {
       allow read: if !(doc in ['courses','ebooks']) || isAdmin() || resource.data.get('accessVersion',0) == 2;
       allow write: if isAdmin() && !(doc in ['courses','ebooks','taken']);
@@ -29,23 +31,27 @@ service cloud.firestore {
     match /site/taken {allow read: if true; allow write: if isAdmin();}
     match /users/{uid} {
       allow read: if own(uid) || isAdmin();
-      allow create: if own(uid) && request.resource.data.get('role','student') == 'student'
+      allow create: if own(uid) && validProfileIdentity(request.resource.data,uid) && request.resource.data.get('role','student') == 'student'
         && !request.resource.data.keys().hasAny(['purchasedEbooks','purchasedCourses','entitlements']);
-      allow update: if isAdmin() || (own(uid) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role','purchasedEbooks','purchasedCourses','entitlements']));
+      allow update: if isAdmin() || (own(uid) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role','purchasedEbooks','purchasedCourses','entitlements'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['email','uid']) || validProfileIdentity(request.resource.data,uid)));
       allow delete: if isAdmin();
     }
     match /turnos/{id} {
-      allow read: if isAdmin() || (request.auth != null && resource.data.uid == request.auth.uid);
-      allow create, delete: if false;
-      // La dueña puede registrar la atención; los importes y pagos son inmutables para el navegador.
-      allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['atencion']);
+      // La ficha de atención comparte documento con la reserva. El historial de la clienta usa orders.
+      allow read: if isAdmin();
+      allow write: if false;
     }
     match /orders/{id} {allow read: if isAdmin() || (request.auth != null && resource.data.uid == request.auth.uid); allow write: if false;}
     match /entitlements/{id} {allow read: if isAdmin() || (request.auth != null && resource.data.uid == request.auth.uid); allow write: if false;}
     match /chat/{room}/msgs/{msg} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid
-        && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500;
+      function commonRoom() {return room in ['general','recursos','trabajos'];}
+      allow read: if isAdmin() || (verified() && commonRoom());
+      allow create: if verified() && commonRoom() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid','user','text','ts'])
+        && request.resource.data.user is string && request.resource.data.user.size() > 0 && request.resource.data.user.size() <= 80
+        && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500
+        && request.resource.data.ts == request.time;
       allow update: if false; allow delete: if isAdmin();
     }
     function reviewEligible(d) {

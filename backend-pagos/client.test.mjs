@@ -142,7 +142,7 @@ test('panel de pagos guarda solo la habilitación digital y permite comprobar la
 test('los seis HTML activos cargan los scripts actualizados y su JavaScript inline compila',async()=>{
   for(const file of ['index.html','admin.html','cursos.html','dashboard.html','servicios.html','pagos.html']){
     const html=await readFile(new URL('../'+file,import.meta.url),'utf8');
-    assert.match(html,/payment-config\.js\?v=20261113mp2/);assert.match(html,/payments\.js\?v=20261124fix1/);
+    assert.match(html,/payment-config\.js\?v=20261113mp2/);assert.match(html,/payments\.js\?v=20261124security1/);
     for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))
       if(!/\bsrc\s*=|\btype\s*=\s*["'](?:application\/ld\+json|text\/plain)/i.test(match[1]))
         assert.doesNotThrow(()=>new vm.Script(match[2],{filename:file}));

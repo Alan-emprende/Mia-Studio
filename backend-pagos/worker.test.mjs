@@ -49,6 +49,7 @@ before(async()=>{
       if(url.pathname==='/users/me')return json({id:1234,site_id:'MLA',tags:accountIsTest?['test_user']:[]});
       if(url.pathname==='/checkout/preferences'){
         preferenceBody=body;preferenceCount++;
+        if(env.MP_PREFERENCE_TEST_FAILURE)return json({error:'simulado'},503);
         return json({id:'pref-1',init_point:'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref-1',
           sandbox_init_point:'https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref-1'});
       }
@@ -670,6 +671,7 @@ test('pagos pendientes o rechazados no confirman una reserva',async()=>{
 test('un pago tardío de un horario tomado queda para revisión y no duplica el turno',async()=>{
   const b=bookingFixture();await call('/checkout',b);
   const key='bookingDays/test_'+b.date;const hold=docs.get(key).data.reservations[0];hold.expiresAt=Date.now()-1;
+  docs.get('bookingLimits/test_'+user.uid).data.holdUntil=Date.now()-1;
   const second=crypto.randomUUID();assert.equal((await call('/checkout',{...b,requestId:second})).status,200);
   payments.set('9876',bookingPayment());const verify=await call('/verify-order',{orderId,paymentId:'9876'});
   assert.equal(verify.data.order.status,'review');assert.equal(docs.has('turnos/'+orderId),false);
@@ -706,3 +708,30 @@ test('agenda cerrada explícitamente no recupera horarios de fábrica y respeta 
   put('site/slots',{v:[]});assert.deepEqual((await call('/availability',b)).data.times,[]);
 });
 
+
+test('dos referencias simultáneas para el mismo producto conservan un solo checkout',async()=>{
+  const results=await Promise.all([call('/checkout',checkoutBody()),call('/checkout',checkoutBody({requestId:crypto.randomUUID()}))]);
+  assert.deepEqual(results.map(x=>x.status).sort(),[200,409]);
+  assert.equal(preferenceCount,1);
+});
+test('un fallo al preparar la seña libera el horario para volver a reservar',async()=>{
+  const b=bookingFixture();
+  env.MP_PREFERENCE_TEST_FAILURE=true;
+  try{assert.equal((await call('/checkout',b)).status,503);}finally{delete env.MP_PREFERENCE_TEST_FAILURE;}
+  assert.equal(docs.get('orders/'+orderId).data.status,'error');
+  assert.ok((await call('/availability',b)).data.times.includes(b.time));
+  assert.equal((await call('/checkout',{...b,requestId:crypto.randomUUID()})).status,200);
+});
+test('una cuenta solo puede apartar un turno sin pagar a la vez',async()=>{
+  const b=bookingFixture();
+  assert.equal((await call('/checkout',b)).status,200);
+  const retry=await call('/checkout',{...b,time:'11:00',requestId:crypto.randomUUID()});
+  assert.equal(retry.status,409);assert.match(retry.data.error,/reserva en curso/);assert.equal(preferenceCount,1);
+});
+test('el rechazo de la seña devuelve la franja a la agenda',async()=>{
+  const b=bookingFixture();
+  await call('/checkout',b);payments.set('9876',bookingPayment({status:'rejected'}));
+  const verified=await call('/verify-order',{orderId,paymentId:'9876'});
+  assert.equal(verified.data.order.status,'rejected');
+  assert.ok((await call('/availability',b)).data.times.includes(b.time));
+});

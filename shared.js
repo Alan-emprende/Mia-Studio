@@ -37,7 +37,10 @@ function initFirebase(){
     if(badge){badge.textContent='☁ online';badge.style.background='rgba(34,197,94,.2)';badge.style.color='#4ade80';}
     // Always sync site config (public read)
     _syncSiteFromCloud();
+    let accountUid;try{accountUid=JSON.parse(localStorage.getItem(KS)||'null')?.uid;}catch{}
     _auth.onAuthStateChanged(user=>{
+      if(accountUid&&accountUid!==user?.uid){currentUser=null;localStorage.removeItem(KS);clearUserLocalData();window.miraClearPrivateContent?.();}
+      accountUid=user?.uid;
       if(user){_fbUid=user.uid;_syncSiteFromCloud();}
       else{_fbUid=null;}
     });
@@ -117,7 +120,7 @@ async function loadTurnosCloud(){
     const snap=await _db.collection('turnos').get();
     const list=snap.docs.map(d=>d.data()).sort((a,b)=>(b.id||0)-(a.id||0));
     if(!list.length&&gT().length)return false; // nube vacía pero hay locales: no borrar
-    localStorage.setItem(KT,JSON.stringify(list));
+    sT(list);
     return true;
   }catch(e){return false;}
 }
@@ -189,7 +192,6 @@ const DEF_FAQ=[
   {q:'¿Puedo verlo desde el celular?',a:'Sí, la plataforma es 100% responsive. Celular, tablet o computadora.'},
 ];
 const DEF_INFO='Mira Estudio es una academia de extensión de pestañas profesional.\n\nNuestras instructoras son certificadas con más de 5 años de experiencia. Trabajamos con las mejores técnicas del mercado.\n\n📍 Clases virtuales y presenciales disponibles\n📱 @miraestudio en Instagram\n✉️ hola@miraestudio.com';
-const ADMIN_PASS_DEFAULT='Mira2025';
 
 // ═══ GETTERS ═══
 const gc=()=>{const d=localStorage.getItem(KC);const list=d?JSON.parse(d):DEF_COURSES.map(c=>({...c,modules:(c.modules||[]).map(m=>({...m,lessons:[...m.lessons]}))}));return window.miraResolveCatalog?window.miraResolveCatalog('courses',list):list;}
@@ -199,10 +201,10 @@ function _saveDigitalCatalog(type,value){
   return pending;
 }
 const sc=v=>_saveDigitalCatalog('courses',v);
-const gT=()=>JSON.parse(localStorage.getItem(KT)||'[]');
-// sT guarda solo localmente: cada turno se sube individualmente con _turnoCloudSave
-// (antes se subía la lista entera a site/turnos_list y una clienta pisaba los turnos de otra)
-const sT=v=>{localStorage.setItem(KT,JSON.stringify(v));};
+let _miraTurnos=[];
+localStorage.removeItem(KT);
+const gT=()=>_miraTurnos;
+const sT=v=>{_miraTurnos=v;};
 const gF=()=>{const d=localStorage.getItem(KF);return d?JSON.parse(d):[...DEF_FAQ];}
 const sF=v=>{localStorage.setItem(KF,JSON.stringify(v));_fsSet('faq',v);};
 const gFt=()=>{const d=localStorage.getItem(KFT);return d?JSON.parse(d):[...DEF_FEATS];}
@@ -304,7 +306,7 @@ purgeLegacyCredentials();
 
 // La identidad y el destino dependen de Firebase, nunca del rol de una caché antigua.
 function miraSessionFromFirebase(user,profile={}){
-  return {...profile,uid:user.uid,email:user.email,name:profile.name||user.displayName||'Alumna',role:user.emailVerified&&user.email==='estudiosmira@gmail.com'?'admin':'student'};
+  return {uid:user.uid,email:user.email,name:(typeof profile.name==='string'&&profile.name.trim()||user.displayName||'Alumna').slice(0,80),role:user.emailVerified&&user.email==='estudiosmira@gmail.com'?'admin':'student'};
 }
 let _miraSigningOut=false;
 async function miraSignOutToHome(){
@@ -366,7 +368,7 @@ function doRegister(){
     _auth.createUserWithEmailAndPassword(em,pw).then(async cred=>{
       const fu=cred.user;_fbUid=fu.uid;
       await fu.updateProfile({displayName:nm});
-      const u={name:nm,email:em,uid:fu.uid,role:'student'};
+      const u={name:nm,email:fu.email,uid:fu.uid,role:'student'};
       try{await _saveUserProfile(fu.uid,u);}catch{await _auth.signOut();_fbUid=null;showErr('Tu cuenta fue creada, pero no se pudo guardar el perfil. Volvé a iniciar sesión para recuperarlo.');return;}
       fu.sendEmailVerification().then(()=>{_auth.signOut();_fbUid=null;closeOv('auth-ov');showVerifyBanner(em);}).catch(async()=>{await _auth.signOut();_fbUid=null;showErr('Tu cuenta fue creada, pero no pudimos enviar el email de verificación. Volvé a iniciar sesión para reenviarlo.');});
     }).catch(err=>{
@@ -569,7 +571,7 @@ function renderEbooks(){
 // ═══ RECURSOS ═══
 function renderResources(){
   const recs=gR();
-  const html=recs.map(r=>`<div class="ritem"><div class="rico">${r.icon}</div><div><div class="rname">${r.name}</div><div class="rtype">${r.type}</div></div></div>`).join('');
+  const html=recs.map(r=>`<div class="ritem"><div class="rico">${r.icon}</div><div><div class="rname">${_escHtml(r.name)}</div><div class="rtype">${r.type}</div></div></div>`).join('');
   const el=document.getElementById('rlist');if(el)el.innerHTML=html;
 }
 
@@ -2171,9 +2173,11 @@ function saveNote(){
   // el timer dispare, igual se guarda el texto correcto bajo la lección correcta.
   const cid = currentCourseId, lid = l.id, key = getNoteKey(cid, lid), val = ta.value;
   clearTimeout(noteSaveTimer);
-  window._pendingNote = { key, cid, lid, val };
+  const uid=currentUser?.uid;
+  window._pendingNote = { key, cid, lid, val, uid };
   noteSaveTimer = setTimeout(() => {
     window._pendingNote = null;
+    if(!uid||_auth?.currentUser?.uid!==uid||currentUser?.uid!==uid)return;
     localStorage.setItem(key, val);
     _saveNoteCloud(cid, lid, val);
     const saved = document.getElementById('notes-saved');
@@ -2188,6 +2192,7 @@ function flushNote(){
   if(!window._pendingNote) return;
   const p = window._pendingNote; window._pendingNote = null;
   clearTimeout(noteSaveTimer);
+  if(!p.uid||p.uid!==_auth?.currentUser?.uid||p.uid!==currentUser?.uid)return;
   localStorage.setItem(p.key, p.val);
   _saveNoteCloud(p.cid, p.lid, p.val);
 }
@@ -3121,9 +3126,10 @@ const _origDOMLoaded = document.addEventListener;
 // ═══════════════════════════════════════════════════════
 // MÓDULO CHAT COMUNIDAD
 // ═══════════════════════════════════════════════════════
-const KC_CHAT = 'ms_chat';
-const getChat = () => JSON.parse(localStorage.getItem(KC_CHAT) || '{}');
-const saveChat = v => localStorage.setItem(KC_CHAT, JSON.stringify(v));
+let _miraChat = Object.create(null);
+localStorage.removeItem('ms_chat');
+const getChat = () => _miraChat;
+const saveChat = v => { _miraChat = v; };
 
 let activeChatRoom = null;
 
@@ -3131,16 +3137,18 @@ let activeChatRoom = null;
 // Los mensajes viven en Firestore (chat/{sala}/msgs) y llegan en tiempo real
 // a todas las alumnas. localStorage queda como espejo/respaldo sin conexión.
 let _chatUnsub = null;
-function _chatCloudOk(){ return _fbReady && _db && currentUser && currentUser.uid; }
+function _chatCloudOk(){ const user=_auth?.currentUser;return !!(_fbReady&&_db&&user?.emailVerified&&user.uid===currentUser?.uid); }
 function _chatListen(roomId){
   if(_chatUnsub){ try{_chatUnsub();}catch(e){} _chatUnsub=null; }
-  if(!_chatCloudOk()) return; // sin nube: modo local
+  if(!_chatCloudOk()) return;
+  const uid=_auth.currentUser.uid;
   _chatUnsub = _db.collection('chat').doc(roomId).collection('msgs')
     .orderBy('ts').limitToLast(80)
     .onSnapshot(snap => {
+      if(_auth?.currentUser?.uid!==uid||activeChatRoom!==roomId)return;
       const msgs = snap.docs.map(d => {
-        const m = d.data(); const dt = new Date(m.ts || 0);
-        return { id: d.id, uid: m.uid || '', user: m.user || 'Alumna', text: String(m.text || ''),
+        const m = d.data(); const dt = m.ts?.toDate?.() || new Date(typeof m.ts==='number'?m.ts:0);
+        return { id: d.id, uid: m.uid || '', user: typeof m.user==='string'&&m.user ? m.user : 'Alumna', text: String(m.text || ''),
           time: dt.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
           date: dt.toLocaleDateString('es-AR',{day:'2-digit',month:'short'}), read: true };
       });
@@ -3154,17 +3162,13 @@ function _chatListen(roomId){
     }, err => { console.warn('chat:', err.message); });
 }
 
-// Genera las salas: una general + una por cada curso desbloqueado
+// Salas comunes para cuentas con correo verificado.
 function getChatRooms() {
-  const courses = gc();
   const rooms = [
     { id: 'general', name: 'General', emoji: '💬', desc: 'Para todas las alumnas' },
     { id: 'recursos', name: 'Recursos', emoji: '📎', desc: 'Comparte materiales' },
     { id: 'trabajos', name: 'Mis Trabajos', emoji: '📸', desc: 'Muestra tus resultados' },
   ];
-  courses.filter(c => !c.locked).forEach(c => {
-    rooms.push({ id: 'curso-' + c.id, name: c.title, emoji: _courseInitial(c), desc: 'Alumnos de este curso' });
-  });
   return rooms;
 }
 
@@ -3182,7 +3186,7 @@ function renderChatRooms() {
       <span class="chat-room-emoji">${r.emoji}</span>
       <div style="flex:1;min-width:0;">
         <div class="chat-room-name">${r.name}</div>
-        <div class="chat-room-last">${last ? last.text.substring(0, 35) + (last.text.length > 35 ? '…' : '') : r.desc}</div>
+        <div class="chat-room-last">${_escHtml(last ? last.text.substring(0,35)+(last.text.length>35?'…':'') : r.desc)}</div>
       </div>
       ${unread > 0 ? `<span class="chat-room-badge">${unread}</span>` : ''}
     </div>`;
@@ -3190,10 +3194,11 @@ function renderChatRooms() {
 }
 
 function openChatRoom(roomId) {
-  activeChatRoom = roomId;
+  if(!_chatCloudOk())return;
   const rooms = getChatRooms();
   const room = rooms.find(r => r.id === roomId);
   if (!room) return;
+  activeChatRoom = roomId;
 
   // Mark messages read
   const chat = getChat();
@@ -3233,24 +3238,23 @@ function renderChatMessages(roomId) {
     return;
   }
 
-  const myName = currentUser ? currentUser.name : '';
   let html = '';
   let lastDate = '';
 
   msgs.forEach(m => {
     const d = m.date || '';
     if (d && d !== lastDate) {
-      html += `<div style="text-align:center;font-size:11px;color:var(--muted);margin:8px 0;">${d}</div>`;
+      html += `<div style="text-align:center;font-size:11px;color:var(--muted);margin:8px 0;">${_escHtml(d)}</div>`;
       lastDate = d;
     }
-    const isMine = (m.uid && currentUser && currentUser.uid) ? m.uid === currentUser.uid : m.user === myName;
+    const isMine = !!m.uid && m.uid === currentUser?.uid;
     const initials = m.user.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     html += `<div class="chat-msg${isMine ? ' mine' : ''}">
-      <div class="chat-msg-av${isMine ? ' mine-av' : ''}">${initials}</div>
+      <div class="chat-msg-av${isMine ? ' mine-av' : ''}">${_escHtml(initials)}</div>
       <div>
-        ${!isMine ? `<div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:3px;">${m.user}</div>` : ''}
+        ${!isMine ? `<div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:3px;">${_escHtml(m.user)}</div>` : ''}
         <div class="chat-msg-bubble">${escapeHtml(m.text)}</div>
-        <div class="chat-msg-meta">${m.time}</div>
+        <div class="chat-msg-meta">${_escHtml(m.time)}</div>
       </div>
     </div>`;
   });
@@ -3266,43 +3270,12 @@ function chatSend() {
   const text = (inp.value || '').trim();
   if (!text) return;
 
-  // Con nube: el mensaje va a Firestore y vuelve solo por el listener en tiempo real
-  if (_chatCloudOk()) {
-    _db.collection('chat').doc(activeChatRoom).collection('msgs').add({
-      uid: currentUser.uid, user: currentUser.name || 'Alumna', text: text.slice(0, 500), ts: Date.now()
-    }).catch(() => toast('⚠️ No se pudo enviar el mensaje. Probá de nuevo.'));
-    inp.value = ''; inp.style.height = 'auto';
-    return;
-  }
-
-  // Sin nube: modo local de respaldo
-  const now = new Date();
-  const time = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-  const date = now.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
-
-  const chat = getChat();
-  if (!chat[activeChatRoom]) chat[activeChatRoom] = [];
-  chat[activeChatRoom].push({
-    id: Date.now(),
-    user: currentUser.name,
-    text,
-    time,
-    date,
-    read: false
-  });
-  // Keep max 200 per room
-  if (chat[activeChatRoom].length > 200) chat[activeChatRoom] = chat[activeChatRoom].slice(-200);
-  saveChat(chat);
-
-  inp.value = '';
-  inp.style.height = 'auto';
-  renderChatMessages(activeChatRoom);
-  renderChatRooms();
-
-  // Update meta
-  const msgs = chat[activeChatRoom];
-  const metaEl = document.getElementById('chat-room-meta');
-  if (metaEl) metaEl.textContent = msgs.length + ' mensaje' + (msgs.length !== 1 ? 's' : '');
+  if(!_chatCloudOk()) {toast('Iniciá sesión con un correo verificado para enviar mensajes.');return;}
+  _db.collection('chat').doc(activeChatRoom).collection('msgs').add({
+    uid:currentUser.uid,user:String(currentUser.name||'Alumna').slice(0,80),text:text.slice(0,500),
+    ts:firebase.firestore.FieldValue.serverTimestamp()
+  }).then(()=>{if(inp.value.trim()===text){inp.value='';inp.style.height='auto';}},
+    ()=>toast('No se pudo enviar el mensaje. Volvé a intentar.'));
 }
 
 function escapeHtml(str) {
@@ -3376,15 +3349,21 @@ function profileSave() {
   toast('✅ Perfil guardado');
 }
 
-function profileChangePass() {
-  const np = (document.getElementById('prof-newpass') || {}).value || '';
-  if (!np || np.length < 6) { toast('⚠️ Mínimo 6 caracteres'); return; }
-  if (!currentUser) return;
-  const users = gU();
-  const idx = users.findIndex(u => u.email === currentUser.email);
-  if (idx >= 0) { users[idx].pass = np; sU(users); }
-  document.getElementById('prof-newpass').value = '';
-  toast('✅ Contraseña actualizada');
+async function profileChangePass(button){
+  const input=document.getElementById('prof-newpass'), user=_auth?.currentUser;
+  if(!user?.emailVerified||user.uid!==currentUser?.uid){toast('Volvé a iniciar sesión para cambiar la contraseña.');return;}
+  const password=input?.value||'';
+  if(password.length<12){toast('Usá al menos 12 caracteres para la nueva contraseña.');return;}
+  if(button)button.disabled=true;
+  try{
+    await user.updatePassword(password);
+    input.value='';
+    toast('Contraseña actualizada. Usá la nueva la próxima vez que ingreses.');
+  }catch(error){
+    if(error.code==='auth/requires-recent-login')toast('Por seguridad, cerrá sesión y volvé a entrar para cambiarla. También podés usar Olvidé mi contraseña.');
+    else if(error.code==='auth/weak-password'||error.code==='auth/password-does-not-meet-requirements')toast('Esa contraseña no cumple los requisitos. Elegí otra.');
+    else toast('No se pudo cambiar la contraseña. Volvé a intentar.');
+  }finally{if(button)button.disabled=false;}
 }
 
 // Patch showPage for profile load
@@ -3569,7 +3548,7 @@ admSaveColors = function() { _baseAdmSaveColors(); showSaveInd('🎨 Colores gua
 
 function showVerifyBanner(email){
   const div=document.createElement('div');div.id='verify-banner-ov';div.className='ov open';div.style.cssText='z-index:500;';
-  div.innerHTML=`<div class="mcard mcard-sm" style="text-align:center;padding:36px 28px;"><div style="font-size:48px;margin-bottom:12px;">📧</div><div style="font-family:var(--fd);font-size:22px;color:var(--dark);margin-bottom:8px;">Verificá tu email</div><p style="font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:20px;">Te enviamos un email a <strong>${email}</strong>.<br>Hacé clic en el link para activar tu cuenta.</p><div style="background:var(--goldp);border:1px solid rgba(201,168,76,.3);border-radius:var(--r2);padding:12px 16px;font-size:13px;color:var(--goldd);margin-bottom:20px;">💡 Revisá también la carpeta de <strong>spam</strong>.</div><button class="btn-p" onclick="document.getElementById('verify-banner-ov').remove();" style="width:100%;padding:13px;margin-bottom:10px;">Ya verifiqué → Iniciar sesión</button><button onclick="resendVerification('${email}')" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;font-family:var(--fb);">↺ Reenviar email</button></div>`;
+  div.innerHTML=`<div class="mcard mcard-sm" style="text-align:center;padding:36px 28px;"><div style="font-size:48px;margin-bottom:12px;">📧</div><div style="font-family:var(--fd);font-size:22px;color:var(--dark);margin-bottom:8px;">Verificá tu email</div><p style="font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:20px;">Te enviamos un email a <strong>${_escHtml(email)}</strong>.<br>Hacé clic en el link para activar tu cuenta.</p><div style="background:var(--goldp);border:1px solid rgba(201,168,76,.3);border-radius:var(--r2);padding:12px 16px;font-size:13px;color:var(--goldd);margin-bottom:20px;">💡 Revisá también la carpeta de <strong>spam</strong>.</div><button class="btn-p" onclick="document.getElementById('verify-banner-ov').remove();" style="width:100%;padding:13px;margin-bottom:10px;">Ya verifiqué → Iniciar sesión</button><button onclick="resendVerification('${email}')" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;font-family:var(--fb);">↺ Reenviar email</button></div>`;
   document.body.appendChild(div);
 }
 function resendVerification(email){
@@ -3583,7 +3562,7 @@ function doResetPass(){
   if(!_fbReady||!_auth){toast('Firebase no disponible');return;}
   _auth.sendPasswordResetEmail(em).then(()=>{
     const fp=document.getElementById('form-reset');
-    if(fp)fp.innerHTML=`<div style="text-align:center;padding:16px 0;"><div style="font-size:48px;">📧</div><div style="font-family:var(--fd);font-size:20px;color:var(--dark);margin:12px 0 8px;">¡Email enviado!</div><p style="font-size:13.5px;color:var(--muted);">Revisá tu bandeja de <strong>${em}</strong>.<br>También revisá spam.</p><button onclick="switchTab('l')" class="btn-auth" style="margin-top:16px;">← Volver al inicio</button></div>`;
+    if(fp)fp.innerHTML=`<div style="text-align:center;padding:16px 0;"><div style="font-size:48px;">📧</div><div style="font-family:var(--fd);font-size:20px;color:var(--dark);margin:12px 0 8px;">¡Email enviado!</div><p style="font-size:13.5px;color:var(--muted);">Revisá tu bandeja de <strong>${_escHtml(em)}</strong>.<br>También revisá spam.</p><button onclick="switchTab('l')" class="btn-auth" style="margin-top:16px;">← Volver al inicio</button></div>`;
   }).catch(err=>{
     const msg=err.code==='auth/user-not-found'?'No existe cuenta con ese email':'Error al enviar el email.';
     toast('❌ '+msg);
@@ -3668,8 +3647,9 @@ function hasEbook(ebookId){
 async function loadUserPurchases(){
   if(!_fbReady||!_db||!currentUser?.uid) return;
   try{
-    const ref=_db.collection('users').doc(currentUser.uid);
-    const doc=await ref.get();
+    const uid=currentUser.uid,ref=_db.collection('users').doc(uid);
+    const doc=await ref.get({source:'server'});
+    if(_auth?.currentUser?.uid!==uid||currentUser?.uid!==uid)return;
     const data=doc.exists?doc.data():{};
     // ── Ebooks comprados ──
     if(data.purchasedEbooks){
@@ -4389,6 +4369,11 @@ function admDelServiceImg(idx,ui){
 // que no se mezclen entre cuentas distintas en la misma computadora.
 // Los datos reales viven en la nube y se recuperan al iniciar sesión.
 function clearUserLocalData(){
+  _chatUnsub?.();_chatUnsub=null;activeChatRoom=null;_miraChat=Object.create(null);sT([]);
+  clearTimeout(noteSaveTimer);window._pendingNote=null;
+  for(const id of ['chat-messages','chat-rooms-list'])document.getElementById(id)?.replaceChildren();
+  for(const id of ['chat-input','notes-textarea']){const input=document.getElementById(id);if(input)input.value='';}
+  for(const id of [KT,'ms_chat'])localStorage.removeItem(id);
   const borrar=[];
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
